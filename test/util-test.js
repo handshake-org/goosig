@@ -7,16 +7,50 @@
 
 const assert = require('./util/assert');
 const random = require('bcrypto/lib/random');
+const BN = require('bcrypto/lib/bn.js');
 const testUtil = require('./util');
 const BigMath = require('../lib/bigmath');
 const util = require('../lib/util');
 const {HashPRNG} = require('../lib/prng');
-const {umod} = BigMath;
+const {umod, modPow, encode, decode} = BigMath;
+
+function modPowBN(x, y, m) {
+  x = new BN(encode(x));
+  y = new BN(encode(y));
+  m = new BN(encode(m));
+  return decode(x.toRed(BN.red(m)).redPow(y).fromRed().toArrayLike(Buffer));
+}
+
+function modSqrtBN(x, m) {
+  x = new BN(encode(x));
+  m = new BN(encode(m));
+  return decode(x.toRed(BN.red(m)).redSqrt().fromRed().toArrayLike(Buffer));
+}
 
 describe('Util', function() {
+  this.timeout(10000);
+
   const rand = new HashPRNG(random.randomBytes(32));
   const [p, q] = rand.sample(testUtil.primes_2048, 2);
   const n = p * q;
+
+  it('should compute sqrt', () => {
+    assert.strictEqual(util.isqrt(1024n).toString(), 32n.toString());
+    assert.strictEqual(util.isqrt(1025n).toString(), 32n.toString());
+    assert.strictEqual(util.dsqrt(1024), 32);
+    assert.strictEqual(util.dsqrt(1025), 32);
+  });
+
+  it('should compute mod_pow', () => {
+    const x = rand.getrandbits(768);
+    const y = rand.getrandbits(33);
+    const m = rand.getrandbits(1024);
+
+    for (let i = 0; i < 50; i++) {
+      assert.strictEqual(modPow(x, y, m).toString(),
+                         modPowBN(x, y, m).toString());
+    }
+  });
 
   it('should compute invert_modp (p)', () => {
     const r = rand.randrange(p);
@@ -42,7 +76,7 @@ describe('Util', function() {
     assert.strictEqual(ok1, true);
   });
 
-  it('should compute ext_euclid (2)', () => {
+  it('should compute ext_euclid', () => {
     const r1 = rand.getrandbits(256);
     const r2 = rand.getrandbits(256);
     const d_ = util.gcd(r1, r2);
@@ -69,11 +103,18 @@ describe('Util', function() {
     assert.strictEqual(ok, true);
   });
 
-  it('should compute sqrt_modp (p)', () => {
+  it('should compute sqrt_modp (p) (1)', () => {
     const r1 = umod(rand.randrange(p) ** 2n, p);
     const sqrtR1 = util.sqrt_modp(r1, p);
 
     assert.strictEqual(umod(sqrtR1 ** 2n, p).toString(), r1.toString());
+  });
+
+  it('should compute sqrt_modp (p) (2)', () => {
+    const r1 = umod(rand.randrange(p) ** 2n, p);
+    const sqrtR1 = util.sqrt_modp(r1, p);
+
+    assert.strictEqual(sqrtR1.toString(), modSqrtBN(r1, p).toString());
   });
 
   it('should compute sqrt_modp (n)', () => {
