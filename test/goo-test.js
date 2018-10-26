@@ -1,21 +1,25 @@
+/* eslint-env mocha */
+/* eslint prefer-arrow-callback: 'off' */
+/* eslint max-len: 'off' */
+/* eslint camelcase: "off" */
+
 'use strict';
 
-/* eslint camelcase: "off" */
-/* eslint max-len: "off" */
-
-const assert = require('bsert');
+const assert = require('./util/assert');
 const random = require('bcrypto/lib/random');
+const testUtil = require('./util');
 const BigMath = require('../lib/bigmath');
 const consts = require('../lib/consts');
 const ops = require('../lib/ops');
 const GooSigner = require('../lib/sign');
-const testUtil = require('../test/util');
 const util = require('../lib/util');
 const {HashPRNG} = require('../lib/prng');
 const GooVerifier = require('../lib/verify');
 const {bitLength} = BigMath;
 
-function main(nreps) {
+describe('Goo', function() {
+  this.timeout(10000);
+
   // reuse Gops throughout. Notice that you can reuse gops for different
   // Signer modulus as long as the *size* of the Signer's modulus is no
   // larger than the one the gops object was built for.
@@ -64,18 +68,11 @@ function main(nreps) {
     ['1024-bit BQF GoUO, 4096-bit Signer PK', gops_c1_4_p, gops_c1_v]
   ];
 
-  const pv_times = [];
-
-  for (let i = 0; i < 2 * pv_expts.length; i++)
-    pv_times.push([[], []]);
-
   const pv_plsts = [testUtil.primes_1024, testUtil.primes_2048];
   const rand = new HashPRNG(random.randomBytes(32));
 
-  const test_sign_verify = () => {
-    const res = new Array(pv_times.length);
-
-    for (const [idx, [msg, gops_p, gops_v]] of pv_expts.entries()) {
+  for (const [idx, [msg, gops_p, gops_v]] of pv_expts.entries()) {
+    it(`should sign and verify msg: "${msg}"`, () => {
       // random Signer modulus
       const [p, q] = rand.sample(pv_plsts[idx % 2], 2);
       const prv = new GooSigner(p, q, gops_p);
@@ -86,19 +83,20 @@ function main(nreps) {
       const s = prv.gops.rand_scalar();
       const C1 = prv.gops.reduce(prv.gops.powgh(p * q, s));
 
-      let start_time, stop_time;
-
       // generate the proof
-      start_time = Date.now();
       const [C2, t, sigma] = prv.sign(C1, s, msg);
-      stop_time = Date.now();
-      pv_times[idx][0].push(stop_time - start_time);
 
       // verify the proof
-      start_time = Date.now();
-      res[idx] = ver.verify([C1, C2, t], msg, sigma);
-      stop_time = Date.now();
-      pv_times[idx][1].push(stop_time - start_time);
+      const result = ver.verify([C1, C2, t], msg, sigma);
+
+      assert.strictEqual(result, true);
+    });
+
+    it(`should sign and verify msg (simple): "${msg}"`, () => {
+      // random Signer modulus
+      const [p, q] = rand.sample(pv_plsts[idx % 2], 2);
+      const prv = new GooSigner(p, q, gops_p);
+      const ver = new GooVerifier(gops_v);
 
       // run the 'simple' proof
       // commit to Signer modulus and encrypt s to PK
@@ -107,42 +105,12 @@ function main(nreps) {
       const C2_simple = prv.encrypt(s_simple);
 
       // generate the proof
-      start_time = Date.now();
       const sigma_simple = prv.sign_simple(C1_simple, C2_simple, msg);
-      stop_time = Date.now();
-      pv_times[idx + pv_expts.length][0].push(stop_time - start_time);
 
       // verify the proof
-      start_time = Date.now();
-      res[idx + pv_expts.length] = ver.verify_simple([C1_simple, C2_simple], msg, sigma_simple);
-      stop_time = Date.now();
-      pv_times[idx + pv_expts.length][1].push(stop_time - start_time);
-    }
+      const result = ver.verify_simple([C1_simple, C2_simple], msg, sigma_simple);
 
-    return res;
-  };
-
-  testUtil.run_all_tests(nreps, 'end-to-end', [
-    [
-      test_sign_verify,
-      'sign_and_verify,4x2,4x4,2x2,2x4,c2x2,c2x4,c1x2,c1x4,4x2_s,4x4_s,2x2_s,2x4_s,c2x2_s,c2x4_s,c1x2_s,c1x4_s'
-    ]
-  ]);
-
-  for (let [idx, [n]] of pv_expts.concat(pv_expts).entries()) {
-    if (idx >= pv_expts.length)
-      n = 'Simple ' + n;
-    testUtil.show_timing_pair(n, pv_times[idx]);
+      assert.strictEqual(result, true);
+    });
   }
-}
-
-{
-  let nr = 1;
-
-  for (let i = 2; i < process.argv.length; i++) {
-    if (/^\d+$/.test(process.argv[i]))
-      nr = process.argv[i] >>> 0;
-  }
-
-  main(nr);
-}
+});
