@@ -3,14 +3,12 @@
 /* eslint camelcase: "off" */
 /* eslint max-len: "off" */
 
-const assert = require('bsert');
 const random = require('bcrypto/lib/random');
 const BigMath = require('../lib/bigmath');
 const consts = require('../lib/consts');
 const ops = require('../lib/ops');
 const GooSigner = require('../lib/sign');
 const testUtil = require('../test/util');
-const util = require('../lib/util');
 const {HashPRNG} = require('../lib/prng');
 const GooVerifier = require('../lib/verify');
 const {bitLength} = BigMath;

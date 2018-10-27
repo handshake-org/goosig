@@ -4,7 +4,7 @@ rl=0
 
 if ! type perl > /dev/null 2>& 1; then
   if uname | grep -i 'darwin' > /dev/null; then
-    echo 'hsd requires perl to start on OSX.' >& 2
+    echo 'Requires perl to start on OSX.' >& 2
     exit 1
   fi
   rl=1

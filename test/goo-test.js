@@ -12,7 +12,6 @@ const BigMath = require('../lib/bigmath');
 const consts = require('../lib/consts');
 const ops = require('../lib/ops');
 const GooSigner = require('../lib/sign');
-const util = require('../lib/util');
 const {HashPRNG} = require('../lib/prng');
 const GooVerifier = require('../lib/verify');
 const {bitLength} = BigMath;
