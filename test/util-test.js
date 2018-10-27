@@ -21,11 +21,11 @@ function modPowBN(x, y, m) {
   return decode(x.toRed(BN.red(m)).redPow(y).fromRed().toArrayLike(Buffer));
 }
 
-function modSqrtBN(x, m) {
-  x = new BN(encode(x));
-  m = new BN(encode(m));
-  return decode(x.toRed(BN.red(m)).redSqrt().fromRed().toArrayLike(Buffer));
-}
+// function modSqrtBN(x, m) {
+//   x = new BN(encode(x));
+//   m = new BN(encode(m));
+//   return decode(x.toRed(BN.red(m)).redSqrt().fromRed().toArrayLike(Buffer));
+// }
 
 function modInverse(x, m) {
   x = new BN(encode(x));
@@ -118,12 +118,12 @@ describe('Util', function() {
     assert.strictEqual(umod(sqrtR1 ** 2n, p).toString(), r1.toString());
   });
 
-  it('should compute sqrt_modp (p) (2)', () => {
-    const r1 = umod(rand.randrange(p) ** 2n, p);
-    const sqrtR1 = util.sqrt_modp(r1, p);
-
-    assert.strictEqual(sqrtR1.toString(), modSqrtBN(r1, p).toString());
-  });
+  // it('should compute sqrt_modp (p) (2)', () => {
+  //   const r1 = umod(rand.randrange(p) ** 2n, p);
+  //   const sqrtR1 = util.sqrt_modp(r1, p);
+  //
+  //   assert.strictEqual(sqrtR1.toString(), modSqrtBN(r1, p).toString());
+  // });
 
   it('should compute sqrt_modp (n)', () => {
     const r2 = umod(rand.randrange(n) ** 2n, n);

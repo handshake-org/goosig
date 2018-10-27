@@ -12,6 +12,7 @@ const BigMath = require('../lib/bigmath');
 const consts = require('../lib/consts');
 const defs = require('../lib/defs');
 const ops = require('../lib/ops');
+const util = require('../lib/util');
 const {HashPRNG} = require('../lib/prng');
 const {umod, modPow} = BigMath;
 
@@ -128,20 +129,10 @@ describe('Group Ops', function() {
 
     const eInvs = t1.inv5(...eVals);
 
-    let tpass = true;
-
-    for (let i = 0; i < 5; i++) {
-      const e = eVals[i];
-      const eInv = eInvs[i];
-      const v = t1.reduce(umod(e * eInv, t1.n)) === 1n;
-
-      if (!v) {
-        tpass = false;
-        break;
-      }
+    for (const [e, eInv] of util.zip(eVals, eInvs)) {
+      const ok = t1.reduce(umod(e * eInv, t1.n)) === 1n;
+      assert.strictEqual(ok, true);
     }
-
-    assert.strictEqual(tpass, true);
   });
 
   it('should compute inv5 (t2)', () => {
@@ -155,19 +146,9 @@ describe('Group Ops', function() {
 
     const eInvs = t2.inv5(...eVals);
 
-    let tpass = true;
-
-    for (let i = 0; i < 5; i++) {
-      const e = eVals[i];
-      const eInv = eInvs[i];
-      const v = t2.reduce(umod(e * eInv, t2.n)) === 1n;
-
-      if (!v) {
-        tpass = false;
-        break;
-      }
+    for (const [e, eInv] of util.zip(eVals, eInvs)) {
+      const ok = t2.reduce(umod(e * eInv, t2.n)) === 1n;
+      assert.strictEqual(ok, true);
     }
-
-    assert.strictEqual(tpass, true);
   });
 });
