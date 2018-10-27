@@ -27,6 +27,12 @@ function modSqrtBN(x, m) {
   return decode(x.toRed(BN.red(m)).redSqrt().fromRed().toArrayLike(Buffer));
 }
 
+function modInverse(x, m) {
+  x = new BN(encode(x));
+  m = new BN(encode(m));
+  return new BN(x.invm(m).toArrayLike(Buffer));
+}
+
 describe('Util', function() {
   this.timeout(10000);
 
@@ -57,6 +63,7 @@ describe('Util', function() {
     const rInv = util.invert_modp(r, p);
 
     assert.strictEqual(umod(r * rInv - 1n, p).toString(), 0n.toString());
+    assert.strictEqual(rInv.toString(), modInverse(r, p).toString());
   });
 
   it('should compute invert_modp (n)', () => {
@@ -64,6 +71,7 @@ describe('Util', function() {
     const r2Inv = util.invert_modp(r2, n);
 
     assert.strictEqual(umod(r2 * r2Inv - 1n, n).toString(), 0n.toString());
+    assert.strictEqual(r2Inv.toString(), modInverse(r2, n).toString());
   });
 
   it('should compute gcd and ext_euclid', () => {
