@@ -3,13 +3,12 @@
 /* eslint camelcase: "off" */
 /* eslint max-len: "off" */
 
-const random = require('bcrypto/lib/random');
 const BigMath = require('../lib/bigmath');
 const consts = require('../lib/consts');
 const ops = require('../lib/ops');
 const GooSigner = require('../lib/sign');
 const testUtil = require('../test/util');
-const {HashPRNG} = require('../lib/prng');
+const util = require('../lib/util');
 const GooVerifier = require('../lib/verify');
 const {bitLength} = BigMath;
 
@@ -68,14 +67,13 @@ function main(nreps) {
     pv_times.push([[], []]);
 
   const pv_plsts = [testUtil.primes_1024, testUtil.primes_2048];
-  const rand = new HashPRNG(random.randomBytes(32));
 
   const test_sign_verify = () => {
     const res = new Array(pv_times.length);
 
     for (const [idx, [msg, gops_p, gops_v]] of pv_expts.entries()) {
       // random Signer modulus
-      const [p, q] = rand.sample(pv_plsts[idx % 2], 2);
+      const [p, q] = util.rand.sample(pv_plsts[idx % 2], 2);
       const prv = new GooSigner(p, q, gops_p);
       const ver = new GooVerifier(gops_v);
 
@@ -100,7 +98,7 @@ function main(nreps) {
 
       // run the 'simple' proof
       // commit to Signer modulus and encrypt s to PK
-      const s_simple = rand.getrandbits(bitLength(prv.n) - 1);
+      const s_simple = util.rand.getrandbits(bitLength(prv.n) - 1);
       const C1_simple = prv.gops.reduce(prv.gops.powgh(p * q, s_simple));
       const C2_simple = prv.encrypt(s_simple);
 
