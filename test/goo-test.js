@@ -7,13 +7,13 @@
 
 const assert = require('./util/assert');
 const testUtil = require('./util');
-const BigMath = require('../lib/bigmath');
 const consts = require('../lib/consts');
+const GooChallenger = require('../lib/challenge');
 const ops = require('../lib/ops');
 const GooSigner = require('../lib/sign');
 const util = require('../lib/util');
 const GooVerifier = require('../lib/verify');
-const {bitLength} = BigMath;
+const RSAKey = require('../lib/rsa');
 
 describe('Goo', function() {
   this.timeout(20000);
@@ -72,40 +72,19 @@ describe('Goo', function() {
     it(`should sign and verify msg: "${msg}"`, () => {
       // random Signer modulus
       const [p, q] = util.rand.sample(pv_plsts[idx % 2], 2);
-      const prv = new GooSigner(p, q, gops_p);
+      const rsakey = new RSAKey(p, q);
+      const gen = new GooChallenger(gops_p);
+      const prv = new GooSigner(rsakey, gops_p);
       const ver = new GooVerifier(gops_v);
 
-      // run the 'complex' proof
-      // commit to Signer modulus
-      const s = prv.gops.rand_scalar();
-      const C1 = prv.gops.reduce(prv.gops.powgh(p * q, s));
+      // generate the challenge token
+      const [C0, C1] = gen.create_challenge(rsakey);
 
       // generate the proof
-      const [C2, t, sigma] = prv.sign(C1, s, msg);
+      const [C2, t, sigma] = prv.sign(C0, C1, msg);
 
       // verify the proof
       const result = ver.verify([C1, C2, t], msg, sigma);
-
-      assert.strictEqual(result, true);
-    });
-
-    it(`should sign and verify msg (simple): "${msg}"`, () => {
-      // random Signer modulus
-      const [p, q] = util.rand.sample(pv_plsts[idx % 2], 2);
-      const prv = new GooSigner(p, q, gops_p);
-      const ver = new GooVerifier(gops_v);
-
-      // run the 'simple' proof
-      // commit to Signer modulus and encrypt s to PK
-      const s_simple = util.rand.getrandbits(bitLength(prv.n) - 1);
-      const C1_simple = prv.gops.reduce(prv.gops.powgh(p * q, s_simple));
-      const C2_simple = prv.encrypt(s_simple);
-
-      // generate the proof
-      const sigma_simple = prv.sign_simple(C1_simple, C2_simple, msg);
-
-      // verify the proof
-      const result = ver.verify_simple([C1_simple, C2_simple], msg, sigma_simple);
 
       assert.strictEqual(result, true);
     });

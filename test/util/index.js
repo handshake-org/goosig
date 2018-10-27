@@ -37,6 +37,10 @@ const testUtil = {
     this.flush();
   },
 
+  show_warning(warn) {
+    this.write(`\x1b[91mWARNING\x1b[0m: ${warn}\n`);
+  },
+
   show_progress(failed) {
     if (failed)
       this.write('\x1b[91m.\x1b[0m');
@@ -56,11 +60,12 @@ const testUtil = {
              mean, samp_dev, max(tvals), min(tvals));
   },
 
-  show_timing_pair(tname, pvvals) {
-    const [pvals, vvals] = pvvals;
+  show_timing_triple(tname, pvvals) {
+    const [gvals, pvals, vvals] = pvvals;
 
     this.show_test(`Timings for ${tname}`, 0);
     this.write('\n');
+    this.show_timing('Generation', gvals, 36);
     this.show_timing('Signing', pvals, 36);
     this.show_timing('Verifying', vvals, 36);
     this.write('\n');

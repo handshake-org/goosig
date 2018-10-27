@@ -4,12 +4,14 @@
 /* eslint max-len: "off" */
 
 const BigMath = require('../lib/bigmath');
+const GooChallenger = require('../lib/challenge');
 const consts = require('../lib/consts');
 const ops = require('../lib/ops');
 const GooSigner = require('../lib/sign');
 const testUtil = require('../test/util');
 const util = require('../lib/util');
 const GooVerifier = require('../lib/verify');
+const RSAKey = require('../lib/rsa');
 const {bitLength} = BigMath;
 
 function main(nreps) {
@@ -64,7 +66,7 @@ function main(nreps) {
   const pv_times = [];
 
   for (let i = 0; i < 2 * pv_expts.length; i++)
-    pv_times.push([[], []]);
+    pv_times.push([[], [], []]);
 
   const pv_plsts = [testUtil.primes_1024, testUtil.primes_2048];
 
@@ -74,45 +76,30 @@ function main(nreps) {
     for (const [idx, [msg, gops_p, gops_v]] of pv_expts.entries()) {
       // random Signer modulus
       const [p, q] = util.rand.sample(pv_plsts[idx % 2], 2);
-      const prv = new GooSigner(p, q, gops_p);
+      const rsakey = new RSAKey(p, q);
+      const gen = new GooChallenger(gops_p);
+      const prv = new GooSigner(rsakey, gops_p);
       const ver = new GooVerifier(gops_v);
-
-      // run the 'complex' proof
-      // commit to Signer modulus
-      const s = prv.gops.rand_scalar();
-      const C1 = prv.gops.reduce(prv.gops.powgh(p * q, s));
 
       let start_time, stop_time;
 
-      // generate the proof
+      // generate the challenge token
       start_time = Date.now();
-      const [C2, t, sigma] = prv.sign(C1, s, msg);
+      const [C0, C1] = gen.create_challenge(rsakey);
       stop_time = Date.now();
       pv_times[idx][0].push(stop_time - start_time);
 
-      // verify the proof
+      // generate the signature
       start_time = Date.now();
-      res[idx] = ver.verify([C1, C2, t], msg, sigma);
+      const [C2, t, sigma] = prv.sign(C0, C1, msg);
       stop_time = Date.now();
       pv_times[idx][1].push(stop_time - start_time);
 
-      // run the 'simple' proof
-      // commit to Signer modulus and encrypt s to PK
-      const s_simple = util.rand.getrandbits(bitLength(prv.n) - 1);
-      const C1_simple = prv.gops.reduce(prv.gops.powgh(p * q, s_simple));
-      const C2_simple = prv.encrypt(s_simple);
-
-      // generate the proof
+      // verify the signature
       start_time = Date.now();
-      const sigma_simple = prv.sign_simple(C1_simple, C2_simple, msg);
+      res[idx] = ver.verify([C1, C2, t], msg, sigma);
       stop_time = Date.now();
-      pv_times[idx + pv_expts.length][0].push(stop_time - start_time);
-
-      // verify the proof
-      start_time = Date.now();
-      res[idx + pv_expts.length] = ver.verify_simple([C1_simple, C2_simple], msg, sigma_simple);
-      stop_time = Date.now();
-      pv_times[idx + pv_expts.length][1].push(stop_time - start_time);
+      pv_times[idx][2].push(stop_time - start_time);
     }
 
     return res;
@@ -121,16 +108,13 @@ function main(nreps) {
   testUtil.run_all_tests(nreps, 'end-to-end', [
     [
       test_sign_verify,
-      // 'sign_and_verify,4x2,4x4,2x2,2x4,c2x2,c2x4,c1x2,c1x4,4x2_s,4x4_s,2x2_s,2x4_s,c2x2_s,c2x4_s,c1x2_s,c1x4_s'
-      'sign_and_verify,4x2,4x4,2x2,2x4,4x2_s,4x4_s,2x2_s,2x4_s'
+      // 'sign_and_verify,4x2,4x4,2x2,2x4,c2x2,c2x4,c1x2,c1x4'
+      'sign_and_verify,4x2,4x4,2x2,2x4'
     ]
   ]);
 
-  for (let [idx, [n]] of pv_expts.concat(pv_expts).entries()) {
-    if (idx >= pv_expts.length)
-      n = 'Simple ' + n;
-    testUtil.show_timing_pair(n, pv_times[idx]);
-  }
+  for (let [idx, [n]] of pv_expts.entries())
+    testUtil.show_timing_triple(n, pv_times[idx]);
 }
 
 {
