@@ -8,7 +8,7 @@ More or less a line-for-line port of [libGooPy][libgoopy]. Experimental.
 const goo = require('goosig');
 const group = new goo.ops.RSAGroupOps(goo.consts.Grsa2048, 2048);
 
-const key = new RSAKey(p, q); // get p and q from somewhere
+const key = new goo.RSAKey(p, q); // get p and q from somewhere
 const challenger = new goo.GooChallenger(group);
 const signer = new goo.GooSigner(key, group);
 const verifier = new goo.GooVerifier(group);
