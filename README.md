@@ -5,13 +5,13 @@ More or less a line-for-line port of [libGooPy][libgoopy]. Experimental.
 ## Usage
 
 ``` js
-const {ops, consts} = require('goosig');
-const group = new ops.RSAGroupOps(consts.Grsa2048, 2048);
+const goosig = require('goosig');
+const group = new goo.ops.RSAGroupOps(goo.consts.Grsa2048, 2048);
 
 const key = new RSAKey(p, q); // get p and q from somewhere
-const challenger = new GooChallenger(group);
-const signer = new GooSigner(key, group);
-const verifier = new GooVerifier(group);
+const challenger = new goo.GooChallenger(group);
+const signer = new goo.GooSigner(key, group);
+const verifier = new goo.GooVerifier(group);
 
 // Generate C0 and C1 based on user's pubkey.
 // Handshake contributors do this part.
