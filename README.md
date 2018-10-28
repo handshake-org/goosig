@@ -5,7 +5,7 @@ More or less a line-for-line port of [libGooPy][libgoopy]. Experimental.
 ## Usage
 
 ``` js
-const goosig = require('goosig');
+const goo = require('goosig');
 const group = new goo.ops.RSAGroupOps(goo.consts.Grsa2048, 2048);
 
 const key = new RSAKey(p, q); // get p and q from somewhere
