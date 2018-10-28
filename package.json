@@ -1,6 +1,7 @@
 {
   "name": "goosig",
   "version": "0.0.0",
+  "private": true,
   "description": "Group of unknown order signatures",
   "keywords": [
     "crypto",
@@ -16,7 +17,7 @@
   "main": "./lib/goosig.js",
   "scripts": {
     "install": "node-gyp rebuild || echo 'Build failed.'",
-    "lint": "eslint bench/ lib/ test/ || exit 0",
+    "lint": "./eslint-bigint || exit 0",
     "test": "BCRYPTO_TEST=1 mocha --reporter spec test/*-test.js",
     "test-file": "BCRYPTO_TEST=1 mocha --reporter spec"
   },
