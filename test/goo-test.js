@@ -60,7 +60,7 @@ describe('Goo', function() {
     ['4096-bit RSA GoUO, 4096-bit Signer PK', gops_4_4_p, gops_4_v],
     ['2048-bit RSA GoUO, 2048-bit Signer PK', gops_2_2_p, gops_2_v],
     ['2048-bit RSA GoUO, 4096-bit Signer PK', gops_2_4_p, gops_2_v],
-    ['2048-bit BQF GoUO, 2048-bit Signer PK', gops_c2_2_p, gops_c2_v]
+    ['2048-bit BQF GoUO, 2048-bit Signer PK', gops_c2_2_p, gops_c2_v],
     ['2048-bit BQF GoUO, 4096-bit Signer PK', gops_c2_4_p, gops_c2_v],
     ['1024-bit BQF GoUO, 2048-bit Signer PK', gops_c1_2_p, gops_c1_v],
     ['1024-bit BQF GoUO, 4096-bit Signer PK', gops_c1_4_p, gops_c1_v]

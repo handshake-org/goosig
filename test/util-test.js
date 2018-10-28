@@ -38,8 +38,8 @@ describe('Util', function() {
   const n = p * q;
 
   it('should compute sqrt', () => {
-    assert.strictEqual(util.isqrt(1024n).toString(), 32n.toString());
-    assert.strictEqual(util.isqrt(1025n).toString(), 32n.toString());
+    assert.strictEqual(util.isqrt(1024n).toString(), (32n).toString());
+    assert.strictEqual(util.isqrt(1025n).toString(), (32n).toString());
     assert.strictEqual(util.dsqrt(1024), 32);
     assert.strictEqual(util.dsqrt(1025), 32);
   });
@@ -59,7 +59,7 @@ describe('Util', function() {
     const r = util.rand.randrange(p);
     const rInv = util.invert_modp(r, p);
 
-    assert.strictEqual(umod(r * rInv - 1n, p).toString(), 0n.toString());
+    assert.strictEqual(umod(r * rInv - 1n, p).toString(), (0n).toString());
     assert.strictEqual(rInv.toString(), modInverse(r, p).toString());
   });
 
@@ -67,7 +67,7 @@ describe('Util', function() {
     const r2 = util.rand.randrange(n);
     const r2Inv = util.invert_modp(r2, n);
 
-    assert.strictEqual(umod(r2 * r2Inv - 1n, n).toString(), 0n.toString());
+    assert.strictEqual(umod(r2 * r2Inv - 1n, n).toString(), (0n).toString());
     assert.strictEqual(r2Inv.toString(), modInverse(r2, n).toString());
   });
 

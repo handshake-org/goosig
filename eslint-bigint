@@ -20,8 +20,11 @@ dir=$(dirname "$file")
 
 shopt -s nullglob
 
-for file in ${dir}/{bench,bin,lib,test}/*.js; do
+for file in ${dir}/{bench,bin,lib,test,test/util}/*.js; do
   cat "$file" \
+    | sed 's/0b\([0-1]\+\)n/0b\1/g' \
+    | sed 's/0o\([0-7]\+\)n/0o\1/g' \
+    | sed 's/0x\([0-9a-fA-F]\+\)n/0x\1/g' \
     | sed 's/\([0-9]\+\)n/\1/g' \
     | sed "s/'bigint'/'number'/g" \
     | sed "s/BigInt(/Number(/g" \

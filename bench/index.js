@@ -3,7 +3,6 @@
 /* eslint camelcase: "off" */
 /* eslint max-len: "off" */
 
-const BigMath = require('../lib/bigmath');
 const GooChallenger = require('../lib/challenge');
 const consts = require('../lib/consts');
 const ops = require('../lib/ops');
@@ -12,7 +11,6 @@ const testUtil = require('../test/util');
 const util = require('../lib/util');
 const GooVerifier = require('../lib/verify');
 const RSAKey = require('../lib/rsa');
-const {bitLength} = BigMath;
 
 function main(nreps) {
   // reuse Gops throughout. Notice that you can reuse gops for different
@@ -112,7 +110,7 @@ function main(nreps) {
     ]
   ]);
 
-  for (let [idx, [n]] of pv_expts.entries())
+  for (const [idx, [n]] of pv_expts.entries())
     testUtil.show_timing_triple(n, pv_times[idx]);
 }
 
