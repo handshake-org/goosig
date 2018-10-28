@@ -16,7 +16,7 @@ const GooVerifier = require('../lib/verify');
 const RSAKey = require('../lib/rsa');
 
 describe('Goo', function() {
-  this.timeout(20000);
+  this.timeout(60000);
 
   // reuse Gops throughout. Notice that you can reuse gops for different
   // Signer modulus as long as the *size* of the Signer's modulus is no
