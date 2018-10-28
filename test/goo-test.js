@@ -40,30 +40,30 @@ describe('Goo', function() {
 
   // 2048-bit BQF discriminant
   // 2048-bit BQF GoUO, 2048-bit Signer key
-  // const gops_c2_2_p = new ops.ClassGroupOps(consts.Ggoo2048, 2048);
+  const gops_c2_2_p = new ops.ClassGroupOps(consts.Ggoo2048, 2048);
   // 2048-bit BQF GoUO, 4096-bit Signer key
-  // const gops_c2_4_p = new ops.ClassGroupOps(consts.Ggoo2048, 4096);
+  const gops_c2_4_p = new ops.ClassGroupOps(consts.Ggoo2048, 4096);
   // 2048-bit BQF GoUO (verification)
-  // const gops_c2_v = new ops.ClassGroupOps(consts.Ggoo2048, null);
+  const gops_c2_v = new ops.ClassGroupOps(consts.Ggoo2048, null);
 
   // 1024-bit BQF discriminant
   // 1024-bit BQF GoUO, 2048-bit Signer key
-  // const gops_c1_2_p = new ops.ClassGroupOps(consts.Ggoo1024, 2048);
+  const gops_c1_2_p = new ops.ClassGroupOps(consts.Ggoo1024, 2048);
   // 1024-bit BQF GoUO, 2048-bit Signer key
-  // const gops_c1_4_p = new ops.ClassGroupOps(consts.Ggoo1024, 4096);
+  const gops_c1_4_p = new ops.ClassGroupOps(consts.Ggoo1024, 4096);
   // 1024-bit BQF GoUO, 4096-bit Signer key
-  // const gops_c1_v = new ops.ClassGroupOps(consts.Ggoo1024, null);
+  const gops_c1_v = new ops.ClassGroupOps(consts.Ggoo1024, null);
 
   // measure times
   const pv_expts = [
     ['4096-bit RSA GoUO, 2048-bit Signer PK', gops_4_2_p, gops_4_v],
     ['4096-bit RSA GoUO, 4096-bit Signer PK', gops_4_4_p, gops_4_v],
     ['2048-bit RSA GoUO, 2048-bit Signer PK', gops_2_2_p, gops_2_v],
-    ['2048-bit RSA GoUO, 4096-bit Signer PK', gops_2_4_p, gops_2_v]
-    // ['2048-bit BQF GoUO, 2048-bit Signer PK', gops_c2_2_p, gops_c2_v],
-    // ['2048-bit BQF GoUO, 4096-bit Signer PK', gops_c2_4_p, gops_c2_v],
-    // ['1024-bit BQF GoUO, 2048-bit Signer PK', gops_c1_2_p, gops_c1_v],
-    // ['1024-bit BQF GoUO, 4096-bit Signer PK', gops_c1_4_p, gops_c1_v]
+    ['2048-bit RSA GoUO, 4096-bit Signer PK', gops_2_4_p, gops_2_v],
+    ['2048-bit BQF GoUO, 2048-bit Signer PK', gops_c2_2_p, gops_c2_v]
+    ['2048-bit BQF GoUO, 4096-bit Signer PK', gops_c2_4_p, gops_c2_v],
+    ['1024-bit BQF GoUO, 2048-bit Signer PK', gops_c1_2_p, gops_c1_v],
+    ['1024-bit BQF GoUO, 4096-bit Signer PK', gops_c1_4_p, gops_c1_v]
   ];
 
   const pv_plsts = [testUtil.primes_1024, testUtil.primes_2048];
