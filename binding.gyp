@@ -6,8 +6,8 @@
   "targets": [{
     "target_name": "goosig",
     "sources": [
-      "./src/aead/aead.c",
-      "./src/whirlpool.cc"
+      "./src/goo/goo.c",
+      "./src/goosig.cc"
     ],
     "cflags": [
       "-Wall",
@@ -31,6 +31,9 @@
     ],
     "include_dirs": [
       "<!(node -e \"require('nan')\")"
+    ],
+    "libraries": [
+      "-lgmp"
     ],
     "variables": {
       "conditions": [
@@ -71,5 +74,5 @@
         ]
       }]
     ]
-  }
+  }]
 }
