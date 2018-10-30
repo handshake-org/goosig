@@ -67,32 +67,30 @@ static void
 goo_group_mul(goo_group_t *group, mpz_t ret, const mpz_t m1, const mpz_t m2);
 
 static void
-goo_prng_init(goo_prng_t *prng, unsigned char key[32]) {
+goo_prng_init(goo_prng_t *prng) {
   memset((void *)prng, 0x00, sizeof(goo_prng_t));
 
-  assert(sizeof(goo_pers) == 14);
-
-  unsigned char entropy[64 + sizeof(goo_pers) - 1];
-
-  memcpy(&entropy[0], &key[0], 32);
-  memset(&entropy[32], 0x00, 32);
-  memcpy(&entropy[64], &goo_pers[0], sizeof(goo_pers) - 1);
-
-  assert(sizeof(entropy) == 77);
-
-  goo_drbg_init(&prng->ctx, entropy, sizeof(entropy));
-
-  mpz_init_set_ui(prng->r_save, 0);
+  mpz_init(prng->r_save);
   mpz_init(prng->tmp);
-  mpz_init_set_ui(prng->m256, 2);
-  mpz_pow_ui(prng->m256, prng->m256, 256);
 }
 
 static void
 goo_prng_uninit(goo_prng_t *prng) {
   mpz_clear(prng->r_save);
   mpz_clear(prng->tmp);
-  mpz_clear(prng->m256);
+}
+
+static void
+goo_prng_seed(goo_prng_t *prng, unsigned char key[32]) {
+  unsigned char entropy[64 + sizeof(goo_pers) - 1];
+
+  memcpy(&entropy[0], &key[0], 32);
+  memset(&entropy[32], 0x00, 32);
+  memcpy(&entropy[64], &goo_pers[0], sizeof(goo_pers) - 1);
+
+  goo_drbg_init(&prng->ctx, entropy, sizeof(entropy));
+
+  mpz_set_ui(prng->r_save, 0);
 }
 
 static void
@@ -108,25 +106,29 @@ goo_prng_getrandbits(goo_prng_t *prng, mpz_t r, unsigned int nbits) {
   unsigned char out[32];
 
   while (b < nbits) {
-    mpz_mul(r, r, prng->m256);
+    mpz_mul_2exp(r, r, 256);
     goo_prng_nextrand(prng, &out[0]);
     goo_mpz_import(prng->tmp, &out[0], 32);
-    mpz_add(r, r, prng->tmp);
+    mpz_ior(r, r, prng->tmp);
     b += 256;
   }
 
   unsigned int left = b - nbits;
 
-  // this.r_save = r & ((1n << left) - 1n);
-  mpz_set_ui(prng->tmp, 2);
-  mpz_pow_ui(prng->tmp, prng->tmp, left);
+  if (left == 0) {
+    mpz_set_ui(prng->r_save, 0);
+    return;
+  }
+
+  // r_save = r & ((1 << left) - 1)
+  mpz_set_ui(prng->tmp, 1);
+  mpz_mul_2exp(prng->tmp, prng->tmp, left);
   mpz_sub_ui(prng->tmp, prng->tmp, 1);
   mpz_set(prng->r_save, r);
   mpz_and(prng->r_save, prng->r_save, prng->tmp);
 
   // r >>= left;
-  mpz_add_ui(prng->tmp, prng->tmp, 1);
-  mpz_fdiv_q(r, r, prng->tmp);
+  mpz_fdiv_q_2exp(r, r, left);
 }
 
 static void
@@ -287,6 +289,8 @@ goo_group_init(
   goo_comb_init(&group->g_comb, group, group->g);
   goo_comb_init(&group->h_comb, group, group->h);
 
+  goo_prng_init(&group->prng);
+
   return 1;
 }
 
@@ -350,6 +354,8 @@ goo_group_uninit(goo_group_t *group) {
 
   goo_comb_uninit(&group->g_comb);
   goo_comb_uninit(&group->h_comb);
+
+  goo_prng_uninit(&group->prng);
 }
 
 static void
@@ -449,6 +455,13 @@ goo_group_powgh(goo_group_t *group, mpz_t ret, const mpz_t e1, const mpz_t e2) {
   goo_comb_t *gcomb = &group->g_comb;
   goo_comb_t *hcomb = &group->h_comb;
 
+  size_t e1bits = goo_mpz_bitlen(e1);
+  size_t e2bits = goo_mpz_bitlen(e2);
+  size_t loge = e1bits > e2bits ? e1bits : e2bits;
+
+  if (loge > GOO_NBITS)
+    return 0;
+
   if (!goo_to_comb_exp(gcomb, e1))
     return 0;
 
@@ -521,7 +534,6 @@ goo_group_wnaf(goo_group_t *group, const mpz_t e, long *out, int bitlen) {
   for (int i = bitlen - 1; i >= 0; i--) {
     mpz_set_ui(group->val, 0);
 
-    // if (mpz_tstbit(group->r, 1)) {
     if (mpz_odd_p(group->r)) {
       mpz_set_ui(group->mask, (1 << w) - 1);
       mpz_and(group->val, group->r, group->mask);
@@ -584,7 +596,7 @@ goo_group_pow2(
   long *e1bits = goo_group_wnaf(group, e1, &group->e1bits[0], totlen);
   long *e2bits = goo_group_wnaf(group, e2, &group->e2bits[0], totlen);
 
-  mpz_init_set_ui(ret, 1); // XXX
+  mpz_set_ui(ret, 1);
 
   for (size_t i = 0; i < totlen; i++) {
     long w1 = e1bits[i];
@@ -634,8 +646,8 @@ goo_hash_item(
 ) {
   size_t len = 0;
 
-  assert(goo_mpz_bytesize(n) <= 768);
   goo_mpz_export(&buf[0], &len, n);
+
   assert(len <= 768);
 
   // Commit to sign.
@@ -664,13 +676,12 @@ goo_hash_all(
   const mpz_t D,
   const mpz_t msg
 ) {
+  unsigned char *size = &group->slab[0];
+  unsigned char *buf = &group->slab[2];
+
   goo_sha256_t ctx;
   goo_sha256_init(&ctx);
-  assert(sizeof(goo_prefix) == 10);
-  goo_sha256_update(&ctx, (const void *)goo_prefix, sizeof(goo_prefix) - 1);
-
-  unsigned char size[2];
-  unsigned char buf[768];
+  goo_sha256_update(&ctx, (void *)goo_prefix, sizeof(goo_prefix) - 1);
 
   goo_hash_item(&ctx, group->n, size, buf);
   goo_hash_item(&ctx, group->g, size, buf);
@@ -684,7 +695,7 @@ goo_hash_all(
   goo_hash_item(&ctx, D, size, buf);
   goo_hash_item(&ctx, msg, size, buf);
 
-  goo_sha256_final(&ctx, &out[0]);
+  goo_sha256_final(&ctx, out);
 }
 
 static void
@@ -705,11 +716,9 @@ goo_fs_chal(
 
   goo_hash_all(&key[0], group, C1, C2, t, A, B, C, D, msg);
 
-  goo_prng_t prng;
-  goo_prng_init(&prng, &key[0]);
-  goo_prng_getrandbits(&prng, chall_out, GOO_CHALBITS);
-  goo_prng_getrandbits(&prng, ell_r_out, GOO_CHALBITS);
-  goo_prng_uninit(&prng);
+  goo_prng_seed(&group->prng, &key[0]);
+  goo_prng_getrandbits(&group->prng, chall_out, GOO_CHALBITS);
+  goo_prng_getrandbits(&group->prng, ell_r_out, GOO_CHALBITS);
 }
 
 static int

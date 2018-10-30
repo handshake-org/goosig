@@ -36,8 +36,6 @@ typedef struct goo_prng_s {
   goo_drbg_t ctx;
   mpz_t r_save;
   mpz_t tmp;
-  mpz_t m256;
-  unsigned char state[64];
 } goo_prng_t;
 
 typedef struct goo_group_s {
@@ -104,6 +102,10 @@ typedef struct goo_group_s {
   mpz_t pctab_p2[GOO_TABLEN];
   long e1bits[GOO_EBITS_SIZE];
   long e2bits[GOO_EBITS_SIZE];
+
+  goo_prng_t prng;
+
+  unsigned char slab[1024];
 } goo_group_t;
 
 typedef struct goo_group_s goo_ctx_t;
