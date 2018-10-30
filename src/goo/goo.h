@@ -68,7 +68,7 @@ typedef struct goo_group_s {
   mpz_t B;
   mpz_t C;
   mpz_t D;
-  mpz_t zp_w2_m_an;
+  mpz_t z_w2_m_an;
   mpz_t tmp;
   mpz_t chal_out;
   mpz_t ell_r_out;
@@ -83,13 +83,13 @@ typedef struct goo_group_s {
   mpz_t Bq;
   mpz_t Cq;
   mpz_t Dq;
-  mpz_t zp_w;
-  mpz_t zp_w2;
-  mpz_t zp_s1;
-  mpz_t zp_a;
-  mpz_t zp_an;
-  mpz_t zp_s1w;
-  mpz_t zp_sa;
+  mpz_t z_w;
+  mpz_t z_w2;
+  mpz_t z_s1;
+  mpz_t z_a;
+  mpz_t z_an;
+  mpz_t z_s1w;
+  mpz_t z_sa;
 
   // combs
   goo_comb_t g_comb;
@@ -116,7 +116,8 @@ goo_init(
   const unsigned char *n,
   size_t n_len,
   unsigned long g,
-  unsigned long h
+  unsigned long h,
+  unsigned long modbits
 );
 
 void
@@ -124,11 +125,13 @@ goo_uninit(goo_ctx_t *ctx);
 
 int
 goo_verify(
-  goo_ctx_t *group,
+  goo_ctx_t *ctx,
   const unsigned char *msg,
   size_t msg_len,
-  const unsigned char *proof,
-  size_t proof_len
+  const unsigned char *sig,
+  size_t sig_len,
+  const unsigned char *C1,
+  size_t C1_len
 );
 
 #if defined(__cplusplus)

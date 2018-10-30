@@ -6,13 +6,13 @@
 
 #include "goo/goo.h"
 
-class GooVerifier : public Nan::ObjectWrap {
+class Goo : public Nan::ObjectWrap {
 public:
   static NAN_METHOD(New);
   static void Init(v8::Local<v8::Object> &target);
 
-  GooVerifier();
-  ~GooVerifier();
+  Goo();
+  ~Goo();
 
   goo_ctx_t ctx;
 

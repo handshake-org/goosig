@@ -218,7 +218,8 @@ goo_group_init(
   const unsigned char *n,
   size_t n_len,
   unsigned long g,
-  unsigned long h
+  unsigned long h,
+  unsigned long modbits
 ) {
   memset((void *)group, 0x00, sizeof(goo_group_t));
 
@@ -248,7 +249,7 @@ goo_group_init(
   mpz_init(group->B);
   mpz_init(group->C);
   mpz_init(group->D);
-  mpz_init(group->zp_w2_m_an);
+  mpz_init(group->z_w2_m_an);
   mpz_init(group->tmp);
   mpz_init(group->chal_out);
   mpz_init(group->ell_r_out);
@@ -263,13 +264,13 @@ goo_group_init(
   mpz_init(group->Bq);
   mpz_init(group->Cq);
   mpz_init(group->Dq);
-  mpz_init(group->zp_w);
-  mpz_init(group->zp_w2);
-  mpz_init(group->zp_s1);
-  mpz_init(group->zp_a);
-  mpz_init(group->zp_an);
-  mpz_init(group->zp_s1w);
-  mpz_init(group->zp_sa);
+  mpz_init(group->z_w);
+  mpz_init(group->z_w2);
+  mpz_init(group->z_s1);
+  mpz_init(group->z_a);
+  mpz_init(group->z_an);
+  mpz_init(group->z_s1w);
+  mpz_init(group->z_sa);
 
   for (int i = 0; i < GOO_TABLEN; i++) {
     mpz_init(group->pctab_p1[i]);
@@ -322,7 +323,7 @@ goo_group_uninit(goo_group_t *group) {
   mpz_clear(group->B);
   mpz_clear(group->C);
   mpz_clear(group->D);
-  mpz_clear(group->zp_w2_m_an);
+  mpz_clear(group->z_w2_m_an);
   mpz_clear(group->tmp);
   mpz_clear(group->chal_out);
   mpz_clear(group->ell_r_out);
@@ -337,13 +338,13 @@ goo_group_uninit(goo_group_t *group) {
   mpz_clear(group->Bq);
   mpz_clear(group->Cq);
   mpz_clear(group->Dq);
-  mpz_clear(group->zp_w);
-  mpz_clear(group->zp_w2);
-  mpz_clear(group->zp_s1);
-  mpz_clear(group->zp_a);
-  mpz_clear(group->zp_an);
-  mpz_clear(group->zp_s1w);
-  mpz_clear(group->zp_sa);
+  mpz_clear(group->z_w);
+  mpz_clear(group->z_w2);
+  mpz_clear(group->z_s1);
+  mpz_clear(group->z_a);
+  mpz_clear(group->z_an);
+  mpz_clear(group->z_s1w);
+  mpz_clear(group->z_sa);
 
   for (int i = 0; i < GOO_TABLEN; i++) {
     mpz_clear(group->pctab_p1[i]);
@@ -730,13 +731,13 @@ static int
 goo_group_verify(
   goo_group_t *group,
 
+  // msg
+  const mpz_t msg,
+
   // pubkey
   const mpz_t C1,
   const mpz_t C2,
   const mpz_t t,
-
-  // msg
-  const mpz_t msg,
 
   // sigma
   const mpz_t chal,
@@ -747,13 +748,13 @@ goo_group_verify(
   const mpz_t Dq,
 
   // z_prime
-  const mpz_t zp_w,
-  const mpz_t zp_w2,
-  const mpz_t zp_s1,
-  const mpz_t zp_a,
-  const mpz_t zp_an,
-  const mpz_t zp_s1w,
-  const mpz_t zp_sa
+  const mpz_t z_w,
+  const mpz_t z_w2,
+  const mpz_t z_s1,
+  const mpz_t z_a,
+  const mpz_t z_an,
+  const mpz_t z_s1w,
+  const mpz_t z_sa
 ) {
   mpz_t *C1_inv = &group->C1_inv;
   mpz_t *C2_inv = &group->C2_inv;
@@ -764,7 +765,7 @@ goo_group_verify(
   mpz_t *B = &group->B;
   mpz_t *C = &group->C;
   mpz_t *D = &group->D;
-  mpz_t *zp_w2_m_an = &group->zp_w2_m_an;
+  mpz_t *z_w2_m_an = &group->z_w2_m_an;
   mpz_t *tmp = &group->tmp;
   mpz_t *chal_out = &group->chal_out;
   mpz_t *ell_r_out = &group->ell_r_out;
@@ -801,29 +802,29 @@ goo_group_verify(
 
   // Step 1: reconstruct A, B, C, and D from signature.
   if (!goo_group_recon(group, *A, Aq, *Aq_inv, ell,
-                       *C2_inv, C2, chal, zp_w, zp_s1)) {
+                       *C2_inv, C2, chal, z_w, z_s1)) {
     return 0;
   }
 
   if (!goo_group_recon(group, *B, Bq, *Bq_inv, ell,
-                       *C2_inv, C2, zp_w, zp_w2, zp_s1w)) {
+                       *C2_inv, C2, z_w, z_w2, z_s1w)) {
     return 0;
   }
 
   if (!goo_group_recon(group, *C, Cq, *Cq_inv, ell,
-                       *C1_inv, C1, zp_a, zp_an, zp_sa)) {
+                       *C1_inv, C1, z_a, z_an, z_sa)) {
     return 0;
   }
 
-  // Make sure sign of (zp_w2 - zp_an) is positive.
-  mpz_sub(*zp_w2_m_an, zp_w2, zp_an);
+  // Make sure sign of (z_w2 - z_an) is positive.
+  mpz_sub(*z_w2_m_an, z_w2, z_an);
 
   mpz_mul(*D, Dq, ell);
-  mpz_add(*D, *D, *zp_w2_m_an);
+  mpz_add(*D, *D, *z_w2_m_an);
   mpz_mul(*tmp, t, chal);
   mpz_sub(*D, *D, *tmp);
 
-  if (mpz_cmp_ui(*zp_w2_m_an, 0) < 0)
+  if (mpz_cmp_ui(*z_w2_m_an, 0) < 0)
     mpz_add(*D, *D, ell);
 
   // Step 2: recompute implicitly claimed V message, viz., chal and ell.
@@ -855,12 +856,13 @@ goo_init(
   const unsigned char *n,
   size_t n_len,
   unsigned long g,
-  unsigned long h
+  unsigned long h,
+  unsigned long modbits
 ) {
   if (ctx == NULL || n == NULL)
     return 0;
 
-  return goo_group_init(ctx, n, n_len, g, h);
+  return goo_group_init(ctx, n, n_len, g, h, modbits);
 }
 
 void
@@ -870,27 +872,27 @@ goo_uninit(goo_ctx_t *ctx) {
 }
 
 #define goo_read_item(n) do {              \
-  if (p + 2 > proof_len)                   \
+  if (pos + 2 > sig_len)                   \
     return 0;                              \
                                            \
-  len = (proof[p + 1] * 0x100) | proof[p]; \
+  len = (sig[pos + 1] * 0x100) | sig[pos]; \
                                            \
   if (len > 768)                           \
     return 0;                              \
                                            \
-  p += 2;                                  \
+  pos += 2;                                \
                                            \
-  if (p + len > proof_len)                 \
+  if (pos + len > sig_len)                 \
     return 0;                              \
                                            \
-  goo_mpz_import((n), &proof[p], len);     \
-  p += len;                                \
+  goo_mpz_import((n), &sig[pos], len);     \
+  pos += len;                              \
 } while (0)                                \
 
 #define goo_read_final() do { \
-  assert(p <= proof_len);     \
+  assert(pos <= sig_len);     \
                               \
-  if (p != proof_len)         \
+  if (pos != sig_len)         \
     return 0;                 \
 } while (0)                   \
 
@@ -899,21 +901,26 @@ goo_verify(
   goo_ctx_t *ctx,
   const unsigned char *msg,
   size_t msg_len,
-  const unsigned char *proof,
-  size_t proof_len
+  const unsigned char *sig,
+  size_t sig_len,
+  const unsigned char *C1,
+  size_t C1_len
 ) {
-  if (ctx == NULL || msg == NULL || proof == NULL)
+  if (ctx == NULL || msg == NULL || sig == NULL || C1 == NULL)
     return 0;
 
-  // if (msg_len < 20 || msg_len > 128)
-  //   return 0;
+  if (msg_len > 768)
+    return 0;
+
+  if (C1_len > 768)
+    return 0;
 
   goo_mpz_import(ctx->msg, msg, msg_len);
+  goo_mpz_import(ctx->C1, C1, C1_len);
 
-  size_t p = 0;
+  size_t pos = 0;
   size_t len = 0;
 
-  goo_read_item(ctx->C1);
   goo_read_item(ctx->C2);
   goo_read_item(ctx->t);
 
@@ -924,26 +931,26 @@ goo_verify(
   goo_read_item(ctx->Cq);
   goo_read_item(ctx->Dq);
 
-  goo_read_item(ctx->zp_w);
-  goo_read_item(ctx->zp_w2);
-  goo_read_item(ctx->zp_s1);
-  goo_read_item(ctx->zp_a);
-  goo_read_item(ctx->zp_an);
-  goo_read_item(ctx->zp_s1w);
-  goo_read_item(ctx->zp_sa);
+  goo_read_item(ctx->z_w);
+  goo_read_item(ctx->z_w2);
+  goo_read_item(ctx->z_s1);
+  goo_read_item(ctx->z_a);
+  goo_read_item(ctx->z_an);
+  goo_read_item(ctx->z_s1w);
+  goo_read_item(ctx->z_sa);
 
   goo_read_final();
 
   return goo_group_verify(
     ctx,
 
+    // msg
+    ctx->msg,
+
     // pubkey
     ctx->C1,
     ctx->C2,
     ctx->t,
-
-    // msg
-    ctx->msg,
 
     // sigma
     ctx->chal,
@@ -954,12 +961,12 @@ goo_verify(
     ctx->Dq,
 
     // z_prime
-    ctx->zp_w,
-    ctx->zp_w2,
-    ctx->zp_s1,
-    ctx->zp_a,
-    ctx->zp_an,
-    ctx->zp_s1w,
-    ctx->zp_sa
+    ctx->z_w,
+    ctx->z_w2,
+    ctx->z_s1,
+    ctx->z_a,
+    ctx->z_an,
+    ctx->z_s1w,
+    ctx->z_sa
   );
 }

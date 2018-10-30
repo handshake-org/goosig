@@ -22,7 +22,7 @@ const key = testUtil.rsaKey(p, q);
 const [s_prime, C1] = gops_p.challenge(key);
 
 // Generate the proof.
-const sig = gops_v.sign(msg, s_prime, C1, key);
+const sig = gops_p.sign(msg, s_prime, C1, key);
 
 // Verify the proof.
 const result = gops_v.verify(msg, sig, C1);

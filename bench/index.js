@@ -58,7 +58,7 @@ function main(nreps) {
 
       // Generate the signature.
       start_time = Date.now();
-      const sig = gops_v.sign(msg, s_prime, C1, key);
+      const sig = gops_p.sign(msg, s_prime, C1, key);
       stop_time = Date.now();
       times[i][1].push(stop_time - start_time);
 
