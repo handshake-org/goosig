@@ -100,9 +100,9 @@ goo_prng_nextrand(goo_prng_t *prng, unsigned char out[32]) {
       break;
   }
 
-  SHA256_Init(&prng->ctx);
-  SHA256_Update(&prng->ctx, &prng->state[0], 64);
-  SHA256_Final(&out[0], &prng->ctx);
+  goo_sha256_init(&prng->ctx);
+  goo_sha256_update(&prng->ctx, &prng->state[0], 64);
+  goo_sha256_final(&prng->ctx, &out[0]);
 
   memcpy(&prng->state[32], &out[0], 32);
 }
@@ -634,7 +634,7 @@ goo_group_recon(
 
 static void
 goo_hash_item(
-  SHA256_CTX *ctx,
+  goo_sha256_t *ctx,
   const mpz_t n,
   unsigned char *size,
   unsigned char *buf
@@ -654,8 +654,8 @@ goo_hash_item(
 
   len &= ~0x8000;
 
-  SHA256_Update(ctx, size, 2);
-  SHA256_Update(ctx, buf, len);
+  goo_sha256_update(ctx, size, 2);
+  goo_sha256_update(ctx, buf, len);
 }
 
 static void
@@ -671,10 +671,10 @@ goo_hash_all(
   const mpz_t D,
   const mpz_t msg
 ) {
-  SHA256_CTX ctx;
-  SHA256_Init(&ctx);
+  goo_sha256_t ctx;
+  goo_sha256_init(&ctx);
   assert(sizeof(goo_prefix) == 10);
-  SHA256_Update(&ctx, (const void *)goo_prefix, sizeof(goo_prefix) - 1);
+  goo_sha256_update(&ctx, (const void *)goo_prefix, sizeof(goo_prefix) - 1);
 
   unsigned char size[2];
   unsigned char buf[768];
@@ -691,7 +691,7 @@ goo_hash_all(
   goo_hash_item(&ctx, D, size, buf);
   goo_hash_item(&ctx, msg, size, buf);
 
-  SHA256_Final(&out[0], &ctx);
+  goo_sha256_final(&ctx, &out[0]);
 }
 
 static void
