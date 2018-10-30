@@ -250,14 +250,14 @@ goo_group_init(
   mpz_init(group->D);
   mpz_init(group->zp_w2_m_an);
   mpz_init(group->tmp);
-  mpz_init(group->chall_out);
+  mpz_init(group->chal_out);
   mpz_init(group->ell_r_out);
   mpz_init(group->elldiff);
   mpz_init(group->C1);
   mpz_init(group->C2);
   mpz_init(group->t);
   mpz_init(group->msg);
-  mpz_init(group->chall);
+  mpz_init(group->chal);
   mpz_init(group->ell);
   mpz_init(group->Aq);
   mpz_init(group->Bq);
@@ -324,14 +324,14 @@ goo_group_uninit(goo_group_t *group) {
   mpz_clear(group->D);
   mpz_clear(group->zp_w2_m_an);
   mpz_clear(group->tmp);
-  mpz_clear(group->chall_out);
+  mpz_clear(group->chal_out);
   mpz_clear(group->ell_r_out);
   mpz_clear(group->elldiff);
   mpz_clear(group->C1);
   mpz_clear(group->C2);
   mpz_clear(group->t);
   mpz_clear(group->msg);
-  mpz_clear(group->chall);
+  mpz_clear(group->chal);
   mpz_clear(group->ell);
   mpz_clear(group->Aq);
   mpz_clear(group->Bq);
@@ -700,7 +700,7 @@ goo_hash_all(
 
 static void
 goo_fs_chal(
-  mpz_t chall_out,
+  mpz_t chal_out,
   mpz_t ell_r_out,
   goo_group_t *group,
   const mpz_t C1,
@@ -717,7 +717,7 @@ goo_fs_chal(
   goo_hash_all(&key[0], group, C1, C2, t, A, B, C, D, msg);
 
   goo_prng_seed(&group->prng, &key[0]);
-  goo_prng_getrandbits(&group->prng, chall_out, GOO_CHALBITS);
+  goo_prng_getrandbits(&group->prng, chal_out, GOO_CHALBITS);
   goo_prng_getrandbits(&group->prng, ell_r_out, GOO_CHALBITS);
 }
 
@@ -739,7 +739,7 @@ goo_group_verify(
   const mpz_t msg,
 
   // sigma
-  const mpz_t chall,
+  const mpz_t chal,
   const mpz_t ell,
   const mpz_t Aq,
   const mpz_t Bq,
@@ -766,7 +766,7 @@ goo_group_verify(
   mpz_t *D = &group->D;
   mpz_t *zp_w2_m_an = &group->zp_w2_m_an;
   mpz_t *tmp = &group->tmp;
-  mpz_t *chall_out = &group->chall_out;
+  mpz_t *chal_out = &group->chal_out;
   mpz_t *ell_r_out = &group->ell_r_out;
   mpz_t *elldiff = &group->elldiff;
 
@@ -801,7 +801,7 @@ goo_group_verify(
 
   // Step 1: reconstruct A, B, C, and D from signature.
   if (!goo_group_recon(group, *A, Aq, *Aq_inv, ell,
-                       *C2_inv, C2, chall, zp_w, zp_s1)) {
+                       *C2_inv, C2, chal, zp_w, zp_s1)) {
     return 0;
   }
 
@@ -820,14 +820,14 @@ goo_group_verify(
 
   mpz_mul(*D, Dq, ell);
   mpz_add(*D, *D, *zp_w2_m_an);
-  mpz_mul(*tmp, t, chall);
+  mpz_mul(*tmp, t, chal);
   mpz_sub(*D, *D, *tmp);
 
   if (mpz_cmp_ui(*zp_w2_m_an, 0) < 0)
     mpz_add(*D, *D, ell);
 
   // Step 2: recompute implicitly claimed V message, viz., chal and ell.
-  goo_fs_chal(*chall_out, *ell_r_out, group, C1, C2, t, *A, *B, *C, *D, msg);
+  goo_fs_chal(*chal_out, *ell_r_out, group, C1, C2, t, *A, *B, *C, *D, msg);
 
   // Final checks.
   // chal has to match
@@ -835,7 +835,7 @@ goo_group_verify(
   // AND ell is prime
   mpz_sub(*elldiff, ell, *ell_r_out);
 
-  if (mpz_cmp(chall, *chall_out) != 0
+  if (mpz_cmp(chal, *chal_out) != 0
       || mpz_cmp_ui(*elldiff, 0) < 0
       || mpz_cmp_ui(*elldiff, GOO_ELLDIFF_MAX) > 0
       || !goo_is_prime(ell)) {
@@ -917,7 +917,7 @@ goo_verify(
   goo_read_item(ctx->C2);
   goo_read_item(ctx->t);
 
-  goo_read_item(ctx->chall);
+  goo_read_item(ctx->chal);
   goo_read_item(ctx->ell);
   goo_read_item(ctx->Aq);
   goo_read_item(ctx->Bq);
@@ -946,7 +946,7 @@ goo_verify(
     ctx->msg,
 
     // sigma
-    ctx->chall,
+    ctx->chal,
     ctx->ell,
     ctx->Aq,
     ctx->Bq,

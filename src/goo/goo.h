@@ -70,14 +70,14 @@ typedef struct goo_group_s {
   mpz_t D;
   mpz_t zp_w2_m_an;
   mpz_t tmp;
-  mpz_t chall_out;
+  mpz_t chal_out;
   mpz_t ell_r_out;
   mpz_t elldiff;
   mpz_t C1;
   mpz_t C2;
   mpz_t t;
   mpz_t msg;
-  mpz_t chall;
+  mpz_t chal;
   mpz_t ell;
   mpz_t Aq;
   mpz_t Bq;
