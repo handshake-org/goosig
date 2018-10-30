@@ -292,7 +292,7 @@ const testUtil = {
     const [n, e, d] = this.rsaExponent(p, q);
     const key = new rsa.RSAPrivateKey(n, e, d, p, q);
 
-    rsa.privateKeyCompute(key);
+    // rsa.privateKeyCompute(key);
 
     return key;
   },
@@ -308,112 +308,112 @@ testUtil.primes1024 = [
     + 'b434bdcda3b6b2e15dc4827b85e75451a145a622735417c7b082a2b7'
     + '5c06dba4965194485569aa36f96ffd98c3435b7d0541f39c81e93dee'
     + '8d83e3755ca7254e4c7c1dc1c7acf55b236cef78b1cb9e38e52da045'
-    + 'c9d892f6731dcebda00f05427d4f3c97'  , 'hex'),
+    + 'c9d892f6731dcebda00f05427d4f3c97', 'hex'),
 
   Buffer.from(''
     + 'e3fef642f78b17f50e3688df6fc419f3355af8a5b50064ba7b0ff5aa'
     + 'e0950b87440a4009722fad7cae9a5ab9c21e94f6260f046bccd88b89'
     + '38e5bf7dc05b84a09758e74ce3a6b56e5d222a2271e84caaf6c1710a'
     + '4f57be711116bb630d3584590aa3665a02e70afa61a01ce010ccea87'
-    + 'a83e9ab6e3bf7011800a460b37c98ebd'  , 'hex'),
+    + 'a83e9ab6e3bf7011800a460b37c98ebd', 'hex'),
 
   Buffer.from(''
     + '4b3b1a1b700b2c5b85084fcb547cc93098e173e7552251e529cdf0b9'
     + '015e6fe914fd188e6c9fc499dc070db1ed5798fe7338ba980bcb19a0'
     + '9180d4025e70ad48636f49c746a3cb9186103f328f6c3f2c79114523'
     + '4c33e3212872fb9fcc1c033bba15c5b96c9622f8669b1597a6dbb935'
-    + 'f2e59e4dd998215ae25d9caae513d691'  , 'hex'),
+    + 'f2e59e4dd998215ae25d9caae513d691', 'hex'),
 
   Buffer.from(''
     + '2be29c388e64b2b650ebaa6a404efec3c2c4c485ab2538a6f71e34d0'
     + '9d3d6b4273020ccc0aed1781238fb90c2062f02f16f9fdde71a9eae6'
     + '6b7357dc7a624921090428a85fde35b13eb185bd314b75ede2fbdd4a'
     + 'c1a7620ed884914f9be6474085c395fa3c23a93404c5c113fffe0853'
-    + 'c82cad367d4b71e94bfe67ded1ddddd9'  , 'hex'),
+    + 'c82cad367d4b71e94bfe67ded1ddddd9', 'hex'),
 
   Buffer.from(''
     + '478941747c630424eeb355c82a533bf1b4d2baa801c7b2db3c1e83a7'
     + '1e02ba028f50a0a536717f3c58edd12c5fb036bbcc76a4a83ba19cd5'
     + '52c7f04436a2a4d5f888c3369f15c738a3565f66f18e54006c309520'
     + '97d3e26ec8feecf48987cbd81f7fb718d8c7af335931baf30db3d0c2'
-    + 'e1296e9002f91b66a7a2159ca90fc53d'  , 'hex'),
+    + 'e1296e9002f91b66a7a2159ca90fc53d', 'hex'),
 
   Buffer.from(''
     + 'ec6e068cbcd4edbe70abe9f09c8055a5feeaccc3c0f6a0d45f44d43c'
     + 'b9b4312c2c467f4d55b8d563f5f979d81f55ec7f229cb117d9070fc6'
     + '8c30712d2814be96c67959cbfd0cebdc4802a0788e79dd5d150887d4'
     + '4db5df2c0fbe183b64e7197cac8cb3759058f476a8aa161a02b8fdd9'
-    + '760bc6401809417f5ad7d2a2df4f224d'  , 'hex'),
+    + '760bc6401809417f5ad7d2a2df4f224d', 'hex'),
 
   Buffer.from(''
     + 'ab7f423ce6409f205dff95d329b91d7a3d22bf335de95dc86495376b'
     + 'e8f8ff25a68b410737bd5314e322a1d80ab304fd4350d4fc29653531'
     + '88f4034818bb56636948d61e46c0a05c672908265ae66a52e9b15cc7'
     + '639c10a43d8021df0a34f367559c8ff2410faddfa9a6efd1077cad08'
-    + 'f8d527f22a14e3f766bbb7a3b5d5d233'  , 'hex'),
+    + 'f8d527f22a14e3f766bbb7a3b5d5d233', 'hex'),
 
   Buffer.from(''
     + '9e720cdeee2b64a2a47746d4a7824fc086c71e7de6a69fc4bc798864'
     + '4a107900ce8d00d4559454cc40874cb0ea736ceaded0f9fc77c68501'
     + 'd113a5311e7bf3fc78ca14eb7fdaab10f6cce4db0bd22bb8b5790cc1'
     + '59184cff0d77b50a6c972fa5d61158fda17201bcb126ee33459b06ac'
-    + '7428f1b571087d9a9e833acbabd2de09'  , 'hex'),
+    + '7428f1b571087d9a9e833acbabd2de09', 'hex'),
 
   Buffer.from(''
     + '8db06ff30beba17fafef2f001ea6b9b7bd114b5ffcbfa4e990f0eb5e'
     + 'ee19b2aca0e3260fe550748940e8c1e9ea09f6fdd7f4e5fe326542e3'
     + '7b1280016679c2ede25ccc36bd769cb261ca3412de55a9fd76509222'
     + '5523fa7791b27b37271973d3ae2e003ea18337621fb83916b967860a'
-    + 'e943410f14ed9f1133a2b4ec79e2e2c3'  , 'hex'),
+    + 'e943410f14ed9f1133a2b4ec79e2e2c3', 'hex'),
 
   Buffer.from(''
     + '3326b19be59af3b0a81a0c3ca95d20623bfcf8722d44d6136cbdc364'
     + 'b7b0911addac7ab792438830e848f2fd7744d9c5201584764144af85'
     + '44cbcc95e3b571fe1ce07a83e020f5bb00a0e510f936f051bdf6b3e7'
     + '8d7b119c1ea3ef952698c7e2ea656d099eed8312e0037167286c9ea7'
-    + 'de855eadbe1e209781be0a1328662ff3'  , 'hex'),
+    + 'de855eadbe1e209781be0a1328662ff3', 'hex'),
 
   Buffer.from(''
     + '6df273ba88b3027aa916f764182c0f1669ef68c35d23d8c60a9a3a0f'
     + '22e0beb7e3ab8b710508eb02b5b2f5619686a47fb11ebc323801f1a0'
     + '1a3049d9e534ece87b87db43392ff31a9dc55cccaa98660731ea9a9d'
     + 'b1bb703214f1509e2a2fad86573335d760a8a3b0b9378d7857ae0435'
-    + '5f3f7a9f9a912ea17116e243e584e199'  , 'hex'),
+    + '5f3f7a9f9a912ea17116e243e584e199', 'hex'),
 
   Buffer.from(''
     + '1ddf1cb3f83ca0f32433ce65bd0d01bd10fa4bd956b906a6e7eda99c'
     + '65c3072c2f9ad7816dcb539b7ddc714d644254ca081c6e789ff8f427'
     + '243d238d885880da521a2ade6ab822b7b9f63a6a8804cefbc5bebb21'
     + '77619153d4804e751d3875e3879931477b8bfeff3fc052708907395a'
-    + '46abe8924f52ab8facfaf263ae15ab9d'  , 'hex'),
+    + '46abe8924f52ab8facfaf263ae15ab9d', 'hex'),
 
   Buffer.from(''
     + '5c44ac04e2b1a4176c55e4dda08f7e1063369eefd4c0eb8a3565133f'
     + 'a7d1d9124bd0b0cf775b269c55b27ceaaf81fba9c589853f5ce56928'
     + '87617678a5333cbf394d4732b04732b1f12a1beb95740f053d70940a'
     + '897c039a1bfdde71b998682915581195be4e12544c05dc8aff8420b6'
-    + '5e04aec5409e07667a306f1574a09bc3'  , 'hex'),
+    + '5e04aec5409e07667a306f1574a09bc3', 'hex'),
 
   Buffer.from(''
     + 'd0673042271520b54e285c471fcbc685bcf5e1067f1db117e67737d5'
     + '62c3bff0665816fec08cd34237f0d16116d8be430dfe235a2a9382f2'
     + '1bea13b20e82705bd796e4d57204384159b3d4b5ce7603325f49951f'
     + 'eaa61eaeff21fad59e992833102f2401e5bf89af06edcbe9c3b997ba'
-    + '2299402f85dab795883a25f32876bf49'  , 'hex'),
+    + '2299402f85dab795883a25f32876bf49', 'hex'),
 
   Buffer.from(''
     + '0f3c1f8f4f621b299b4e3b071568cb7a4f385ce7236d9839589a7900'
     + 'e56d642aeacc743582e4a4dddcce394bac83450ccca9df29ddef94a0'
     + '44e965bae0f15035a652a8578cf61382506a3e423b34e74f84f69dba'
     + '006e8a495e533ad29b7084b3200449ad7eb1b4725ab4900d6be7f799'
-    + 'd06814c8f229ece0990fa8af7ad5339b'  , 'hex'),
+    + 'd06814c8f229ece0990fa8af7ad5339b', 'hex'),
 
   Buffer.from(''
     + 'ce194d7e647744cbe9729b0c06e9b582998f8eef7a011c65d15ce002'
     + '7f9dfde6d1ac1d2a04f4bf5f128c24fc6193e550e567aac78995ca64'
     + '28bbe0cfe65fad04b402f682ee7d2c7a32826cb29042257f6d2f2a2e'
     + 'dbeeb2b322a27c725095da4d0412960944eb65f7416a8c5feb89e24b'
-    + '80f4422c2a2d8c0b67b2f160a1495573'  , 'hex')
+    + '80f4422c2a2d8c0b67b2f160a1495573', 'hex')
 ];
 
 testUtil.primes2048 = [
@@ -427,7 +427,7 @@ testUtil.primes2048 = [
     + 'c21ce8307320257fae148887af5412db2cece240044cd668c72c7219'
     + 'b2e6a32f5da0e0cd52ec9078e7ef521461f2fe5d83b240c412507961'
     + '0512976d1c3b65fcb0ad75133012e2c7329ce55177556f07bdabb271'
-    + '622466fb'  , 'hex'),
+    + '622466fb', 'hex'),
 
   Buffer.from(''
     + '842d18ae53b1e47aac1d2c7ff91ee656f669ce9676edc2689f39b2cd'
@@ -439,7 +439,7 @@ testUtil.primes2048 = [
     + '9b92ad5e82c5ceae9f9124f1b361e22503ad1ca0bad526a2eef833ad'
     + '84efc4203137b10704bab5ce6bb2eb58a2209ef738c44b7127655ed9'
     + '37c5a937ae6ac9beaace7ece9fb33ae60e980da73730a6144e38ca9a'
-    + '537fe02d'  , 'hex'),
+    + '537fe02d', 'hex'),
 
   Buffer.from(''
     + '725ae73d4e5cb87d3b674f019f98bd012b71e585a053d91833b7770f'
@@ -451,7 +451,7 @@ testUtil.primes2048 = [
     + '67539852fcc7adcdadc073dda3336d7c9912c1033f5c418a5fb74f06'
     + '4b91409570174dfdc34000a9da3dbbeb0fbf05c8025c72cdc99cf4ee'
     + '0a27ed0001b6b286140712115d4c836e7cbce248821ce9eb8cb9f487'
-    + '7d7fb7b5'  , 'hex'),
+    + '7d7fb7b5', 'hex'),
 
   Buffer.from(''
     + '91cb1a275081c430cbd7705459f3db2ea1b4763e9efaebde48ad4f2d'
@@ -463,7 +463,7 @@ testUtil.primes2048 = [
     + '1ecf615718bebfe184feb04ff1f4f882313ced7750017165c9f9bc81'
     + '5698ef269fc3ae0d621be4678490f9dacc8c8daae1a2ca60d98841f1'
     + '2e65befcd58796132d9d4debf73eadab889f32b74e6354fc20716090'
-    + 'c3daa507'  , 'hex'),
+    + 'c3daa507', 'hex'),
 
   Buffer.from(''
     + '29d393bed0ab37a0d913fcc4efbd756967f4a251b904f3f1d22dad4c'
@@ -475,7 +475,7 @@ testUtil.primes2048 = [
     + '6c7990377229194735d974531c113ec67e94878111294a9a5b8b8f41'
     + '6d10734e96324ff0722073336c2c552291f91fe638c621e4f5dbc957'
     + '33ed225e63dd73614d7da9e9521c4ba275a6d121d976b8e9f6501546'
-    + '53238621'  , 'hex'),
+    + '53238621', 'hex'),
 
   Buffer.from(''
     + 'b38edcaca984c3e2d6ee298d62e79c9f8d2fb54c30e92cf27565a7b3'
@@ -487,7 +487,7 @@ testUtil.primes2048 = [
     + 'a5a6f92c8ab5b29c471ef1d8c228dbd6a94c2e6811b862c45de4e6f1'
     + '3334c77ae5385c32f9670815a52b956d20e874cbe88a4f8444e5fe2d'
     + 'b694b74ca7bd09a09642b6edf7b211ee1dcf7b905afcdd77ffa77b96'
-    + '11df170f'  , 'hex'),
+    + '11df170f', 'hex'),
 
   Buffer.from(''
     + 'f87e97ef263c26829d7be5e52af624b50ac0172909f6411842dde7d8'
@@ -499,7 +499,7 @@ testUtil.primes2048 = [
     + 'f3a115b71e33f4c51ec1abd7ed86c34b9e70df854ab94893822e4af2'
     + 'ece2745f61758eba27a8ae6970d968baf37ce5554bee8eabd3aabc35'
     + 'f32f449baf04ad4695ee06dbc2cdfed22a15e5de163bcdf7ecfeecb9'
-    + 'd90f6d2d'  , 'hex'),
+    + 'd90f6d2d', 'hex'),
 
   Buffer.from(''
     + '4de02a4a9fb81c07d58edc57213b174cc8c8b171c36b4e0ba1e54378'
@@ -511,7 +511,7 @@ testUtil.primes2048 = [
     + '9353ff250b190b9122969a545986ebd27514d3fd9df8bd6280ecc4ad'
     + '0208e857f14be9671906fed5c3bd501606d2c062f13bc699654cab5d'
     + 'e0d23631bf895d0b6a6263aaf17dbb72baca4426cae93e0edce74bae'
-    + 'a329d7e1'  , 'hex'),
+    + 'a329d7e1', 'hex'),
 
   Buffer.from(''
     + '821c6fa123511e67a096681f3b5e5329c858d60877b63848df374ea6'
@@ -523,7 +523,7 @@ testUtil.primes2048 = [
     + '4ddd704771d5f54ea93f5c18e5237e382d4c32d2d3f5ad22ed673ce3'
     + 'b70bbe5168fe3d6b2316dd3aca4274d6c53886db2316c70bcaa9b931'
     + '819d10143428c3f3a6306b1254e2e792f2a5ae5eb8bd99c463ec8d68'
-    + 'b4290bcd'  , 'hex'),
+    + 'b4290bcd', 'hex'),
 
   Buffer.from(''
     + '606fc8d62d6698d2d5240ea841163f3aaf08647c8de3f439bf5796d9'
@@ -535,7 +535,7 @@ testUtil.primes2048 = [
     + '4db8b525ffc971d7ac13365a3c68fee48a6600f3811e9645ea9c6e97'
     + '79defccd9a4c12ff536addb8ffefc25666a30fe86208f760320a4040'
     + '34d48d887f75ed2034f2fd183c38c8592e34ff44b44ddb3c53e69af7'
-    + '0982cf07'  , 'hex'),
+    + '0982cf07', 'hex'),
 
   Buffer.from(''
     + '19a48e3e0400c3212490f076b661cff2518582dc55813fde8c44c020'
@@ -547,7 +547,7 @@ testUtil.primes2048 = [
     + 'ceca5338069d420ab77b03868bd374fb50ea77ef61a294bef16dbece'
     + 'e6983f83d069c96ac0c17bf3c80eebb57f8ddd4538ad1fa62ec1110f'
     + 'aa04199ffa94819da9ebb8262723762fe18e195a6518abc408f688f1'
-    + '12669cf1'  , 'hex'),
+    + '12669cf1', 'hex'),
 
   Buffer.from(''
     + 'bc850511e19ab100053a5a8e511d096bb840bf1157bb85188491e1d5'
@@ -559,7 +559,7 @@ testUtil.primes2048 = [
     + 'feb8ab6f299eda1b61e3911508a0e9412142dca880e675a16f18cdab'
     + '4f1d2a3e8f7335320666ca48f7b54c778b137f144859e89d476a17e7'
     + '94434dca2a7814ec46754db4b6179e0fa32e01a18fdff1b61cdccd18'
-    + '43365675'  , 'hex'),
+    + '43365675', 'hex'),
 
   Buffer.from(''
     + '211e072f71e44c8184c66756e62367d6fa43e51ff528d0b1afd0686e'
@@ -571,7 +571,7 @@ testUtil.primes2048 = [
     + 'd9449c8c0afe38b756133e9b2e1cacd2cb4f7069b022dd1fdf7bbb22'
     + '1ddb1897b00519203c98fc3334db1e0ec73d41bda9453b67e9550a65'
     + '01708fb256a833896ed899f3d0f5f93927e81447db4f7f399b6a0f1f'
-    + '2f35038f'  , 'hex'),
+    + '2f35038f', 'hex'),
 
   Buffer.from(''
     + '6aed5e7e77a0d5d6bb2ffd939e6fd62fe24f1f50bf7c768b73f151d5'
@@ -583,7 +583,7 @@ testUtil.primes2048 = [
     + '69fd17ac7ab0775ac37c8fb92df6176364dfad81f6c46801c2c857b2'
     + '04a449ed6de7217a063cfd5967bdae2ac87e75768aa93cbd60eb3821'
     + 'c183258f28a8e0c1dbe5a095ba25b74bf538d1fed2c4b564f2dd0403'
-    + '2f1d67f9'  , 'hex'),
+    + '2f1d67f9', 'hex'),
 
   Buffer.from(''
     + 'b8c9c5180615b5d1b2155626a88e48d67c69997165f2ee4e7af92c66'
@@ -595,7 +595,7 @@ testUtil.primes2048 = [
     + 'a17bd74a22c6f31a4867783c2e80fceb9a4a92815be4f27295a6aa60'
     + 'c617901aca2f051722da53833d7e5690a1112d33d6d89aaa1755390b'
     + '1d4370bc0350720bd6fb9e920fa24998cdc395419f4e266b2a2eeedf'
-    + '971fc7bb'  , 'hex'),
+    + '971fc7bb', 'hex'),
 
   Buffer.from(''
     + '3dc4959866d39bdff5c0012be4f53e3877267a8d8446e0e078de86d3'
@@ -607,7 +607,7 @@ testUtil.primes2048 = [
     + 'f03ec1425b5fb6a0748959b8f490a8272daa3c65649f26605a27795b'
     + '1fed5e0e061dd69c46065b1728a2a16ad335ee9fc076553a2fd3fe7b'
     + '978f1dd07a394dc0733c29a7600406aea354f2a588dde271f95a07d4'
-    + '8eb33883'  , 'hex')
+    + '8eb33883', 'hex')
 ];
 
 function sum(iter) {
