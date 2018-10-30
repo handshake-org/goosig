@@ -8,9 +8,6 @@
 #include "openssl/sha.h"
 #include "goo.h"
 
-#define goo_mpz_bytesize(n) \
-  (mpz_sizeinbase((n), 2) + 7) / 8
-
 #define goo_mpz_import(ret, data, len) \
   mpz_import((ret), (len), 1, sizeof((data)[0]), 0, 0, (data))
 
@@ -37,6 +34,9 @@ goo_mpz_bitlen(const mpz_t n) {
 
   return bits;
 }
+
+#define goo_mpz_bytesize(n) \
+  (goo_mpz_bitlen((n)) + 7) / 8
 
 static const char goo_prefix[] = "libGooPy:";
 static const char goo_pers[] = "libGooPy_prng";
@@ -182,7 +182,6 @@ goo_comb_uninit(goo_comb_t *comb) {
   for (int i = 0; i < GOO_COMB_ITEMS; i++)
     mpz_clear(comb->items[i]);
 }
-
 
 static int
 goo_to_comb_exp(goo_comb_t *comb, const mpz_t e) {
