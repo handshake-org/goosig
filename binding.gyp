@@ -6,7 +6,10 @@
   "targets": [{
     "target_name": "goosig",
     "sources": [
+      "./src/goo/drbg.c",
       "./src/goo/goo.c",
+      "./src/goo/hmac.c",
+      "./src/goo/random.c",
       "./src/goosig.cc"
     ],
     "cflags": [

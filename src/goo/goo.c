@@ -5,7 +5,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <gmp.h>
-#include "openssl/sha.h"
 #include "goo.h"
 
 #define goo_mpz_import(ret, data, len) \
@@ -71,18 +70,22 @@ static void
 goo_prng_init(goo_prng_t *prng, unsigned char key[32]) {
   memset((void *)prng, 0x00, sizeof(goo_prng_t));
 
+  assert(sizeof(goo_pers) == 14);
+
+  unsigned char entropy[64 + sizeof(goo_pers) - 1];
+
+  memcpy(&entropy[0], &key[0], 32);
+  memset(&entropy[32], 0x00, 32);
+  memcpy(&entropy[64], &goo_pers[0], sizeof(goo_pers) - 1);
+
+  assert(sizeof(entropy) == 77);
+
+  goo_drbg_init(&prng->ctx, entropy, sizeof(entropy));
+
   mpz_init_set_ui(prng->r_save, 0);
   mpz_init(prng->tmp);
   mpz_init_set_ui(prng->m256, 2);
   mpz_pow_ui(prng->m256, prng->m256, 256);
-
-  assert(sizeof(goo_pers) == 14);
-  memset(&prng->state[0], 0x00, 64);
-  memcpy(&prng->state[0], goo_pers, sizeof(goo_pers) - 1);
-  memcpy(&prng->state[32], &key[0], 32);
-
-  for (int i = 0; i < 32; i++)
-    prng->state[i] ^= key[i];
 }
 
 static void
@@ -94,17 +97,7 @@ goo_prng_uninit(goo_prng_t *prng) {
 
 static void
 goo_prng_nextrand(goo_prng_t *prng, unsigned char out[32]) {
-  for (int i = 0; i < 32; i++) {
-    prng->state[i] += 1;
-    if (prng->state[i] != 0)
-      break;
-  }
-
-  goo_sha256_init(&prng->ctx);
-  goo_sha256_update(&prng->ctx, &prng->state[0], 64);
-  goo_sha256_final(&prng->ctx, &out[0]);
-
-  memcpy(&prng->state[32], &out[0], 32);
+  goo_drbg_generate(&prng->ctx, &out[0], 32);
 }
 
 static void

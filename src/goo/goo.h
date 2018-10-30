@@ -5,7 +5,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <gmp.h>
-#include "sha256.h"
+#include "drbg.h"
 
 #if defined(__cplusplus)
 extern "C" {
@@ -33,7 +33,7 @@ typedef struct goo_comb_s {
 } goo_comb_t;
 
 typedef struct goo_prng_s {
-  goo_sha256_t ctx;
+  goo_drbg_t ctx;
   mpz_t r_save;
   mpz_t tmp;
   mpz_t m256;
