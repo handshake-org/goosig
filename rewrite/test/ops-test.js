@@ -5,18 +5,16 @@
 'use strict';
 
 const assert = require('./util/assert');
-const random = require('bcrypto/lib/random');
 const testUtil = require('./util');
 const BigMath = require('../lib/bigmath');
 const constants = require('../lib/constants');
 const Goo = require('../lib/goo');
-const PRNG = require('../lib/prng');
+const util = require('../lib/util');
 const {mod, modPow} = BigMath;
 
 describe('Group Ops', function() {
   this.timeout(10000);
 
-  const rng = new PRNG(random.randomBytes(32));
   const [p, q] = testUtil.sample(testUtil.primes1024, 2);
   const {n} = testUtil.rsaKey(p, q);
 
@@ -25,10 +23,10 @@ describe('Group Ops', function() {
 
   it('should compute pow2_wnaf (t1)', () => {
     const [b1, b2, e1, e2] = [
-      rng.randomBits(2048),
-      rng.randomBits(2048),
-      rng.randomBits(2048),
-      rng.randomBits(2048)
+      util.randomBits(2048),
+      util.randomBits(2048),
+      util.randomBits(2048),
+      util.randomBits(2048)
     ];
 
     const [b1Inv, b2Inv] = t1.inv2(b1, b2);
@@ -40,10 +38,10 @@ describe('Group Ops', function() {
 
   it('should compute pow2_wnaf (t2)', () => {
     const [b1, b2, e1, e2] = [
-      rng.randomBits(2048),
-      rng.randomBits(2048),
-      rng.randomBits(2048),
-      rng.randomBits(2048)
+      util.randomBits(2048),
+      util.randomBits(2048),
+      util.randomBits(2048),
+      util.randomBits(2048)
     ];
 
     const [b1Inv, b2Inv] = t2.inv2(b1, b2);
@@ -55,8 +53,8 @@ describe('Group Ops', function() {
 
   it('should compute powgh (t1)', () => {
     const [e1, e2] = [
-      rng.randomBits(2 * 2048 + constants.CHAL_BITS + 2 - 1), // XXX -1
-      rng.randomBits(2 * 2048 + constants.CHAL_BITS + 2 - 1) // XXX -1
+      util.randomBits(2 * 2048 + constants.CHAL_BITS + 2 - 1), // XXX -1
+      util.randomBits(2 * 2048 + constants.CHAL_BITS + 2 - 1) // XXX -1
     ];
 
     const out = mod(modPow(2n, e1, t1.n) * modPow(3n, e2, t1.n), t1.n);
@@ -67,8 +65,8 @@ describe('Group Ops', function() {
 
   it('should compute powgh (t2)', () => {
     const [e1, e2] = [
-      rng.randomBits(2 * 2048 + constants.CHAL_BITS + 2 - 1), // XXX -1
-      rng.randomBits(2 * 2048 + constants.CHAL_BITS + 2 - 1) // XXX -1
+      util.randomBits(2 * 2048 + constants.CHAL_BITS + 2 - 1), // XXX -1
+      util.randomBits(2 * 2048 + constants.CHAL_BITS + 2 - 1) // XXX -1
     ];
 
     const [e1_s, e2_s] = [
@@ -85,8 +83,8 @@ describe('Group Ops', function() {
 
   it('should compute inv2 (t1)', () => {
     const [e1, e2] = [
-      rng.randomBits(2048),
-      rng.randomBits(2048)
+      util.randomBits(2048),
+      util.randomBits(2048)
     ];
 
     const [e1Inv, e2Inv] = t1.inv2(e1, e2);
@@ -98,8 +96,8 @@ describe('Group Ops', function() {
 
   it('should compute inv2 (t2)', () => {
     const [e1, e2] = [
-      rng.randomBits(2048),
-      rng.randomBits(2048)
+      util.randomBits(2048),
+      util.randomBits(2048)
     ];
 
     const [e1_s, e2_s] = [
@@ -116,11 +114,11 @@ describe('Group Ops', function() {
 
   it('should compute inv5 (t1)', () => {
     const eVals = [
-      rng.randomBits(2048),
-      rng.randomBits(2048),
-      rng.randomBits(2048),
-      rng.randomBits(2048),
-      rng.randomBits(2048)
+      util.randomBits(2048),
+      util.randomBits(2048),
+      util.randomBits(2048),
+      util.randomBits(2048),
+      util.randomBits(2048)
     ];
 
     const eInvs = t1.inv5(...eVals);
@@ -133,11 +131,11 @@ describe('Group Ops', function() {
 
   it('should compute inv5 (t2)', () => {
     const eVals = [
-      rng.randomBits(2048),
-      rng.randomBits(2048),
-      rng.randomBits(2048),
-      rng.randomBits(2048),
-      rng.randomBits(2048)
+      util.randomBits(2048),
+      util.randomBits(2048),
+      util.randomBits(2048),
+      util.randomBits(2048),
+      util.randomBits(2048)
     ];
 
     const eInvs = t2.inv5(...eVals);

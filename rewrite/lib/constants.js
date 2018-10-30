@@ -1,5 +1,9 @@
 'use strict';
 
+/*
+ * Constants
+ */
+
 exports.AOL = Buffer.from(''
   + 'cc41451de93d4d10f68cb141c9e05ecb0db7bf4773d3f0554dddc60cfab1'
   + '66056acd78b4dc02db4e81f3d7a77c71bc7563a05de3070c48ec25c40320'

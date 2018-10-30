@@ -5,7 +5,6 @@
 const assert = require('bsert');
 const SHA256 = require('bcrypto/lib/sha256');
 const DRBG = require('bcrypto/lib/drbg');
-const rsa = require('bcrypto/lib/rsa');
 const BigMath = require('./bigmath');
 const constants = require('./constants');
 const primes = require('./primes');
@@ -34,7 +33,6 @@ class Goo {
     this.nh = this.n / 2n;
     this.g = BigInt(g);
     this.h = BigInt(h);
-
     this.randBits = util.clog2(this.n) - 1;
     this.e1bits = new Int32Array(constants.EXPONENT_SIZE * 2 + 2);
     this.e2bits = new Int32Array(constants.EXPONENT_SIZE * 2 + 2);
@@ -383,7 +381,7 @@ class Goo {
 
   veil(msg, key) {
     assert(Buffer.isBuffer(msg));
-    assert(key instanceof rsa.RSAKey);
+    assert(key && typeof key === 'object');
 
     const C0_pre = BigMath.decode(msg);
     const n = BigMath.decode(key.n);
@@ -411,7 +409,7 @@ class Goo {
 
   unveil(msg, key) {
     assert(Buffer.isBuffer(msg));
-    assert(key instanceof rsa.RSAKey);
+    assert(key && typeof key === 'object');
 
     const C0 = BigMath.decode(msg);
     const n = BigMath.decode(key.n);
@@ -421,7 +419,7 @@ class Goo {
   }
 
   challenge(key) {
-    assert(key instanceof rsa.RSAKey);
+    assert(key && typeof key === 'object');
 
     const n = BigMath.decode(key.n);
     const s_prime = util.randomBits(256);
@@ -439,7 +437,7 @@ class Goo {
     assert(Buffer.isBuffer(msg));
     assert(Buffer.isBuffer(s_prime));
     assert(Buffer.isBuffer(C1));
-    assert(key instanceof rsa.RSAPrivateKey);
+    assert(key && typeof key === 'object');
 
     return this._sign(BigMath.decode(msg),
                       BigMath.decode(s_prime),
@@ -645,8 +643,10 @@ class Goo {
   toJSON() {
     return {
       n: BigMath.encodeHex(this.n),
+      nh: BigMath.encodeHex(this.nh),
       g: Number(this.g),
       h: Number(this.h),
+      randBits: this.randBits,
       combs: this.combs.map((combs) => {
         return combs.map(comb => comb.toJSON());
       })
@@ -689,7 +689,8 @@ class Comb {
     this.ebits = new Uint8Array(0);
     this.wins = [];
 
-    this.init(goo, base, spec);
+    if (goo != null)
+      this.init(goo, base, spec);
   }
 
   init(goo, base, spec) {
@@ -804,6 +805,30 @@ class Comb {
     };
   }
 
+  fromJSON(json) {
+    assert(json && typeof json === 'object');
+    assert((json.pointsPerAdd >>> 0) === json.pointsPerAdd);
+    assert((json.addsPerShift >>> 0) === json.addsPerShift);
+    assert((json.shifts >>> 0) === json.shifts);
+    assert((json.bitsPerWindow >>> 0) === json.bitsPerWindow);
+    assert((json.bits >>> 0) === json.bits);
+    assert((json.pointsPerSubcomb >>> 0) === json.pointsPerSubcomb);
+    assert((json.size >>> 0) === json.size);
+    assert(Array.isArray(json.items));
+
+    this.pointsPerAdd = json.pointsPerAdd;
+    this.addsPerShift = json.addsPerShift;
+    this.shifts = json.shifts;
+    this.bitsPerWindow = json.bitsPerWindow;
+    this.bits = json.bits;
+    this.pointsPerSubcomb = json.pointsPerSubcomb;
+
+    for (const item of json.items)
+      this.items.push(BigMath.decodeHex(item));
+
+    return this;
+  }
+
   static generate(bits, maxSize) {
     assert((bits >>> 0) === bits);
     assert((maxSize >>> 0) === maxSize);
@@ -873,6 +898,10 @@ class Comb {
       throw new Error('Could not calculate comb.');
 
     return ret;
+  }
+
+  static fromJSON(json) {
+    return new this().fromJSON(json);
   }
 }
 

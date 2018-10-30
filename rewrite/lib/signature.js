@@ -6,6 +6,10 @@ const assert = require('assert');
 const bio = require('bufio');
 const BigMath = require('./bigmath');
 
+/*
+ * Signature
+ */
+
 class Signature extends bio.Struct {
   constructor(options) {
     super();
@@ -215,5 +219,9 @@ function readInt(br) {
 
   return BigMath.readBR(br, size);
 }
+
+/*
+ * Expose
+ */
 
 module.exports = Signature;
