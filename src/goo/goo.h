@@ -2,7 +2,11 @@
 #define _GOOSIG_H
 
 #include <stdlib.h>
+#ifdef GOO_HAS_GMP
 #include <gmp.h>
+#else
+#include "mini-gmp.h"
+#endif
 
 #include "drbg.h"
 

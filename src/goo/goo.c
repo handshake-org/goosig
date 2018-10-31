@@ -1,8 +1,6 @@
 #include <assert.h>
 #include <string.h>
 #include <stdlib.h>
-#include <stdio.h>
-#include <gmp.h>
 
 #include "goo.h"
 #include "random.h"
@@ -1285,6 +1283,54 @@ goo_sig_uninit(goo_sig_t *sig) {
   mpz_clear(sig->z_sa);
 }
 
+#ifdef GOO_HAS_GMP
+#define goo_mpz_jacobi mpz_jacobi
+#else
+static int
+goo_mpz_jacobi(const mpz_t a, const mpz_t b) {
+  if (mpz_cmp_ui(b, 0) <= 0 || mpz_even_p(b))
+    return 0;
+
+  mpz_t x, y;
+
+  mpz_init(x);
+  mpz_init(y);
+
+  mpz_mod(x, a, b);
+  mpz_set(y, b);
+
+  int negate = 0;
+  unsigned long r;
+
+  while (mpz_cmp_ui(x, 0) != 0) {
+    while (mpz_even_p(x)) {
+      mpz_fdiv_q_ui(x, x, 2);
+      r = mpz_mod_ui(NULL, y, 8);
+      if (r == 3 || r == 5)
+        negate ^= 1;
+    }
+
+    if (mpz_mod_ui(NULL, x, 4) == 3
+        && mpz_mod_ui(NULL, y, 4) == 3) {
+      negate ^= 1;
+    }
+
+    mpz_swap(x, y);
+    mpz_mod(x, x, y);
+  }
+
+  r = mpz_cmp_ui(y, 1);
+
+  mpz_clear(x);
+  mpz_clear(y);
+
+  if (r == 0)
+    return negate ? -1 : 1;
+
+  return 0;
+}
+#endif
+
 static void
 goo_factor_twos(mpz_t d, unsigned long *s, const mpz_t n) {
   mpz_set(d, n);
@@ -1301,9 +1347,17 @@ goo_mod_sqrtp(mpz_t ret, const mpz_t n, const mpz_t p) {
   if (mpz_cmp_ui(p, 0) < 0)
     return 0;
 
+  int r = 0;
   unsigned long s;
-  mpz_t nn, t, Q, w, y, q, y_save;
-  mpz_inits(nn, t, Q, w, y, q, y_save, NULL);
+
+  mpz_t nn, t, Q, w, y, q, ys;
+  mpz_init(nn);
+  mpz_init(t);
+  mpz_init(Q);
+  mpz_init(w);
+  mpz_init(y);
+  mpz_init(q);
+  mpz_init(ys);
 
   mpz_set(nn, n);
   mpz_mod(nn, nn, p);
@@ -1313,7 +1367,7 @@ goo_mod_sqrtp(mpz_t ret, const mpz_t n, const mpz_t p) {
     goto succeed;
   }
 
-  if (mpz_jacobi(nn, p) == -1)
+  if (goo_mpz_jacobi(nn, p) == -1)
     goto fail;
 
   mpz_mod_ui(t, p, 4);
@@ -1335,7 +1389,7 @@ goo_mod_sqrtp(mpz_t ret, const mpz_t n, const mpz_t p) {
   // Find a non-residue mod p.
   mpz_set_ui(w, 2);
 
-  while (mpz_jacobi(w, p) != -1)
+  while (goo_mpz_jacobi(w, p) != -1)
     mpz_add_ui(w, w, 1);
 
   mpz_powm(w, w, Q, p);
@@ -1349,7 +1403,7 @@ goo_mod_sqrtp(mpz_t ret, const mpz_t n, const mpz_t p) {
   for (;;) {
     unsigned long i = 0;
 
-    mpz_set(y_save, y);
+    mpz_set(ys, y);
 
     while (i < s && mpz_cmp_ui(y, 1) != 0) {
       mpz_powm_ui(y, y, 2, p);
@@ -1373,7 +1427,7 @@ goo_mod_sqrtp(mpz_t ret, const mpz_t n, const mpz_t p) {
 
     mpz_powm_ui(w, w, 2, p);
 
-    mpz_set(y, y_save);
+    mpz_set(y, ys);
     mpz_mul(y, y, w);
     mpz_mod(y, y, p);
   }
@@ -1393,46 +1447,62 @@ goo_mod_sqrtp(mpz_t ret, const mpz_t n, const mpz_t p) {
   mpz_set(ret, q);
 
 succeed:
-  mpz_clears(nn, t, Q, w, y, q, y_save, NULL);
-  return 1;
+  r = 1;
 fail:
-  mpz_clears(nn, t, Q, w, y, q, y_save, NULL);
-  return 0;
+  mpz_clear(nn);
+  mpz_clear(t);
+  mpz_clear(Q);
+  mpz_clear(w);
+  mpz_clear(y);
+  mpz_clear(q);
+  mpz_clear(ys);
+  return r;
 }
 
 static int
 goo_mod_sqrtn(mpz_t ret, const mpz_t x, const mpz_t p, const mpz_t q) {
-  mpz_t sqrt_p, sqrt_q, mp, mq, xx, xy;
-  mpz_inits(sqrt_p, sqrt_q, mp, mq, xx, xy, NULL);
+  int r = 0;
+  mpz_t sp, sq, mp, mq, xx, yy;
 
-  if (!goo_mod_sqrtp(sqrt_p, x, p)
-      || !goo_mod_sqrtp(sqrt_q, x, q)) {
+  mpz_init(sp);
+  mpz_init(sq);
+  mpz_init(mp);
+  mpz_init(mq);
+  mpz_init(xx);
+  mpz_init(yy);
+
+  if (!goo_mod_sqrtp(sp, x, p)
+      || !goo_mod_sqrtp(sq, x, q)) {
     goto fail;
   }
 
   mpz_gcdext(ret, mp, mq, p, q);
 
-  mpz_set(xx, sqrt_q);
+  mpz_set(xx, sq);
   mpz_mul(xx, xx, mp);
   mpz_mul(xx, xx, p);
 
-  mpz_set(xy, sqrt_p);
-  mpz_mul(xy, xy, mq);
-  mpz_mul(xy, xy, q);
+  mpz_set(yy, sp);
+  mpz_mul(yy, yy, mq);
+  mpz_mul(yy, yy, q);
 
-  mpz_add(xx, xx, xy);
+  mpz_add(xx, xx, yy);
 
-  mpz_set(xy, p);
-  mpz_mul(xy, xy, q);
+  mpz_set(yy, p);
+  mpz_mul(yy, yy, q);
 
-  mpz_mod(ret, xx, xy);
+  mpz_mod(ret, xx, yy);
 
-  mpz_clears(sqrt_p, sqrt_q, mp, mq, xx, xy, NULL);
-  return 1;
+  r = 1;
 
 fail:
-  mpz_clears(sqrt_p, sqrt_q, mp, mq, xx, xy, NULL);
-  return 0;
+  mpz_clear(sp);
+  mpz_clear(sq);
+  mpz_clear(mp);
+  mpz_clear(mq);
+  mpz_clear(xx);
+  mpz_clear(yy);
+  return r;
 }
 
 static int
@@ -1808,6 +1878,8 @@ goo_challenge(
   const unsigned char *n,
   size_t n_len
 ) {
+  int r = 0;
+
   if (ctx == NULL
       || s_prime == NULL
       || s_prime_len == NULL
@@ -1821,7 +1893,8 @@ goo_challenge(
     return 0;
 
   mpz_t nn, spn;
-  mpz_inits(nn, spn, NULL);
+  mpz_init(nn);
+  mpz_init(spn);
 
   goo_mpz_import(nn, n, n_len);
 
@@ -1839,11 +1912,11 @@ goo_challenge(
   if (*s_prime == NULL || *C1 == NULL)
     goto fail;
 
-  mpz_clears(nn, spn, NULL);
-  return 1;
+  r = 1;
 fail:
-  mpz_clears(nn, spn, NULL);
-  return 0;
+  mpz_clear(nn);
+  mpz_clear(spn);
+  return r;
 }
 
 int
@@ -1864,6 +1937,8 @@ goo_sign(
   const unsigned char *q,
   size_t q_len
 ) {
+  int r = 0;
+
   if (ctx == NULL
       || out == NULL
       || out_len == NULL
@@ -1886,7 +1961,11 @@ goo_sign(
   }
 
   mpz_t spn, nn, pn, qn;
-  mpz_inits(spn, nn, pn, qn, NULL);
+
+  mpz_init(spn);
+  mpz_init(nn);
+  mpz_init(pn);
+  mpz_init(qn);
 
   goo_mpz_import(ctx->msg, msg, msg_len);
   goo_mpz_import(spn, s_prime, s_prime_len);
@@ -1951,14 +2030,14 @@ goo_sign(
   *out = data;
   *out_len = len;
 
-  goo_sig_uninit(&sig);
-  mpz_clears(spn, nn, pn, qn, NULL);
-
-  return 1;
+  r = 1;
 fail:
   goo_sig_uninit(&sig);
-  mpz_clears(spn, nn, pn, qn, NULL);
-  return 0;
+  mpz_clear(spn);
+  mpz_clear(nn);
+  mpz_clear(pn);
+  mpz_clear(qn);
+  return r;
 }
 
 int

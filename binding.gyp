@@ -1,6 +1,6 @@
 {
   "variables": {
-    "bcrypto_byteorder%":
+    "goo_byteorder%":
       "<!(python -c 'from __future__ import print_function; import sys; print(sys.byteorder)')",
   },
   "targets": [{
@@ -51,17 +51,31 @@
               "openssl_root%": "C:/OpenSSL-Win64"
             }]
           ]
+        }],
+        ["OS=='win'", {
+          "with_gmp%": "false"
+        }, {
+          "with_gmp%": "<!(utils/has_lib.sh gmpxx && utils/has_lib.sh gmp)"
         }]
       ]
     },
     "conditions": [
-      ["bcrypto_byteorder=='little'", {
+      ["goo_byteorder=='little'", {
         "defines": [
-          "BCRYPTO_LITTLE_ENDIAN"
+          "GOO_LITTLE_ENDIAN"
         ]
       }, {
         "defines": [
-          "BCRYPTO_BIG_ENDIAN"
+          "GOO_BIG_ENDIAN"
+        ]
+      }],
+      ["with_gmp=='false'", {
+        "sources": [
+          "./src/goo/mini-gmp.c"
+        ]
+      }, {
+        "defines": [
+          "GOO_HAS_GMP"
         ]
       }],
       ["OS=='win'", {
