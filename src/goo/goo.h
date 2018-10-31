@@ -51,6 +51,11 @@ typedef struct goo_comb_s {
   mpz_t *items;
 } goo_comb_t;
 
+typedef struct goo_comb_item_s {
+  goo_comb_t g;
+  goo_comb_t h;
+} goo_comb_item_t;
+
 typedef struct goo_prng_s {
   goo_drbg_t ctx;
   mpz_t save;
@@ -66,10 +71,8 @@ typedef struct goo_group_s {
   size_t rand_bits;
 
   // combs
-  goo_comb_t g_comb1;
-  goo_comb_t h_comb1;
-  goo_comb_t g_comb2;
-  goo_comb_t h_comb2;
+  size_t combs_len;
+  goo_comb_item_t combs[2];
 
   // wnaf
   mpz_t pctab_p1[GOO_TABLEN];

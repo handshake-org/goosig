@@ -360,7 +360,6 @@ goo_comb_init(
 
   long skip = (1 << spec->points_per_add) - 1;
 
-  comb->exists = 1;
   comb->points_per_add = spec->points_per_add;
   comb->adds_per_shift = spec->adds_per_shift;
   comb->shifts = spec->shifts;
@@ -425,9 +424,6 @@ goo_comb_init(
 
 static void
 goo_comb_uninit(goo_comb_t *comb) {
-  if (comb->exists == 0)
-    return;
-
   for (int i = 0; i < comb->size; i++)
     mpz_clear(comb->items[i]);
 
@@ -436,7 +432,6 @@ goo_comb_uninit(goo_comb_t *comb) {
 
   goo_free(comb->wins);
 
-  comb->exists = 0;
   comb->size = 0;
   comb->shifts = 0;
   comb->items = NULL;
@@ -450,8 +445,6 @@ goo_to_comb_exp(goo_comb_t *comb, const mpz_t e) {
   if (len < 0 || len > comb->bits)
     return 0;
 
-  int pad = comb->bits - len;
-
   for (int i = comb->adds_per_shift - 1; i >= 0; i--) {
     for (int j = 0; j < comb->shifts; j++) {
       long ret = 0;
@@ -460,14 +453,7 @@ goo_to_comb_exp(goo_comb_t *comb, const mpz_t e) {
         int b = (i + k * comb->adds_per_shift) * comb->shifts + j;
 
         ret <<= 1;
-
-        if (b < pad)
-          continue;
-
-        int p = (comb->bits - 1) - b;
-        assert(p >= 0);
-
-        ret += (long)mpz_tstbit(e, p);
+        ret += (long)mpz_tstbit(e, (comb->bits - 1) - b);
       }
 
       comb->wins[j][(comb->adds_per_shift - 1) - i] = ret;
@@ -561,27 +547,26 @@ goo_group_init(
     long big_bits = big + GOO_CHAL_BITS + 1;
 
     goo_combspec_t big_spec;
-    goo_combspec_init(&big_spec, big_bits, GOO_MAX_COMB_SIZE);
+    assert(goo_combspec_init(&big_spec, big_bits, GOO_MAX_COMB_SIZE));
 
     long small_bits = group->rand_bits;
     goo_combspec_t small_spec;
-    goo_combspec_init(&small_spec, small_bits, GOO_MAX_COMB_SIZE);
+    assert(goo_combspec_init(&small_spec, small_bits, GOO_MAX_COMB_SIZE));
 
-    goo_comb_init(&group->g_comb1, group, group->g, &small_spec, 0);
-    goo_comb_init(&group->h_comb1, group, group->h, &small_spec, 0);
-    goo_comb_init(&group->g_comb2, group, group->g, &big_spec, 0);
-    goo_comb_init(&group->h_comb2, group, group->h, &big_spec, 0);
+    group->combs_len = 2;
+    goo_comb_init(&group->combs[0].g, group, group->g, &small_spec, 0);
+    goo_comb_init(&group->combs[0].h, group, group->h, &small_spec, 0);
+    goo_comb_init(&group->combs[1].g, group, group->g, &big_spec, 0);
+    goo_comb_init(&group->combs[1].h, group, group->h, &big_spec, 0);
   } else {
     long tiny_bits = GOO_CHAL_BITS;
 
     goo_combspec_t tiny_spec;
-    goo_combspec_init(&tiny_spec, tiny_bits, GOO_MAX_COMB_SIZE);
+    assert(goo_combspec_init(&tiny_spec, tiny_bits, GOO_MAX_COMB_SIZE));
 
-    goo_comb_init(&group->g_comb1, group, group->g, &tiny_spec, 1);
-    goo_comb_init(&group->h_comb1, group, group->h, &tiny_spec, 1);
-
-    memset(&group->g_comb2, 0x00, sizeof(goo_comb_t));
-    memset(&group->h_comb2, 0x00, sizeof(goo_comb_t));
+    group->combs_len = 1;
+    goo_comb_init(&group->combs[0].g, group, group->g, &tiny_spec, 1);
+    goo_comb_init(&group->combs[0].h, group, group->h, &tiny_spec, 1);
   }
 
   goo_prng_init(&group->prng);
@@ -647,10 +632,12 @@ goo_group_uninit(goo_group_t *group) {
     mpz_clear(group->pctab_n2[i]);
   }
 
-  goo_comb_uninit(&group->g_comb1);
-  goo_comb_uninit(&group->h_comb1);
-  goo_comb_uninit(&group->g_comb2);
-  goo_comb_uninit(&group->h_comb2);
+  for (size_t i = 0; i < group->combs_len; i++) {
+    goo_comb_uninit(&group->combs[i].g);
+    goo_comb_uninit(&group->combs[i].h);
+  }
+
+  group->combs_len = 0;
 
   goo_prng_uninit(&group->prng);
 }
@@ -749,21 +736,23 @@ goo_group_inv5(
 
 static int
 goo_group_powgh(goo_group_t *group, mpz_t ret, const mpz_t e1, const mpz_t e2) {
-  goo_comb_t *gcomb = &group->g_comb1;
-  goo_comb_t *hcomb = &group->h_comb1;
-
   size_t e1bits = goo_mpz_bitlen(e1);
   size_t e2bits = goo_mpz_bitlen(e2);
   size_t loge = e1bits > e2bits ? e1bits : e2bits;
 
-  if (loge > (size_t)gcomb->bits) {
-    if (group->g_comb2.exists && loge <= (size_t)group->g_comb2.bits) {
-      gcomb = &group->g_comb2;
-      hcomb = &group->h_comb2;
-    } else {
-      return 0;
+  goo_comb_t *gcomb = NULL;
+  goo_comb_t *hcomb = NULL;
+
+  for (size_t i = 0; i < group->combs_len; i++) {
+    if (loge <= (size_t)group->combs[i].g.bits) {
+      gcomb = &group->combs[i].g;
+      hcomb = &group->combs[i].h;
+      break;
     }
   }
+
+  if (!gcomb || !hcomb)
+    return 0;
 
   if (!goo_to_comb_exp(gcomb, e1))
     return 0;
@@ -800,6 +789,25 @@ goo_group_powgh(goo_group_t *group, mpz_t ret, const mpz_t e1, const mpz_t e2) {
 }
 
 static int
+goo_group_powgh_slow(
+  goo_group_t *group,
+  mpz_t ret,
+  const mpz_t e1,
+  const mpz_t e2
+) {
+  mpz_t q1, q2;
+  mpz_init(q1);
+  mpz_init(q2);
+  mpz_powm(q1, group->g, e1, group->n);
+  mpz_powm(q2, group->h, e2, group->n);
+  mpz_mul(ret, q1, q2);
+  mpz_mod(ret, ret, group->n);
+  mpz_clear(q1);
+  mpz_clear(q2);
+  return 1;
+}
+
+static void
 goo_group_wnaf_pc_help(goo_group_t *group, const mpz_t b, mpz_t *out) {
   goo_group_sqr(group, group->bsq, b);
 
@@ -807,11 +815,9 @@ goo_group_wnaf_pc_help(goo_group_t *group, const mpz_t b, mpz_t *out) {
 
   for (int i = 1; i < GOO_TABLEN; i++)
     goo_group_mul(group, out[i], out[i - 1], group->bsq);
-
-  return 1;
 }
 
-static int
+static void
 goo_group_precomp_wnaf(
   goo_group_t *group,
   const mpz_t b,
@@ -819,13 +825,8 @@ goo_group_precomp_wnaf(
   mpz_t *p,
   mpz_t *n
 ) {
-  if (!goo_group_wnaf_pc_help(group, b, p))
-    return 0;
-
-  if (!goo_group_wnaf_pc_help(group, b_inv, n))
-    return 0;
-
-  return 1;
+  goo_group_wnaf_pc_help(group, b, p);
+  goo_group_wnaf_pc_help(group, b_inv, n);
 }
 
 static long *
@@ -870,7 +871,39 @@ goo_group_one_mul(
     goo_group_mul(group, ret, ret, n[(-1 - w) >> 1]);
 }
 
-static int
+static void
+goo_group_pow_wnaf(
+  goo_group_t *group,
+  mpz_t ret,
+  const mpz_t b,
+  const mpz_t b_inv,
+  const mpz_t e
+) {
+  if (b_inv == NULL)
+    return goo_group_pow(group, ret, b, b_inv, e);
+
+  mpz_t *p = &group->pctab_p1[0];
+  mpz_t *n = &group->pctab_n1[0];
+
+  goo_group_precomp_wnaf(group, b, b_inv, p, n);
+
+  size_t totlen = goo_mpz_bitlen(e) + 1;
+
+  long *ebits = goo_group_wnaf(group, e, &group->e1bits[0], totlen);
+
+  mpz_set_ui(ret, 1);
+
+  for (size_t i = 0; i < totlen; i++) {
+    long w = ebits[i];
+
+    if (mpz_cmp_ui(ret, 1) != 0)
+      goo_group_sqr(group, ret, ret);
+
+    goo_group_one_mul(group, ret, w, p, n);
+  }
+}
+
+static void
 goo_group_pow2(
   goo_group_t *group,
   mpz_t ret,
@@ -886,11 +919,8 @@ goo_group_pow2(
   mpz_t *p2 = &group->pctab_p2[0];
   mpz_t *n2 = &group->pctab_n2[0];
 
-  if (!goo_group_precomp_wnaf(group, b1, b1_inv, p1, n1))
-    return 0;
-
-  if (!goo_group_precomp_wnaf(group, b2, b2_inv, p2, n2))
-    return 0;
+  goo_group_precomp_wnaf(group, b1, b1_inv, p1, n1);
+  goo_group_precomp_wnaf(group, b2, b2_inv, p2, n2);
 
   size_t e1len = goo_mpz_bitlen(e1);
   size_t e2len = goo_mpz_bitlen(e2);
@@ -911,8 +941,28 @@ goo_group_pow2(
     goo_group_one_mul(group, ret, w1, p1, n1);
     goo_group_one_mul(group, ret, w2, p2, n2);
   }
+}
 
-  return 1;
+static void
+goo_group_pow2_slow(
+  goo_group_t *group,
+  mpz_t ret,
+  const mpz_t b1,
+  const mpz_t b1_inv,
+  const mpz_t e1,
+  const mpz_t b2,
+  const mpz_t b2_inv,
+  const mpz_t e2
+) {
+  mpz_t q1, q2;
+  mpz_init(q1);
+  mpz_init(q2);
+  mpz_powm(q1, b1, e1, group->n);
+  mpz_powm(q2, b2, e2, group->n);
+  mpz_mul(ret, q1, q2);
+  mpz_mod(ret, ret, group->n);
+  mpz_clear(q1);
+  mpz_clear(q2);
 }
 
 static int
@@ -928,8 +978,7 @@ goo_group_recon(
   const mpz_t e3,
   const mpz_t e4
 ) {
-  if (!goo_group_pow2(group, ret, b1, b1_inv, e1, b2, b2_inv, e2))
-    return 0;
+  goo_group_pow2(group, ret, b1, b1_inv, e1, b2, b2_inv, e2);
 
   if (!goo_group_powgh(group, group->gh, e3, e4))
     return 0;
@@ -1054,7 +1103,7 @@ goo_group_fs_chal(
   goo_prng_getrandbits(&group->prng, ell, GOO_CHAL_BITS);
 
   if (!verify) {
-    // For prover, call nextPrime on ell_r to get ell.
+    // For prover, call next_prime on ell_r to get ell.
     if (!goo_next_prime(ell, ell, GOO_ELLDIFF_MAX)) {
       mpz_set_ui(chal, 0);
       mpz_set_ui(ell, 0);
@@ -1112,7 +1161,7 @@ goo_group_verify(
   // `t` must be one of the small primes in our list.
   int found = 0;
 
-  for (int i = 0; i < 168; i++) {
+  for (int i = 0; i < (int)sizeof(goo_primes); i++) {
     if (mpz_cmp_ui(t, goo_primes[i]) == 0) {
       found = 1;
       break;
@@ -1223,6 +1272,8 @@ goo_group_challenge(
   mpz_t C1,
   const mpz_t n
 ) {
+  int r = 0;
+
   mpz_t s;
   mpz_init(s);
 
@@ -1238,11 +1289,10 @@ goo_group_challenge(
 
   goo_group_reduce(group, C1, C1);
 
-  mpz_clear(s);
-  return 1;
+  r = 1;
 fail:
   mpz_clear(s);
-  return 0;
+  return r;
 }
 
 static void
@@ -1288,6 +1338,8 @@ goo_sig_uninit(goo_sig_t *sig) {
 #else
 static int
 goo_mpz_jacobi(const mpz_t a, const mpz_t b) {
+  // Supposed to be undefined behavior.
+  // Just return 0.
   if (mpz_cmp_ui(b, 0) <= 0 || mpz_even_p(b))
     return 0;
 
@@ -1857,16 +1909,21 @@ goo_uninit(goo_ctx_t *ctx) {
   if (pos + len > sig_len)                 \
     return 0;                              \
                                            \
+  /* non-minimal serialization */          \
+  if (len > 0 && sig[pos] == 0x00)         \
+    return 0;                              \
+                                           \
   goo_mpz_import((n), &sig[pos], len);     \
   pos += len;                              \
 } while (0)                                \
 
-#define goo_read_final() do { \
-  assert(pos <= sig_len);     \
-                              \
-  if (pos != sig_len)         \
-    return 0;                 \
-} while (0)                   \
+#define goo_read_final() do {     \
+  assert(pos <= sig_len);         \
+                                  \
+  /* non-minimal serialization */ \
+  if (pos != sig_len)             \
+    return 0;                     \
+} while (0)                       \
 
 int
 goo_challenge(
@@ -1905,9 +1962,6 @@ goo_challenge(
   *s_prime = goo_mpz_pad(NULL, *s_prime_len, spn);
   *C1_len = goo_mpz_bytesize(ctx->n);
   *C1 = goo_mpz_pad(NULL, *C1_len, ctx->C1);
-
-  // *s_prime = goo_mpz_export(NULL, s_prime_len, spn);
-  // *C1 = goo_mpz_export(NULL, C1_len, ctx->C1);
 
   if (*s_prime == NULL || *C1 == NULL)
     goto fail;
