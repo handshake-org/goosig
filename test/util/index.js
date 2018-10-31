@@ -295,7 +295,7 @@ const testUtil = {
     const [n, e, d] = this.rsaExponent(p, q);
     const key = new rsa.RSAPrivateKey(n, e, d, p, q);
 
-    // rsa.privateKeyCompute(key);
+    rsa.privateKeyCompute(key);
 
     return key;
   },
