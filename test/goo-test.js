@@ -39,7 +39,6 @@ function runTests(name, Goo, Other, vectors) {
     // Native 2048 bit
     const other_2_v = new Other(Goo.RSA2048, 2, 3, null);
 
-    // measure times
     const tests = [
       ['4096-bit RSA GoUO, 2048-bit Signer PK', gops_4_2_p, gops_4_v],
       ['4096-bit RSA GoUO, 4096-bit Signer PK', gops_4_4_p, gops_4_v],

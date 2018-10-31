@@ -1,11 +1,9 @@
-/* eslint-env mocha */
-/* eslint prefer-arrow-callback: 'off' */
-/* eslint max-len: 'off' */
 /* eslint camelcase: "off" */
 
 'use strict';
 
 const assert = require('../test/util/assert');
+const {performance} = require('perf_hooks');
 const testUtil = require('../test/util');
 const Goo = require('../lib/goo');
 const Native = require('../lib/native');
@@ -31,20 +29,20 @@ assert.strictEqual(result, true);
 
 let start, i;
 
-start = Date.now();
+start = performance.now();
 
 for (i = 0; i < 1000; i++) {
   const result = gops_v.verify(msg, sig, C1);
   assert.strictEqual(result, true);
 }
 
-console.log((Date.now() - start) / i);
+console.log('JS: %d', (performance.now() - start) / i);
 
-start = Date.now();
+start = performance.now();
 
 for (i = 0; i < 1000; i++) {
   const result = native.verify(msg, sig, C1);
   assert.strictEqual(result, true);
 }
 
-console.log((Date.now() - start) / i);
+console.log('Native: %d', (performance.now() - start) / i);

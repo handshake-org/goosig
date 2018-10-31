@@ -59,8 +59,11 @@ const testUtil = {
 
     this.write(`\x1b[92m \u25f7 ${tname}\x1b[0m: `);
 
-    this.log('%d ms, \u03c3=%d ms, max=%d ms, min=%d ms',
-             mean, sampDev, max(tvals), min(tvals));
+    this.log('%s ms, \u03c3=%s ms, max=%s ms, min=%s ms',
+             mean.toFixed(2),
+             sampDev.toFixed(2),
+             max(tvals).toFixed(2),
+             min(tvals).toFixed(2));
   },
 
   showTimingTriple(tname, pvvals) {

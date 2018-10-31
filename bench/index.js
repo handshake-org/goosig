@@ -1,12 +1,13 @@
 'use strict';
 
 /* eslint camelcase: "off" */
-/* eslint max-len: "off" */
 
+const {performance} = require('perf_hooks');
 const testUtil = require('../test/util');
 const Goo = require('../lib/goo');
+const Native = require('../lib/native');
 
-function main(nreps) {
+function main(Goo, nreps) {
   // 4096-bit GoUO
   // 4096-bit RSA GoUO, 2048-bit Signer key
   const gops_4_2_p = new Goo(Goo.AOL, 2, 3, 2048);
@@ -51,21 +52,21 @@ function main(nreps) {
       let start_time, stop_time;
 
       // Generate the challenge token.
-      start_time = Date.now();
+      start_time = performance.now();
       const [s_prime, C1] = gops_p.challenge(key);
-      stop_time = Date.now();
+      stop_time = performance.now();
       times[i][0].push(stop_time - start_time);
 
       // Generate the signature.
-      start_time = Date.now();
+      start_time = performance.now();
       const sig = gops_p.sign(msg, s_prime, C1, key);
-      stop_time = Date.now();
+      stop_time = performance.now();
       times[i][1].push(stop_time - start_time);
 
       // Verify the signature.
-      start_time = Date.now();
+      start_time = performance.now();
       res[i] = gops_v.verify(msg, sig, C1);
-      stop_time = Date.now();
+      stop_time = performance.now();
       times[i][2].push(stop_time - start_time);
     }
 
@@ -85,11 +86,21 @@ function main(nreps) {
 
 {
   let nr = 1;
+  let native = false;
 
   for (let i = 2; i < process.argv.length; i++) {
-    if (/^\d+$/.test(process.argv[i]))
-      nr = process.argv[i] >>> 0;
+    const arg = process.argv[i];
+
+    if (/^\d+$/.test(arg))
+      nr = arg >>> 0;
+    else if (arg === '--native-only')
+      native = true;
   }
 
-  main(nr);
+  if (native) {
+    main(Native, nr);
+  } else {
+    main(Goo, nr);
+    main(Native, nr);
+  }
 }
