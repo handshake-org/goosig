@@ -1,6 +1,7 @@
 #include <assert.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdio.h>
 #include <gmp.h>
 
 #include "goo.h"
@@ -265,6 +266,7 @@ combspec_size(long bits) {
 static void
 combspec_result(
   goo_combspec_t *combs,
+  size_t map_size,
   long shifts,
   long aps,
   long ppa,
@@ -272,6 +274,9 @@ combspec_result(
 ) {
   long ops = shifts * (aps + 1) - 1;
   long size = ((1 << ppa) - 1) * aps;
+
+  assert(ops >= 0);
+  assert((size_t)ops < map_size);
 
   goo_combspec_t *best = &combs[ops];
 
@@ -311,8 +316,8 @@ goo_combspec_init(
 
       long shifts = bpw / aps;
 
-      combspec_result(combs, shifts, aps, ppa, bpw);
-      combspec_result(combs, aps, shifts, ppa, bpw);
+      combspec_result(combs, map_size, shifts, aps, ppa, bpw);
+      combspec_result(combs, map_size, aps, shifts, ppa, bpw);
     }
   }
 
@@ -424,6 +429,9 @@ goo_comb_init(
 
 static void
 goo_comb_uninit(goo_comb_t *comb) {
+  if (comb->exists == 0)
+    return;
+
   for (int i = 0; i < comb->size; i++)
     mpz_clear(comb->items[i]);
 
@@ -432,6 +440,9 @@ goo_comb_uninit(goo_comb_t *comb) {
 
   goo_free(comb->wins);
 
+  comb->exists = 0;
+  comb->size = 0;
+  comb->shifts = 0;
   comb->items = NULL;
   comb->wins = NULL;
 }
@@ -1195,7 +1206,7 @@ goo_group_randbits(goo_group_t *group, mpz_t ret, size_t size) {
 static int
 goo_group_expand_sprime(goo_group_t *group, mpz_t s, const mpz_t s_prime) {
   unsigned char key[32];
-  size_t pos = 32 - goo_mpz_bytesize(s);
+  size_t pos = 32 - goo_mpz_bytesize(s_prime);
 
   if (pos > 32) // Overflow
     return 0;
