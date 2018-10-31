@@ -10,9 +10,9 @@ allows the creation of signatures originating from RSA private keys _without
 revealing the RSA public key_.
 
 GooSig uses a [cryptographic protocol][protocol] devised by Dan Boneh and Riad
-Wahby which makes use of _g_roups of unkn_o_wn _o_rder. It was originally
-ported from the python [reference implementation][libgoopy] to javascript, but
-has since been [implemented in C][c] as well.
+Wahby which makes use of Groups of unknOwn Order. It was originally ported from
+the python [reference implementation][libgoopy] to javascript, but has since
+been [implemented in C][c] as well.
 
 ## Usage
 
