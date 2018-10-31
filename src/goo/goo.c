@@ -37,8 +37,6 @@ goo_mpz_bitlen(const mpz_t n) {
 #define goo_mpz_bytesize(n) \
   (goo_mpz_bitlen((n)) + 7) / 8
 
-#include <stdio.h>
-
 static inline unsigned char *
 goo_mpz_pad(void *out, size_t size, const mpz_t n) {
   size_t len = goo_mpz_bytesize(n);
