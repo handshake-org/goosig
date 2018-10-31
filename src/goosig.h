@@ -18,6 +18,8 @@ public:
 
 private:
   static NAN_METHOD(Init);
+  static NAN_METHOD(Challenge);
+  static NAN_METHOD(Sign);
   static NAN_METHOD(Verify);
 };
 #endif

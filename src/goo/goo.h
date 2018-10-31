@@ -2,39 +2,54 @@
 #define _GOOSIG_H
 
 #include <stdlib.h>
-#include <stdbool.h>
-#include <stdint.h>
 #include <gmp.h>
+
 #include "drbg.h"
 
 #if defined(__cplusplus)
 extern "C" {
 #endif
 
-#define GOO_POINTS_PER_ADD 8
-#define GOO_ADDS_PER_SHIFT 2
-#define GOO_NSHIFTS 8
-#define GOO_BITS_PER_WINDOW 16
-#define GOO_NBITS 128
-#define GOO_POINTS_PER_SUBCOMB 255
-// #define GOO_COMB_ITEMS (((1 << GOO_POINTS_PER_ADD) - 1) * GOO_ADDS_PER_SHIFT)
-#define GOO_COMB_ITEMS 510
-#define GOO_WINSIZE 6
-// #define GOO_TABLEN (1 << (GOO_WINSIZE - 2))
-#define GOO_TABLEN 16
-#define GOO_RAND_EXPONENT_SIZE 2048
-#define GOO_EBITS_SIZE (GOO_RAND_EXPONENT_SIZE * 2 + 2)
+#define GOO_DEFAULT_G 2
+#define GOO_DEFAULT_H 3
+#define GOO_MAX_RSA_BITS 4096
+#define GOO_EXPONENT_SIZE 2048
+#define GOO_WINDOW_SIZE 6
+#define GOO_MAX_COMB_SIZE 512
+#define GOO_CHAL_BITS 128
 #define GOO_ELLDIFF_MAX 512
-#define GOO_CHALBITS 128
+#define GOO_HASH_PREFIX "libGooPy:"
+#define GOO_DRBG_PERS "libGooPy_prng"
+
+#define GOO_TABLEN 16
+#define GOO_EBITS_SIZE (GOO_EXPONENT_SIZE * 2 + 2)
+
+typedef struct goo_combspec_s {
+  int exists;
+  long points_per_add;
+  long adds_per_shift;
+  long shifts;
+  long bits_per_window;
+  long ops;
+  long size;
+} goo_combspec_t;
 
 typedef struct goo_comb_s {
-  long wins[GOO_NSHIFTS][GOO_ADDS_PER_SHIFT];
-  mpz_t items[GOO_COMB_ITEMS];
+  int exists;
+  long points_per_add;
+  long adds_per_shift;
+  long shifts;
+  long bits_per_window;
+  long bits;
+  long points_per_subcomb;
+  long size;
+  long **wins;
+  mpz_t *items;
 } goo_comb_t;
 
 typedef struct goo_prng_s {
   goo_drbg_t ctx;
-  mpz_t r_save;
+  mpz_t save;
   mpz_t tmp;
 } goo_prng_t;
 
@@ -44,6 +59,23 @@ typedef struct goo_group_s {
   mpz_t nh;
   mpz_t g;
   mpz_t h;
+  size_t rand_bits;
+
+  // combs
+  goo_comb_t g_comb1;
+  goo_comb_t h_comb1;
+  goo_comb_t g_comb2;
+  goo_comb_t h_comb2;
+
+  // wnaf
+  mpz_t pctab_p1[GOO_TABLEN];
+  mpz_t pctab_n1[GOO_TABLEN];
+  mpz_t pctab_n2[GOO_TABLEN];
+  mpz_t pctab_p2[GOO_TABLEN];
+  long e1bits[GOO_EBITS_SIZE];
+  long e2bits[GOO_EBITS_SIZE];
+
+  goo_prng_t prng;
 
   // temporary variables
   mpz_t b12;
@@ -91,22 +123,26 @@ typedef struct goo_group_s {
   mpz_t z_s1w;
   mpz_t z_sa;
 
-  // combs
-  goo_comb_t g_comb;
-  goo_comb_t h_comb;
-
-  // wnaf
-  mpz_t pctab_p1[GOO_TABLEN];
-  mpz_t pctab_n1[GOO_TABLEN];
-  mpz_t pctab_n2[GOO_TABLEN];
-  mpz_t pctab_p2[GOO_TABLEN];
-  long e1bits[GOO_EBITS_SIZE];
-  long e2bits[GOO_EBITS_SIZE];
-
-  goo_prng_t prng;
-
   unsigned char slab[1024];
 } goo_group_t;
+
+typedef struct goo_sig_s {
+  mpz_t C2;
+  mpz_t t;
+  mpz_t chal;
+  mpz_t ell;
+  mpz_t Aq;
+  mpz_t Bq;
+  mpz_t Cq;
+  mpz_t Dq;
+  mpz_t z_w;
+  mpz_t z_w2;
+  mpz_t z_s1;
+  mpz_t z_a;
+  mpz_t z_an;
+  mpz_t z_s1w;
+  mpz_t z_sa;
+} goo_sig_t;
 
 typedef struct goo_group_s goo_ctx_t;
 
@@ -122,6 +158,36 @@ goo_init(
 
 void
 goo_uninit(goo_ctx_t *ctx);
+
+int
+goo_challenge(
+  goo_ctx_t *ctx,
+  unsigned char **s_prime,
+  size_t *s_prime_len,
+  unsigned char **C1,
+  size_t *C1_len,
+  const unsigned char *n,
+  size_t n_len
+);
+
+int
+goo_sign(
+  goo_ctx_t *ctx,
+  unsigned char **out,
+  size_t *out_len,
+  const unsigned char *msg,
+  size_t msg_len,
+  const unsigned char *s_prime,
+  size_t s_prime_len,
+  const unsigned char *C1,
+  size_t C1_len,
+  const unsigned char *n,
+  size_t n_len,
+  const unsigned char *p,
+  size_t p_len,
+  const unsigned char *q,
+  size_t q_len
+);
 
 int
 goo_verify(
