@@ -9,10 +9,10 @@ receiving coins from the airdrop, cryptographic trickery is required: GooSig
 allows the creation of signatures originating from RSA private keys _without
 revealing the RSA public key_.
 
-GooSig uses a [cryptographic protocol][protocol] devised by Dan Boneh and Riad
-Wahby which makes use of Groups of unknOwn Order. It was originally ported from
-the python [reference implementation][libgoopy] to javascript, but has since
-been [implemented in C][c] as well.
+GooSig implements a [cryptographic protocol][protocol] devised by Dan Boneh and
+Riad Wahby which makes use of Groups of unknOwn Order. It was originally ported
+from the python [reference implementation][libgoopy] to javascript, but has
+since been [implemented in C][c] as well.
 
 ## Usage
 
