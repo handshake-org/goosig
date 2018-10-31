@@ -1599,9 +1599,7 @@ goo_group_sign(
   // Prevent D from being negative.
   if (mpz_cmp(*r_w2, *r_an) < 0) {
     // [r_w2, r_an] = [r_an, r_w2]
-    mpz_set(*x, *r_w2);
-    mpz_set(*r_w2, *r_an);
-    mpz_set(*r_an, *x);
+    mpz_swap(*r_w2, *r_an);
   }
 
   // P's first message (except for A; see "V's message", below).
