@@ -2210,42 +2210,29 @@ goo_uninit(goo_ctx_t *ctx) {
     goo_group_uninit(ctx);
 }
 
-#define goo_write_item(n) do {             \
-  size_t nsize = goo_mpz_bytesize((n));    \
-  if (nsize > 512) {                       \
-    free(data);                            \
-    goto fail;                             \
-  }                                        \
-  data[pos++] = nsize;                     \
-  data[pos++] = nsize >> 8;                \
-  goo_mpz_export(&data[pos], NULL, (n));   \
-  pos += nsize;                            \
+#define goo_write_item(n, size) do {     \
+  size_t bytes = goo_mpz_bytesize((n));  \
+  if (bytes > (size)) {                  \
+    free(data);                          \
+    goto fail;                           \
+  }                                      \
+  size_t pad = (size) - bytes;           \
+  memset(&data[pos], 0x00, pad);         \
+  pos += pad;                            \
+  goo_mpz_export(&data[pos], NULL, (n)); \
+  pos += bytes;                          \
 } while (0)
 
 #define goo_write_final() \
   assert(pos == len)
 
-#define goo_read_item(n) do {              \
-  if (pos + 2 > sig_len)                   \
-    return 0;                              \
-                                           \
-  len = (sig[pos + 1] * 0x100) | sig[pos]; \
-                                           \
-  if (len > 512)                           \
-    return 0;                              \
-                                           \
-  pos += 2;                                \
-                                           \
-  if (pos + len > sig_len)                 \
-    return 0;                              \
-                                           \
-  /* non-minimal serialization */          \
-  if (len > 0 && sig[pos] == 0x00)         \
-    return 0;                              \
-                                           \
-  goo_mpz_import((n), &sig[pos], len);     \
-  pos += len;                              \
-} while (0)                                \
+#define goo_read_item(n, size) do {       \
+  if (pos + (size) > sig_len)             \
+    return 0;                             \
+                                          \
+  goo_mpz_import((n), &sig[pos], (size)); \
+  pos += (size);                          \
+} while (0)                               \
 
 #define goo_read_final() do {     \
   assert(pos <= sig_len);         \
@@ -2377,46 +2364,41 @@ goo_sign(
   size_t pos = 0;
   size_t len = 0;
 
-  len += 2 + goo_mpz_bytesize(sig.C2);
-  len += 2 + goo_mpz_bytesize(sig.t);
+  size_t modbytes = (goo_mpz_bitlen(ctx->n) + 7) / 8;
+  size_t chalbytes = (GOO_CHAL_BITS + 7) / 8;
 
-  len += 2 + goo_mpz_bytesize(sig.chal);
-  len += 2 + goo_mpz_bytesize(sig.ell);
-  len += 2 + goo_mpz_bytesize(sig.Aq);
-  len += 2 + goo_mpz_bytesize(sig.Bq);
-  len += 2 + goo_mpz_bytesize(sig.Cq);
-  len += 2 + goo_mpz_bytesize(sig.Dq);
-
-  len += 2 + goo_mpz_bytesize(sig.z_w);
-  len += 2 + goo_mpz_bytesize(sig.z_w2);
-  len += 2 + goo_mpz_bytesize(sig.z_s1);
-  len += 2 + goo_mpz_bytesize(sig.z_a);
-  len += 2 + goo_mpz_bytesize(sig.z_an);
-  len += 2 + goo_mpz_bytesize(sig.z_s1w);
-  len += 2 + goo_mpz_bytesize(sig.z_sa);
+  len += modbytes; // C2
+  len += 2; // t
+  len += chalbytes; // chal
+  len += chalbytes; // ell
+  len += modbytes; // Aq
+  len += modbytes; // Bq
+  len += modbytes; // Cq
+  len += 2048 / 8; // Dq
+  len += chalbytes * 7; // z_prime
 
   unsigned char *data = malloc(len);
 
   if (data == NULL)
     goto fail;
 
-  goo_write_item(sig.C2);
-  goo_write_item(sig.t);
+  goo_write_item(sig.C2, modbytes);
+  goo_write_item(sig.t, 2);
 
-  goo_write_item(sig.chal);
-  goo_write_item(sig.ell);
-  goo_write_item(sig.Aq);
-  goo_write_item(sig.Bq);
-  goo_write_item(sig.Cq);
-  goo_write_item(sig.Dq);
+  goo_write_item(sig.chal, chalbytes);
+  goo_write_item(sig.ell, chalbytes);
+  goo_write_item(sig.Aq, modbytes);
+  goo_write_item(sig.Bq, modbytes);
+  goo_write_item(sig.Cq, modbytes);
+  goo_write_item(sig.Dq, 2048 / 8);
 
-  goo_write_item(sig.z_w);
-  goo_write_item(sig.z_w2);
-  goo_write_item(sig.z_s1);
-  goo_write_item(sig.z_a);
-  goo_write_item(sig.z_an);
-  goo_write_item(sig.z_s1w);
-  goo_write_item(sig.z_sa);
+  goo_write_item(sig.z_w, chalbytes);
+  goo_write_item(sig.z_w2, chalbytes);
+  goo_write_item(sig.z_s1, chalbytes);
+  goo_write_item(sig.z_a, chalbytes);
+  goo_write_item(sig.z_an, chalbytes);
+  goo_write_item(sig.z_s1w, chalbytes);
+  goo_write_item(sig.z_sa, chalbytes);
 
   goo_write_final();
 
@@ -2456,25 +2438,27 @@ goo_verify(
   goo_mpz_import(ctx->C1, C1, C1_len);
 
   size_t pos = 0;
-  size_t len = 0;
 
-  goo_read_item(ctx->C2);
-  goo_read_item(ctx->t);
+  size_t modbytes = (goo_mpz_bitlen(ctx->n) + 7) / 8;
+  size_t chalbytes = (GOO_CHAL_BITS + 7) / 8;
 
-  goo_read_item(ctx->chal);
-  goo_read_item(ctx->ell);
-  goo_read_item(ctx->Aq);
-  goo_read_item(ctx->Bq);
-  goo_read_item(ctx->Cq);
-  goo_read_item(ctx->Dq);
+  goo_read_item(ctx->C2, modbytes);
+  goo_read_item(ctx->t, 2);
 
-  goo_read_item(ctx->z_w);
-  goo_read_item(ctx->z_w2);
-  goo_read_item(ctx->z_s1);
-  goo_read_item(ctx->z_a);
-  goo_read_item(ctx->z_an);
-  goo_read_item(ctx->z_s1w);
-  goo_read_item(ctx->z_sa);
+  goo_read_item(ctx->chal, chalbytes);
+  goo_read_item(ctx->ell, chalbytes);
+  goo_read_item(ctx->Aq, modbytes);
+  goo_read_item(ctx->Bq, modbytes);
+  goo_read_item(ctx->Cq, modbytes);
+  goo_read_item(ctx->Dq, 2048 / 8);
+
+  goo_read_item(ctx->z_w, chalbytes);
+  goo_read_item(ctx->z_w2, chalbytes);
+  goo_read_item(ctx->z_s1, chalbytes);
+  goo_read_item(ctx->z_a, chalbytes);
+  goo_read_item(ctx->z_an, chalbytes);
+  goo_read_item(ctx->z_s1w, chalbytes);
+  goo_read_item(ctx->z_sa, chalbytes);
 
   goo_read_final();
 

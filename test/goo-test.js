@@ -89,8 +89,8 @@ function runTests(name, Goo, Other, vectors) {
       const msg = Buffer.from(vector.msg, 'hex');
       const s_prime = Buffer.from(vector.s_prime, 'hex');
       const C1 = Buffer.from(vector.C1, 'hex');
-      const sig = Signature.fromJSON(vector.sig).encode();
       const gbits = vector.group === 'AOL' ? 4096 : 2048;
+      const sig = Signature.fromJSON(vector.sig).encode(gbits);
       const str = `${gbits}-bit RSA GoUO, ${bits}-bit Signer PK`;
 
       it(`should verify test vector: "${str}"`, () => {
