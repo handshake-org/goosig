@@ -59,7 +59,13 @@ function runTests(name, Goo, Other, vectors) {
         const key = testUtil.rsaKey(p, q);
 
         // Generate the challenge token.
-        const [s_prime, C1] = gops_p.challenge(key);
+        let [s_prime, C1] = gops_p.challenge(key);
+
+        // Encrypt to the recipient.
+        const ct = gops_p.encrypt(s_prime, C1, key);
+
+        // Recipient decrypts.
+        [s_prime, C1] = gops_p.decrypt(ct, key);
 
         // Generate the proof.
         const sig = gops_p.sign(msg, s_prime, C1, key);
