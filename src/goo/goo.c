@@ -63,19 +63,7 @@ goo_mpz_pad(void *out, size_t size, const mpz_t n) {
 static const char goo_prefix[] = "libGooPy:";
 static const char goo_pers[] = "libGooPy_prng";
 
-static unsigned long goo_primes[168] = {
-  2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71,
-  73, 79, 83, 89, 97, 101, 103, 107, 109, 113, 127, 131, 137, 139, 149, 151,
-  157, 163, 167, 173, 179, 181, 191, 193, 197, 199, 211, 223, 227, 229, 233,
-  239, 241, 251, 257, 263, 269, 271, 277, 281, 283, 293, 307, 311, 313, 317,
-  331, 337, 347, 349, 353, 359, 367, 373, 379, 383, 389, 397, 401, 409, 419,
-  421, 431, 433, 439, 443, 449, 457, 461, 463, 467, 479, 487, 491, 499, 503,
-  509, 521, 523, 541, 547, 557, 563, 569, 571, 577, 587, 593, 599, 601, 607,
-  613, 617, 619, 631, 641, 643, 647, 653, 659, 661, 673, 677, 683, 691, 701,
-  709, 719, 727, 733, 739, 743, 751, 757, 761, 769, 773, 787, 797, 809, 811,
-  821, 823, 827, 829, 839, 853, 857, 859, 863, 877, 881, 883, 887, 907, 911,
-  919, 929, 937, 941, 947, 953, 967, 971, 977, 983, 991, 997
-};
+#include "primes.h"
 
 static inline void *
 goo_malloc(size_t size) {
@@ -142,7 +130,7 @@ goo_prng_uninit(goo_prng_t *prng) {
 }
 
 static void
-goo_prng_seed(goo_prng_t *prng, unsigned char key[32]) {
+goo_prng_seed(goo_prng_t *prng, const unsigned char key[32]) {
   unsigned char entropy[64 + sizeof(goo_pers) - 1];
 
   memcpy(&entropy[0], &key[0], 32);
@@ -190,6 +178,24 @@ goo_prng_getrandbits(goo_prng_t *prng, mpz_t r, unsigned long nbits) {
 
   // r >>= left;
   mpz_fdiv_q_2exp(r, r, left);
+}
+
+static void
+goo_prng_getrandint(goo_prng_t *prng, mpz_t ret, const mpz_t max) {
+  if (mpz_cmp_ui(max, 0) <= 0) {
+    mpz_set_ui(ret, 0);
+    return;
+  }
+
+  mpz_set(ret, max);
+  mpz_sub_ui(ret, ret, 1); // XXX
+
+  size_t bits = goo_mpz_bitlen(ret);
+
+  mpz_add_ui(ret, ret, 1);
+
+  while (mpz_cmp(ret, max) >= 0)
+    goo_prng_getrandbits(prng, ret, bits);
 }
 
 static size_t
@@ -1050,13 +1056,134 @@ goo_hash_all(
   goo_sha256_final(&ctx, out);
 }
 
-static int
-goo_is_prime(const mpz_t p) {
-  return mpz_probab_prime_p(p, 16) != 0 ? 1 : 0;
+static void
+goo_factor_twos(mpz_t d, unsigned long *s, const mpz_t n) {
+  mpz_set(d, n);
+  *s = 0;
+
+  while (mpz_even_p(d)) {
+    mpz_fdiv_q_ui(d, d, 2);
+    *s += 1;
+  }
 }
 
 static int
-goo_next_prime(mpz_t ret, const mpz_t p, unsigned long maxinc) {
+goo_miller_rabin(
+  const mpz_t n,
+  const unsigned char *key,
+  long reps,
+  int force2
+) {
+  if (mpz_cmp_ui(n, 7) < 0) {
+    if (mpz_cmp_ui(n, 3) == 0 || mpz_cmp_ui(n, 5) == 0)
+      return 1;
+    return 0;
+  }
+
+  int r = 0;
+  mpz_t nm1, nm3, q, x, y;
+  unsigned long k;
+
+  mpz_init(nm1);
+  mpz_init(nm3);
+  mpz_init(q);
+  mpz_init(x);
+  mpz_init(y);
+
+  mpz_set(nm1, n);
+  mpz_sub_ui(nm1, nm1, 1);
+
+  mpz_set(nm3, nm1);
+  mpz_sub_ui(nm3, nm3, 2);
+
+  // k = nm1 zero bits
+  // q = nm1 >> k
+  goo_factor_twos(q, &k, nm1);
+
+  // Setup PRNG.
+  goo_prng_t prng;
+  goo_prng_init(&prng);
+  goo_prng_seed(&prng, key);
+
+  for (long i = 0; i < reps; i++) {
+    if (i == reps - 1 && force2) {
+      mpz_set_ui(x, 2);
+    } else {
+      goo_prng_getrandint(&prng, x, nm3);
+      mpz_add_ui(x, x, 2);
+    }
+
+    mpz_powm(y, x, q, n);
+
+    if (mpz_cmp_ui(y, 1) == 0 || mpz_cmp(y, nm1) == 0)
+      continue;
+
+    for (unsigned long j = 1; j < k; j++) {
+      mpz_powm_ui(y, y, 2, n);
+
+      if (mpz_cmp(y, nm1) == 0)
+        goto next;
+
+      if (mpz_cmp_ui(y, 1) == 0)
+        goto fail;
+    }
+
+    goto fail;
+next:
+    ;
+  }
+
+  r = 1;
+fail:
+  mpz_clear(nm1);
+  mpz_clear(nm3);
+  mpz_clear(q);
+  mpz_clear(x);
+  mpz_clear(y);
+  return r;
+}
+
+static int
+goo_lucas(const mpz_t n, long reps) {
+  // Placeholder.
+  return 1;
+}
+
+static int
+goo_is_prime(const mpz_t p, const unsigned char *key) {
+  int r = 0;
+  mpz_t tmp;
+
+  mpz_init(tmp);
+
+  for (long i = 0; i < GOO_TEST_PRIMES_LEN; i++) {
+    if (mpz_cmp_ui(p, goo_test_primes[i]) == 0)
+      goto succeed;
+
+    if (mpz_mod_ui(tmp, p, goo_test_primes[i]) == 0)
+      goto fail;
+  }
+
+  if (!goo_miller_rabin(p, key, 16 + 1, 1))
+    goto fail;
+
+  if (!goo_lucas(p, 2))
+    goto fail;
+
+succeed:
+  r = 1;
+fail:
+  mpz_clear(tmp);
+  return r;
+}
+
+static int
+goo_next_prime(
+  mpz_t ret,
+  const mpz_t p,
+  const unsigned char *key,
+  unsigned long max
+) {
   unsigned long inc = 0;
 
   mpz_set(ret, p);
@@ -1066,14 +1193,14 @@ goo_next_prime(mpz_t ret, const mpz_t p, unsigned long maxinc) {
     mpz_add_ui(ret, ret, 1);
   }
 
-  while (!goo_is_prime(ret)) {
-    if (maxinc != 0 && inc > maxinc)
+  while (!goo_is_prime(ret, key)) {
+    if (max != 0 && inc > max)
       break;
     mpz_add_ui(ret, ret, 2);
     inc += 2;
   }
 
-  if (maxinc != 0 && inc > maxinc)
+  if (max != 0 && inc > max)
     return 0;
 
   return 1;
@@ -1084,6 +1211,7 @@ goo_group_fs_chal(
   goo_group_t *group,
   mpz_t chal,
   mpz_t ell,
+  unsigned char *k,
   const mpz_t C1,
   const mpz_t C2,
   const mpz_t t,
@@ -1102,9 +1230,12 @@ goo_group_fs_chal(
   goo_prng_getrandbits(&group->prng, chal, GOO_CHAL_BITS);
   goo_prng_getrandbits(&group->prng, ell, GOO_CHAL_BITS);
 
+  if (k != NULL)
+    memcpy(k, key, 32);
+
   if (!verify) {
     // For prover, call next_prime on ell_r to get ell.
-    if (!goo_next_prime(ell, ell, GOO_ELLDIFF_MAX)) {
+    if (!goo_next_prime(ell, ell, key, GOO_ELLDIFF_MAX)) {
       mpz_set_ui(chal, 0);
       mpz_set_ui(ell, 0);
       return 0;
@@ -1158,10 +1289,12 @@ goo_group_verify(
   mpz_t *ell_r_out = &group->ell_r_out;
   mpz_t *elldiff = &group->elldiff;
 
+  unsigned char key[32];
+
   // `t` must be one of the small primes in our list.
   int found = 0;
 
-  for (long i = 0; i < (long)sizeof(goo_primes); i++) {
+  for (long i = 0; i < GOO_PRIMES_LEN; i++) {
     if (mpz_cmp_ui(t, goo_primes[i]) == 0) {
       found = 1;
       break;
@@ -1215,9 +1348,8 @@ goo_group_verify(
     mpz_add(*D, *D, ell);
 
   // Step 2: recompute implicitly claimed V message, viz., chal and ell.
-  goo_group_fs_chal(group, *chal_out, *ell_r_out,
-                    C1, C2, t, *A, *B, *C, *D,
-                    msg, 1);
+  goo_group_fs_chal(group, *chal_out, *ell_r_out, &key[0],
+                    C1, C2, t, *A, *B, *C, *D, msg, 1);
 
   // Final checks.
   // chal has to match
@@ -1228,7 +1360,7 @@ goo_group_verify(
   if (mpz_cmp(chal, *chal_out) != 0
       || mpz_cmp_ui(*elldiff, 0) < 0
       || mpz_cmp_ui(*elldiff, GOO_ELLDIFF_MAX) > 0
-      || !goo_is_prime(ell)) {
+      || !goo_is_prime(ell, &key[0])) {
     return 0;
   }
 
@@ -1343,10 +1475,11 @@ goo_mpz_jacobi(const mpz_t a, const mpz_t b) {
   if (mpz_cmp_ui(b, 0) <= 0 || mpz_even_p(b))
     return 0;
 
-  mpz_t x, y;
+  mpz_t x, y, t;
 
   mpz_init(x);
   mpz_init(y);
+  mpz_init(t);
 
   mpz_mod(x, a, b);
   mpz_set(y, b);
@@ -1357,13 +1490,13 @@ goo_mpz_jacobi(const mpz_t a, const mpz_t b) {
   while (mpz_cmp_ui(x, 0) != 0) {
     while (mpz_even_p(x)) {
       mpz_fdiv_q_ui(x, x, 2);
-      r = mpz_mod_ui(NULL, y, 8);
+      r = mpz_mod_ui(t, y, 8);
       if (r == 3 || r == 5)
         negate ^= 1;
     }
 
-    if (mpz_mod_ui(NULL, x, 4) == 3
-        && mpz_mod_ui(NULL, y, 4) == 3) {
+    if (mpz_mod_ui(t, x, 4) == 3
+        && mpz_mod_ui(t, y, 4) == 3) {
       negate ^= 1;
     }
 
@@ -1375,6 +1508,7 @@ goo_mpz_jacobi(const mpz_t a, const mpz_t b) {
 
   mpz_clear(x);
   mpz_clear(y);
+  mpz_clear(t);
 
   if (r == 0)
     return negate ? -1 : 1;
@@ -1382,17 +1516,6 @@ goo_mpz_jacobi(const mpz_t a, const mpz_t b) {
   return 0;
 }
 #endif
-
-static void
-goo_factor_twos(mpz_t d, unsigned long *s, const mpz_t n) {
-  mpz_set(d, n);
-  *s = 0;
-
-  while (mpz_even_p(d)) {
-    mpz_fdiv_q_ui(d, d, 2);
-    *s += 1;
-  }
-}
 
 static int
 goo_mod_sqrtp(mpz_t ret, const mpz_t n, const mpz_t p) {
@@ -1652,7 +1775,7 @@ goo_group_sign(
   // Find `t`.
   int found = 0;
 
-  for (long i = 0; i < (long)sizeof(goo_primes); i++) {
+  for (long i = 0; i < GOO_PRIMES_LEN; i++) {
     // t = small_primes[i]
     mpz_set_ui(*t, goo_primes[i]);
 
@@ -1761,7 +1884,8 @@ goo_group_sign(
     goo_group_reduce(group, *A, *A);
 
     // [chal, ell] = fs_chal(C1, C2, t, A, B, C, D, msg)
-    r = goo_group_fs_chal(group, *chal, *ell, C1, *C2,
+    r = goo_group_fs_chal(group,
+                          *chal, *ell, NULL, C1, *C2,
                           *t, *A, *B, *C, *D, msg, 0);
   }
 
