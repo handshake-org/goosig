@@ -25,8 +25,8 @@ describe('Group Ops', function() {
     const [b1, b2, e1, e2] = [
       util.randomBits(2048),
       util.randomBits(2048),
-      util.randomBits(2048),
-      util.randomBits(2048)
+      util.randomBits(128),
+      util.randomBits(128)
     ];
 
     const [b1Inv, b2Inv] = t1.inv2(b1, b2);
@@ -40,8 +40,8 @@ describe('Group Ops', function() {
     const [b1, b2, e1, e2] = [
       util.randomBits(2048),
       util.randomBits(2048),
-      util.randomBits(2048),
-      util.randomBits(2048)
+      util.randomBits(128),
+      util.randomBits(128)
     ];
 
     const [b1Inv, b2Inv] = t2.inv2(b1, b2);

@@ -16,6 +16,7 @@ extern "C" {
 
 #define GOO_DEFAULT_G 2
 #define GOO_DEFAULT_H 3
+#define GOO_MIN_RSA_BITS 1024
 #define GOO_MAX_RSA_BITS 4096
 #define GOO_EXPONENT_SIZE 2048
 #define GOO_WINDOW_SIZE 6
@@ -25,8 +26,7 @@ extern "C" {
 #define GOO_HASH_PREFIX "libGooPy:"
 #define GOO_DRBG_PERS "libGooPy_prng"
 
-#define GOO_TABLEN 16
-#define GOO_EBITS_SIZE (GOO_EXPONENT_SIZE * 2 + 2)
+#define GOO_TABLEN (1 << (GOO_WINDOW_SIZE - 2))
 
 typedef struct goo_combspec_s {
   int exists;
@@ -79,8 +79,8 @@ typedef struct goo_group_s {
   mpz_t pctab_n1[GOO_TABLEN];
   mpz_t pctab_n2[GOO_TABLEN];
   mpz_t pctab_p2[GOO_TABLEN];
-  long e1bits[GOO_EBITS_SIZE];
-  long e2bits[GOO_EBITS_SIZE];
+  long e1bits[GOO_CHAL_BITS + 1];
+  long e2bits[GOO_CHAL_BITS + 1];
 
   goo_prng_t prng;
 
