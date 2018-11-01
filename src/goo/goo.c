@@ -130,10 +130,10 @@ goo_prng_uninit(goo_prng_t *prng) {
 }
 
 static void
-goo_prng_seed(goo_prng_t *prng, const unsigned char key[32]) {
+goo_prng_seed(goo_prng_t *prng, const unsigned char *key) {
   unsigned char entropy[64 + sizeof(goo_pers) - 1];
 
-  memcpy(&entropy[0], &key[0], 32);
+  memcpy(&entropy[0], key, 32);
   memset(&entropy[32], 0x00, 32);
   memcpy(&entropy[64], &goo_pers[0], sizeof(goo_pers) - 1);
 
