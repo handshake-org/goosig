@@ -63,7 +63,7 @@ goo_mpz_pad(void *out, size_t size, const mpz_t n) {
 static const char goo_prefix[] = "libGooPy:";
 static const char goo_pers[] = "libGooPy_prng";
 
-static unsigned int goo_primes[168] = {
+static unsigned long goo_primes[168] = {
   2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71,
   73, 79, 83, 89, 97, 101, 103, 107, 109, 113, 127, 131, 137, 139, 149, 151,
   157, 163, 167, 173, 179, 181, 191, 193, 197, 199, 211, 223, 227, 229, 233,
@@ -160,10 +160,10 @@ goo_prng_nextrand(goo_prng_t *prng, unsigned char out[32]) {
 }
 
 static void
-goo_prng_getrandbits(goo_prng_t *prng, mpz_t r, unsigned int nbits) {
+goo_prng_getrandbits(goo_prng_t *prng, mpz_t r, unsigned long nbits) {
   mpz_set(r, prng->save);
 
-  unsigned int b = goo_mpz_bitlen(r);
+  unsigned long b = goo_mpz_bitlen(r);
   unsigned char out[32];
 
   while (b < nbits) {
@@ -174,7 +174,7 @@ goo_prng_getrandbits(goo_prng_t *prng, mpz_t r, unsigned int nbits) {
     b += 256;
   }
 
-  unsigned int left = b - nbits;
+  unsigned long left = b - nbits;
 
   if (left == 0) {
     mpz_set_ui(prng->save, 0);
@@ -204,7 +204,7 @@ goo_clog2(const mpz_t val) {
 
 static unsigned long
 goo_sqrt(unsigned long n) {
-  int len = 0;
+  long len = 0;
 
   unsigned long nn = n;
 
@@ -213,7 +213,7 @@ goo_sqrt(unsigned long n) {
     nn >>= 1;
   }
 
-  int shift = 2 * ((len + 1) / 2) - 2;
+  long shift = 2 * ((len + 1) / 2) - 2;
 
   if (shift < 0)
     shift = 0;
@@ -380,12 +380,12 @@ goo_comb_init(
 
   comb->wins = (long **)goo_calloc(comb->shifts, sizeof(long *));
 
-  for (int i = 0; i < comb->shifts; i++)
+  for (long i = 0; i < comb->shifts; i++)
     comb->wins[i] = (long *)goo_calloc(comb->adds_per_shift, sizeof(long));
 
   comb->items = (mpz_t *)goo_calloc(comb->size, sizeof(mpz_t));
 
-  for (int i = 0; i < comb->size; i++)
+  for (long i = 0; i < comb->size; i++)
     mpz_init(comb->items[i]);
 
   mpz_set(comb->items[0], base);
@@ -398,22 +398,22 @@ goo_comb_init(
   mpz_set_ui(win, 1);
   mpz_mul_2exp(win, win, comb->bits_per_window);
 
-  for (int i = 1; i < comb->points_per_add; i++) {
-    int oval = 1 << i;
-    int ival = oval >> 1;
+  for (long i = 1; i < comb->points_per_add; i++) {
+    long oval = 1 << i;
+    long ival = oval >> 1;
 
     goo_group_pow(group, it[oval - 1], it[ival - 1], NULL, win);
 
-    for (int j = oval + 1; j < 2 * oval; j++)
+    for (long j = oval + 1; j < 2 * oval; j++)
       goo_group_mul(group, it[j - 1], it[j - oval - 1], it[oval - 1]);
   }
 
   mpz_set_ui(win, 1);
   mpz_mul_2exp(win, win, comb->shifts);
 
-  for (int i = 1; i < comb->adds_per_shift; i++) {
-    for (int j = 0; j < skip; j++) {
-      int k = i * skip + j;
+  for (long i = 1; i < comb->adds_per_shift; i++) {
+    for (long j = 0; j < skip; j++) {
+      long k = i * skip + j;
 
       goo_group_pow(group, it[k], it[k - skip], NULL, win);
     }
@@ -424,10 +424,10 @@ goo_comb_init(
 
 static void
 goo_comb_uninit(goo_comb_t *comb) {
-  for (int i = 0; i < comb->size; i++)
+  for (long i = 0; i < comb->size; i++)
     mpz_clear(comb->items[i]);
 
-  for (int i = 0; i < comb->shifts; i++)
+  for (long i = 0; i < comb->shifts; i++)
     goo_free(comb->wins[i]);
 
   goo_free(comb->wins);
@@ -440,17 +440,17 @@ goo_comb_uninit(goo_comb_t *comb) {
 
 static int
 goo_to_comb_exp(goo_comb_t *comb, const mpz_t e) {
-  int len = (int)goo_mpz_bitlen(e);
+  long len = (long)goo_mpz_bitlen(e);
 
   if (len < 0 || len > comb->bits)
     return 0;
 
-  for (int i = comb->adds_per_shift - 1; i >= 0; i--) {
-    for (int j = 0; j < comb->shifts; j++) {
+  for (long i = comb->adds_per_shift - 1; i >= 0; i--) {
+    for (long j = 0; j < comb->shifts; j++) {
       long ret = 0;
 
-      for (int k = 0; k < comb->points_per_add; k++) {
-        int b = (i + k * comb->adds_per_shift) * comb->shifts + j;
+      for (long k = 0; k < comb->points_per_add; k++) {
+        long b = (i + k * comb->adds_per_shift) * comb->shifts + j;
 
         ret <<= 1;
         ret += (long)mpz_tstbit(e, (comb->bits - 1) - b);
@@ -523,7 +523,7 @@ goo_group_init(
   mpz_init(group->z_s1w);
   mpz_init(group->z_sa);
 
-  for (int i = 0; i < GOO_TABLEN; i++) {
+  for (long i = 0; i < GOO_TABLEN; i++) {
     mpz_init(group->pctab_p1[i]);
     mpz_init(group->pctab_n1[i]);
     mpz_init(group->pctab_p2[i]);
@@ -625,14 +625,14 @@ goo_group_uninit(goo_group_t *group) {
   mpz_clear(group->z_s1w);
   mpz_clear(group->z_sa);
 
-  for (int i = 0; i < GOO_TABLEN; i++) {
+  for (long i = 0; i < GOO_TABLEN; i++) {
     mpz_clear(group->pctab_p1[i]);
     mpz_clear(group->pctab_n1[i]);
     mpz_clear(group->pctab_p2[i]);
     mpz_clear(group->pctab_n2[i]);
   }
 
-  for (size_t i = 0; i < group->combs_len; i++) {
+  for (long i = 0; i < group->combs_len; i++) {
     goo_comb_uninit(&group->combs[i].g);
     goo_comb_uninit(&group->combs[i].h);
   }
@@ -736,15 +736,15 @@ goo_group_inv5(
 
 static int
 goo_group_powgh(goo_group_t *group, mpz_t ret, const mpz_t e1, const mpz_t e2) {
-  size_t e1bits = goo_mpz_bitlen(e1);
-  size_t e2bits = goo_mpz_bitlen(e2);
-  size_t loge = e1bits > e2bits ? e1bits : e2bits;
+  long e1bits = (long)goo_mpz_bitlen(e1);
+  long e2bits = (long)goo_mpz_bitlen(e2);
+  long loge = e1bits > e2bits ? e1bits : e2bits;
 
   goo_comb_t *gcomb = NULL;
   goo_comb_t *hcomb = NULL;
 
-  for (size_t i = 0; i < group->combs_len; i++) {
-    if (loge <= (size_t)group->combs[i].g.bits) {
+  for (long i = 0; i < group->combs_len; i++) {
+    if (loge <= group->combs[i].g.bits) {
       gcomb = &group->combs[i].g;
       hcomb = &group->combs[i].h;
       break;
@@ -762,14 +762,14 @@ goo_group_powgh(goo_group_t *group, mpz_t ret, const mpz_t e1, const mpz_t e2) {
 
   mpz_set_ui(ret, 1);
 
-  for (int i = 0; i < gcomb->shifts; i++) {
+  for (long i = 0; i < gcomb->shifts; i++) {
     long *e1vs = gcomb->wins[i];
     long *e2vs = hcomb->wins[i];
 
     if (mpz_cmp_ui(ret, 1) != 0)
       goo_group_sqr(group, ret, ret);
 
-    for (int j = 0; j < gcomb->adds_per_shift; j++) {
+    for (long j = 0; j < gcomb->adds_per_shift; j++) {
       long e1v = e1vs[j];
       long e2v = e2vs[j];
 
@@ -813,7 +813,7 @@ goo_group_wnaf_pc_help(goo_group_t *group, const mpz_t b, mpz_t *out) {
 
   mpz_set(out[0], b);
 
-  for (int i = 1; i < GOO_TABLEN; i++)
+  for (long i = 1; i < GOO_TABLEN; i++)
     goo_group_mul(group, out[i], out[i - 1], group->bsq);
 }
 
@@ -830,12 +830,12 @@ goo_group_precomp_wnaf(
 }
 
 static long *
-goo_group_wnaf(goo_group_t *group, const mpz_t e, long *out, int bitlen) {
+goo_group_wnaf(goo_group_t *group, const mpz_t e, long *out, long bitlen) {
   long w = GOO_WINDOW_SIZE;
 
   mpz_set(group->r, e);
 
-  for (int i = bitlen - 1; i >= 0; i--) {
+  for (long i = bitlen - 1; i >= 0; i--) {
     mpz_set_ui(group->val, 0);
 
     if (mpz_odd_p(group->r)) {
@@ -1052,7 +1052,7 @@ goo_hash_all(
 
 static int
 goo_is_prime(const mpz_t p) {
-  return mpz_probab_prime_p(p, 2) != 0 ? 1 : 0;
+  return mpz_probab_prime_p(p, 16) != 0 ? 1 : 0;
 }
 
 static int
@@ -1161,7 +1161,7 @@ goo_group_verify(
   // `t` must be one of the small primes in our list.
   int found = 0;
 
-  for (int i = 0; i < (int)sizeof(goo_primes); i++) {
+  for (long i = 0; i < (long)sizeof(goo_primes); i++) {
     if (mpz_cmp_ui(t, goo_primes[i]) == 0) {
       found = 1;
       break;
@@ -1652,7 +1652,7 @@ goo_group_sign(
   // Find `t`.
   int found = 0;
 
-  for (int i = 0; i < (int)sizeof(goo_primes); i++) {
+  for (long i = 0; i < (long)sizeof(goo_primes); i++) {
     // t = small_primes[i]
     mpz_set_ui(*t, goo_primes[i]);
 

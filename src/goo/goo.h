@@ -71,7 +71,7 @@ typedef struct goo_group_s {
   size_t rand_bits;
 
   // combs
-  size_t combs_len;
+  long combs_len;
   goo_comb_item_t combs[2];
 
   // wnaf
