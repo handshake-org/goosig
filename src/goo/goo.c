@@ -39,6 +39,9 @@ static const char goo_pers[] = GOO_DRBG_PERS;
 #define goo_mpz_mod_ui mpz_fdiv_ui
 #define goo_mpz_and_ui(x, y) mpz_fdiv_ui((x), (y) + 1)
 
+// Note: violates strict aliasing.
+#define goo_mpz_unconst(n) *((mpz_t *)&(n))
+
 static inline size_t
 goo_mpz_bitlen(const mpz_t n) {
   if (mpz_sgn(n) == 0)
@@ -78,6 +81,10 @@ goo_mpz_zerobits(const mpz_t n) {
 
   if (sgn == 0)
     return 0;
+
+  // Note: mpz_ptr is undocumented.
+  // https://gmplib.org/list-archives/gmp-discuss/2009-May/003769.html
+  // https://gmplib.org/list-archives/gmp-devel/2013-February/002775.html
 
   // if n < 0
   if (sgn < 0) {
