@@ -11,7 +11,7 @@ const testUtil = require('./util');
 const Goo = require('../lib/js/goo');
 const Native = require('../lib/native/goo');
 const Signature = require('../lib/js/signature');
-const vectors = require('./data/vectors.json');
+const vectors = require('./data/vectors-original.json');
 const vectorsNative = require('./data/vectors-native.json');
 
 function runTests(name, Goo, Other, vectors) {
