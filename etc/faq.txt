@@ -1,0 +1,147 @@
+The RSA Factoring Challenge FAQ
+
+Why is the RSA Factoring Challenge no longer active?
+
+Various cryptographic challenges — including the RSA Factoring Challenge —
+served in the early days of commercial cryptography to measure the state of
+progress in practical cryptanalysis and reward researchers for the new
+knowledge they have brought to the community. Now that the industry has a
+considerably more advanced understanding of the cryptanalytic strength of
+common symmetric-key and public-key algorithms, these challenges are no longer
+active. The records, however, are presented here for reference by interested
+cryptographers.
+
+What was the RSA Factoring Challenge?
+
+The RSA Factoring challenge was an effort, sponsored by RSA Laboratories, to
+learn about the actual difficulty of factoring large numbers of the type used
+in RSA keys. Posted here for historical interest is the set of eight challenge
+numbers, ranging in size from 576 bits (174 decimal digits) to 2048 bits (617
+decimal digits) that made up the challenge. Each number is the product of two
+large primes, similar to the modulus of an RSA key pair.
+
+Factoring a number means representing it as the product of prime numbers. Prime
+numbers, such as 2, 3, 5, 7, 11, and 13, are those numbers that are not evenly
+divisible by any smaller number, except 1. A non-prime, or composite number,
+can be written as the product of smaller primes, known as its prime factors.
+665, for example is the product of the primes 5, 7, and 19. A number is said to
+be factored when all of its prime factors are identified. As the size of the
+number increases, the difficulty of factoring increases rapidly.
+
+Factoring 100-digit numbers is easy with today's hardware and algorithms. No
+public effort has yet resulted in successful factoring of numbers of more than
+200 digits. Advances in both computer hardware and number theory, though, are
+expected to advance the state of the art. One purpose of this contest was to
+"track" the state of the art in factoring.
+
+The first person to submit a correct factorization for any of the challenge
+numbers was eligible for a cash prize. Given the amount of computation required
+for such a factorization, the prizes were mainly symbolic. They served as a
+small incentive for public demonstrations of factoring on a large scale.
+
+To date, the largest number of this type to be factored, in 2005, was 640 bits.
+The 704-bit or 768-bit value is likely to be factored soon. On the other hand,
+barring fundamental algorithmic or computing advances, RSA-2048 should stand
+for decades.
+
+How do I get the RSA Challenge numbers?
+
+There are eight RSA challenge numbers, ranging in size from 576 bits to 2048
+bits. They are available here. To obtain a single challenge number, select its
+entry and a page will display containing the decimal value of the challenge
+number, its current status (whether or not it has yet been factored), and the
+prize awarded for the first factorization. The value may be copied directly
+from this page, or downloaded as ASCII text.
+
+If you prefer to obtain all the challenge numbers at once, the URL listed above
+allows you to download a single file, in text format, that contains all eight
+challenge numbers.
+
+What does it mean when a Challenge Number is factored?
+
+Users of the RSA public-key cryptosystem may wonder what the factoring of a
+challenge number implies about the security of their keys. Should they
+immediately replace their keys with larger ones? Should they stop using RSA
+altogether?
+
+Clearly, the factoring of a challenge-number of specific length does not mean
+that the RSA cryptosystem is "broken." It does not even mean, necessarily, that
+keys of the same length as the factored challenge number must be discarded. It
+simply gives us an idea of the amount of work required to factor a modulus of a
+given size. This can be translated into an estimate of the cost of breaking a
+particular RSA key pair.
+
+Suppose, for example, that in the year 2010 a factorization of RSA-768 is
+announced that requires 6 months of effort on 100,000 workstations. In this
+hypothetical situation, would all 768-bit RSA keys need to be replaced? The
+answer is no. If the data being protected needs security for significantly less
+than six months, and its value is considerably less than the cost of running
+100,000 workstations for that period, then 768-bit keys may continue to be
+used.
+
+Applications that require longer-term security or have data with a high
+financial value should migrate to longer keys before the factoring of the
+corresponding challenge number is announced. In either case, the results of the
+Factoring Challenge provide real data to help the cryptosystem user choose the
+appropriate key size.
+
+RSA Laboratories' Frequently Asked Questions About Today's Cryptography
+provides more information on choosing RSA key lengths for various applications.
+RSA Laboratories Bulletin #13 discusses key length requirements for various
+cryptosystems.
+
+How were the challenge numbers generated?
+
+The RSA challenge numbers were generated using a secure process that guarantees
+that the factors of each number cannot be obtained by any method other than
+factoring the published value. No one, not even RSA Laboratories, knows the
+factors of any of the challenge numbers.
+
+The generation took place on a Compaq laptop PC with no network connection of
+any kind. The process proceeded as follows:
+
+1. First, 30,000 random bytes were generated using a ComScire QNG hardware
+random number generator, attached to the laptop's parallel port.
+
+2. The random bytes were used as the seed values for the B_GenerateKeyPair
+function, in version 4.0 of the RSA BSAFE library. The private portion of the
+generated keypair was discarded. The public portion was exported, in DER format
+to a disk file.
+
+3. The moduli were extracted from the DER files and converted to decimal for
+posting on the Web page.
+
+4. The laptop's hard drive was destroyed.
+
+How do I know which challenge numbers have been factored?
+
+The status of each of the challenge numbers is available here. The status will
+be shown as "Not Factored" for values for which no correct factorization has
+been submitted. If the number has been factored, the status will identify the
+submitter and the date of submission.
+
+For challenge numbers that have been factored, the individual page will provide
+a brief description of the factoring effort. A pointer to a web site, if
+available, that has the details of the effort will also be provided.
+
+What are the best factoring methods?
+
+The best known algorithm for factoring large numbers is the General Number
+Field Sieve (GNFS).
+
+GNFS consists of a sieving phase that searches a fixed set of prime numbers for
+candidates that have a particular algebraic relationship, modulo the number to
+be factored. This is followed by a matrix solving phase that creates a large
+matrix from the candidate values, then solves it to determine the factors.
+
+The sieving phase may be done in distributed fashion, on a large number of
+processors simultaneously. The matrix solving phase requires massive amounts of
+storage and is typically performed on a large supercomputer.
+
+More information on factoring algorithms is available on the RSA Laboratories
+FAQ.
+
+The TWIRL design by Adi Shamir and Eran Tromer represents the state of the art
+in hardware circuits for integer factoring, which is likely the most efficient
+approach for very large numbers. More information about TWIRL and its impact on
+RSA key size can be found in an RSA Laboratories technical note.
