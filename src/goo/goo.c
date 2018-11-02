@@ -4,6 +4,14 @@
 
 #include "goo.h"
 #include "random.h"
+#include "primes.h"
+
+static const char goo_prefix[] = GOO_HASH_PREFIX;
+static const char goo_pers[] = GOO_DRBG_PERS;
+
+/*
+ * GMP helpers
+ */
 
 #define goo_mpz_import(ret, data, len) \
   mpz_import((ret), (len), 1, sizeof((data)[0]), 0, 0, (data))
@@ -15,12 +23,15 @@
   (mpz_out_str(stdout, 16, (n)), printf("\n"))
 
 #define goo_print_hex(data, len) do { \
-  mpz_t n; \
-  mpz_init(n); \
-  goo_mpz_import(n, (data), (len)); \
-  goo_mpz_print(n); \
-  mpz_clear(n); \
+  mpz_t n;                            \
+  mpz_init(n);                        \
+  goo_mpz_import(n, (data), (len));   \
+  goo_mpz_print(n);                   \
+  mpz_clear(n);                       \
 } while (0)
+
+#define goo_mpz_bytesize(n) \
+  (goo_mpz_bitlen((n)) + 7) / 8
 
 static inline size_t
 goo_mpz_bitlen(const mpz_t n) {
@@ -31,9 +42,6 @@ goo_mpz_bitlen(const mpz_t n) {
 
   return bits;
 }
-
-#define goo_mpz_bytesize(n) \
-  (goo_mpz_bitlen((n)) + 7) / 8
 
 static inline unsigned char *
 goo_mpz_pad(void *out, size_t size, const mpz_t n) {
@@ -60,10 +68,9 @@ goo_mpz_pad(void *out, size_t size, const mpz_t n) {
   return out;
 }
 
-static const char goo_prefix[] = GOO_HASH_PREFIX;
-static const char goo_pers[] = GOO_DRBG_PERS;
-
-#include "primes.h"
+/*
+ * Allocator
+ */
 
 static inline void *
 goo_malloc(size_t size) {
@@ -103,17 +110,9 @@ goo_free(void *ptr) {
     free(ptr);
 }
 
-static void
-goo_group_pow(
-  goo_group_t *group,
-  mpz_t ret,
-  const mpz_t b,
-  const mpz_t b_inv,
-  const mpz_t e
-);
-
-static void
-goo_group_mul(goo_group_t *group, mpz_t ret, const mpz_t m1, const mpz_t m2);
+/*
+ * PRNG
+ */
 
 static void
 goo_prng_init(goo_prng_t *prng) {
@@ -206,6 +205,10 @@ goo_prng_getrandint(goo_prng_t *prng, mpz_t ret, const mpz_t max) {
   while (mpz_cmp(ret, max) >= 0)
     goo_prng_getrandbits(prng, ret, bits);
 }
+
+/*
+ * Utils
+ */
 
 static size_t
 goo_clog2(const mpz_t val) {
@@ -349,6 +352,10 @@ goo_dsqrt(unsigned long x) {
   }
 }
 
+/*
+ * CombSpec
+ */
+
 static inline size_t
 combspec_size(long bits) {
   long max = 0;
@@ -462,6 +469,22 @@ goo_combspec_init(
 
   return 1;
 }
+
+static void
+goo_group_pow(
+  goo_group_t *group,
+  mpz_t ret,
+  const mpz_t b,
+  const mpz_t b_inv,
+  const mpz_t e
+);
+
+static void
+goo_group_mul(goo_group_t *group, mpz_t ret, const mpz_t m1, const mpz_t m2);
+
+/*
+ * Comb
+ */
 
 static void
 goo_comb_init(
@@ -579,6 +602,10 @@ goo_to_comb_exp(goo_comb_t *comb, const mpz_t e) {
 
   return 1;
 }
+
+/*
+ * Group
+ */
 
 static int
 goo_group_init(
@@ -1947,6 +1974,10 @@ fail:
   mpz_clear(s);
   return r;
 }
+
+/*
+ * Signature
+ */
 
 static void
 goo_sig_init(goo_sig_t *sig) {
