@@ -176,4 +176,4 @@ See LICENSE for more info.
 [faq]: https://web.archive.org/web/20130502202924/http://www.rsa.com/rsalabs/node.asp?id=2094
 [list]: http://www.ontko.com/pub/rayo/primes/rsa_fact.html
 [etc]: https://github.com/handshake-org/goosig/tree/master/etc
-[constants]: https://github.com/handshake-org/goosig/blob/master/lib/constants.js
+[constants]: https://github.com/handshake-org/goosig/blob/master/lib/internal/constants.js
