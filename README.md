@@ -58,7 +58,7 @@ result === true;
 The design of GooSig requires a public RSA modulus whose prime factorization is
 unknown.
 
-In the early 1990s, RSA labs generated several [RSA moduli][numbers-wiki] for
+In the early 1990s, RSA Labs generated several [RSA moduli][numbers-wiki] for
 the [RSA factoring challenge][challenge-wiki]. RSA Labs claims to have
 [destroyed the hard drives][faq] containing the primes.
 
