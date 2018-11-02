@@ -22,7 +22,8 @@ cd "${dir}/.."
 
 shopt -s nullglob
 
-for file in ./{,port/}{bench,bin,etc,lib{,/js,/native,/internal},test,test/util}/*.js; do
+for file in ./{bench,bin,etc,lib{,/js,/native,/internal},test{,/util}}/*.js; do
+  echo "Linting: $file"
   cat "$file" \
     | sed 's/0b\([0-1]\+\)n/0b\1/g' \
     | sed 's/0o\([0-7]\+\)n/0o\1/g' \
