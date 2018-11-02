@@ -300,6 +300,16 @@ const testUtil = {
     return key;
   },
 
+  genKey(bits) {
+    if (bits === 4096)
+      bits = 1;
+
+    const primes = [this.primes1024, this.primes2048];
+    const [p, q] = this.sample(primes[bits & 1], 2);
+
+    return this.rsaKey(p, q);
+  },
+
   primes1024: null,
   primes2048: null
 };

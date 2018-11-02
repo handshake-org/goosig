@@ -13,13 +13,18 @@ const util = require('../lib/js/util');
 const {mod, modPow} = BigMath;
 
 describe('Group Ops', function() {
-  this.timeout(10000);
+  this.timeout(60000);
 
-  const [p, q] = testUtil.sample(testUtil.primes1024, 2);
-  const {n} = testUtil.rsaKey(p, q);
+  let t1 = null;
+  let t2 = null;
 
-  const t1 = new Goo(Goo.RSA2048, 2, 3, 2048);
-  const t2 = new Goo(n, 5, 7, 2048);
+  it('open contexts', () => {
+    const [p, q] = testUtil.sample(testUtil.primes1024, 2);
+    const {n} = testUtil.rsaKey(p, q);
+
+    t1 = new Goo(Goo.RSA2048, 2, 3, 2048);
+    t2 = new Goo(n, 5, 7, 2048);
+  });
 
   it('should compute pow2_wnaf (t1)', () => {
     const [b1, b2, e1, e2] = [
