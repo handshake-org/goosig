@@ -77,6 +77,7 @@ function encode(name, data, desc) {
 
   if (desc)
     out += `// ${desc}\n`;
+
   out += `// BLAKE2b-256: ${blake2b.toString('hex')}\n`;
   out += `// SHA-256: ${sha256.toString('hex')}\n`;
   out += `// SHA-3: ${sha3.toString('hex')}\n`;
@@ -91,7 +92,7 @@ function encode(name, data, desc) {
     out += `  + '${chunk}'`;
   }
 
-  out += `, 'hex');\n`;
+  out += ', \'hex\');\n';
 
   return out;
 }

@@ -5,7 +5,7 @@
 'use strict';
 
 const assert = require('./util/assert');
-const rsa = require('bcrypto/lib/rsa');
+// const rsa = require('bcrypto/lib/rsa');
 const SHA256 = require('bcrypto/lib/sha256');
 const testUtil = require('./util');
 const Goo = require('../lib/js/goo');
@@ -91,9 +91,9 @@ function runTests(name, Goo, Other, vectors) {
     for (const vector of vectors) {
       const group = Goo[vector.group];
       const bits = vector.bits;
-      const key = rsa.privateKeyImportJWK(vector.key);
+      // const key = rsa.privateKeyImportJWK(vector.key);
       const msg = Buffer.from(vector.msg, 'hex');
-      const s_prime = Buffer.from(vector.s_prime, 'hex');
+      // const s_prime = Buffer.from(vector.s_prime, 'hex');
       const C1 = Buffer.from(vector.C1, 'hex');
       const gbits = vector.group === 'AOL2' ? 4096 : 2048;
       const sig = Signature.fromJSON(vector.sig).encode(gbits);
