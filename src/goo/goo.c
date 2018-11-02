@@ -22,6 +22,7 @@ static const char goo_pers[] = GOO_DRBG_PERS;
 #define goo_mpz_print(n) \
   (mpz_out_str(stdout, 16, (n)), printf("\n"))
 
+// For debugging
 #define goo_print_hex(data, len) do { \
   mpz_t n;                            \
   mpz_init(n);                        \
@@ -30,22 +31,23 @@ static const char goo_pers[] = GOO_DRBG_PERS;
   mpz_clear(n);                       \
 } while (0)
 
-#define goo_mpz_bytesize(n) \
+#define goo_mpz_bytelen(n) \
   (goo_mpz_bitlen((n)) + 7) / 8
+
+#define goo_mpz_lshift mpz_mul_2exp
+#define goo_mpz_rshift mpz_fdiv_q_2exp
 
 static inline size_t
 goo_mpz_bitlen(const mpz_t n) {
-  size_t bits = mpz_sizeinbase(n, 2);
+  if (mpz_sgn(n) == 0)
+    return 0;
 
-  if (bits == 1 && mpz_cmp_ui(n, 0) == 0)
-    bits = 0;
-
-  return bits;
+  return mpz_sizeinbase(n, 2);
 }
 
 static inline unsigned char *
 goo_mpz_pad(void *out, size_t size, const mpz_t n) {
-  size_t len = goo_mpz_bytesize(n);
+  size_t len = goo_mpz_bytelen(n);
 
   if (len > size)
     return NULL;
@@ -67,6 +69,130 @@ goo_mpz_pad(void *out, size_t size, const mpz_t n) {
 
   return out;
 }
+
+static inline unsigned long
+goo_mpz_zerobits(const mpz_t n) {
+  int sgn = mpz_sgn(n);
+
+  if (sgn == 0)
+    return 0;
+
+  // if n < 0
+  if (sgn < 0) {
+    // n = -n;
+    mpz_neg((mpz_ptr)n, n);
+  }
+
+  unsigned long bits = (unsigned long)mpz_scan1(n, 0);
+
+  if (sgn < 0) {
+    // n = -n;
+    mpz_neg((mpz_ptr)n, n);
+  }
+
+  return bits;
+}
+
+static inline unsigned long
+goo_mpz_mod_ui(const mpz_t n, unsigned long m) {
+  static mpz_t r;
+  return mpz_mod_ui(r, n, m);
+}
+
+static inline unsigned long
+goo_mpz_and_ui(const mpz_t n, unsigned long m) {
+  return goo_mpz_mod_ui(n, m + 1);
+}
+
+#ifndef GOO_HAS_GMP
+// Jacobi is not implemented in mini-gmp.
+// https://github.com/golang/go/blob/aadaec5/src/math/big/int.go#L754
+static int
+mpz_jacobi(const mpz_t x, const mpz_t y) {
+  // Undefined behavior.
+  // if y == 0 || y & 1 == 0
+  if (mpz_sgn(y) == 0 || mpz_even_p(y))
+    return 0;
+
+  mpz_t a;
+  mpz_t b;
+  mpz_t c;
+  mpz_t t;
+  int j;
+
+  mpz_init(a);
+  mpz_init(b);
+  mpz_init(c);
+  mpz_init(t);
+  j = 0;
+
+  // a = x
+  mpz_set(a, x);
+  // b = y
+  mpz_set(b, y);
+  j = 1;
+
+  // if b < 0
+  if (mpz_sgn(b) < 0) {
+    // if a < 0
+    if (mpz_sgn(a) < 0)
+      j = -1;
+    // b = -b
+    mpz_neg(b, b);
+  }
+
+  for (;;) {
+    // if b == 1
+    if (mpz_cmp_ui(b, 1) == 0)
+      break;
+
+    // if a == 0
+    if (mpz_sgn(a) == 0) {
+      j = 0;
+      break;
+    }
+
+    // a = a % b
+    mpz_mod(a, a, b);
+
+    // if a == 0
+    if (mpz_sgn(a) == 0) {
+      j = 0;
+      break;
+    }
+
+    // s = bitlen(a)
+    unsigned long s = goo_mpz_zerobits(a);
+
+    if (s & 1) {
+      // bmod8 = b & 7
+      unsigned long bmod8 = mpz_mod_ui(t, b, 8);
+
+      if (bmod8 == 3 || bmod8 == 5)
+        j = -j;
+    }
+
+    // c = a >> s
+    mpz_fdiv_q_2exp(c, a, s);
+
+    // if b & 3 == 3 and c & 3 == 3
+    if (mpz_mod_ui(t, b, 4) == 3 && mpz_mod_ui(t, c, 4) == 3)
+      j = -j;
+
+    // a = b
+    mpz_set(a, b);
+    // b = c
+    mpz_set(b, c);
+  }
+
+  mpz_clear(a);
+  mpz_clear(b);
+  mpz_clear(c);
+  mpz_clear(t);
+
+  return j;
+}
+#endif
 
 /*
  * Allocator
@@ -185,7 +311,7 @@ goo_prng_getrandbits(goo_prng_t *prng, mpz_t r, unsigned long nbits) {
 static void
 goo_prng_getrandint(goo_prng_t *prng, mpz_t ret, const mpz_t max) {
   // if max <= 0
-  if (mpz_cmp_ui(max, 0) <= 0) {
+  if (mpz_sgn(max) <= 0) {
     // ret = 0
     mpz_set_ui(ret, 0);
     return;
@@ -212,122 +338,16 @@ goo_prng_getrandint(goo_prng_t *prng, mpz_t ret, const mpz_t max) {
 
 static size_t
 goo_clog2(const mpz_t val) {
-  mpz_t t;
-  mpz_init_set(t, val);
-  mpz_sub_ui(t, t, 1);
-  size_t bits = goo_mpz_bitlen(t);
-  mpz_clear(t);
+  mpz_sub_ui((mpz_ptr)val, val, 1);
+  size_t bits = goo_mpz_bitlen(val);
+  mpz_add_ui((mpz_ptr)val, val, 1);
   return bits;
-}
-
-static unsigned long
-goo_zerobits(const mpz_t n) {
-  if (mpz_cmp_ui(n, 0) == 0)
-    return 0;
-
-  mpz_t x;
-  mpz_init(x);
-
-  // x = n
-  mpz_set(x, n);
-
-  // if x < 0
-  if (mpz_cmp_ui(x, 0) < 0) {
-    // x = -x;
-    mpz_neg(x, x);
-  }
-
-  unsigned long i = 0;
-
-  // while x & 1 == 0
-  while (mpz_even_p(x)) {
-    i += 1;
-    // x >>= 1
-    mpz_fdiv_q_2exp(x, x, 1);
-  }
-
-  mpz_clear(x);
-
-  return i;
-}
-
-// https://github.com/golang/go/blob/aadaec5/src/math/big/nat.go#L1335
-static void
-goo_isqrt(mpz_t r, const mpz_t x) {
-  if (mpz_cmp_ui(x, 1) <= 0) {
-    mpz_set(r, x);
-    return;
-  }
-
-  mpz_t z1, z2;
-  mpz_init(z1);
-  mpz_init(z2);
-
-  unsigned long len = goo_mpz_bitlen(x);
-
-  // See https://members.loria.fr/PZimmermann/mca/pub226.html.
-  // z1 = 1 << ((bitlen(x) >> 1) + 1);
-  mpz_set_ui(z1, 1);
-  mpz_mul_2exp(z1, z1, (len >> 1) + 1);
-
-  for (;;) {
-    // z2 = x / z1
-    mpz_fdiv_q(z2, x, z1);
-    // z2 += z1
-    mpz_add(z2, z2, z1);
-    // z2 >>= 1
-    mpz_fdiv_q_2exp(z2, z2, 1);
-
-    // if z2 >= z1
-    if (mpz_cmp(z2, z1) >= 0)
-      break;
-
-    // z1 = z2
-    mpz_set(z1, z2);
-  }
-
-  // Maybe switch to this entirely.
-  mpz_sqrt(z2, x);
-  assert(mpz_cmp(z1, z2) == 0);
-
-  // r = z1
-  mpz_set(r, z1);
-  mpz_clear(z1);
-  mpz_clear(z2);
-}
-
-static int
-goo_is_square(const mpz_t n) {
-  int r = 0;
-
-  mpz_t x;
-  mpz_init(x);
-
-  // x = isqrt(n)
-  goo_isqrt(x, n);
-
-  // x = x * x
-  mpz_mul(x, x, x);
-
-  // if x == n
-  if (mpz_cmp(x, n) == 0)
-    goto succeed;
-
-  goto fail;
-succeed:
-  r = 1;
-fail:
-  mpz_clear(x);
-  return r;
 }
 
 static unsigned long
 goo_dsqrt(unsigned long x) {
   if (x <= 1)
     return x;
-
-  // Possibly use:
-  // (unsigned log)sqrt((double)x)
 
   unsigned long len = 0;
   unsigned long y = x;
@@ -352,100 +372,9 @@ goo_dsqrt(unsigned long x) {
   }
 }
 
-#ifdef GOO_HAS_GMP
-#define goo_jacobi mpz_jacobi
-#else
-// https://github.com/golang/go/blob/aadaec5/src/math/big/int.go#L754
-static int
-goo_jacobi(const mpz_t x, const mpz_t y) {
-  // Undefined behavior.
-  // if y == 0 || y & 1 == 0
-  if (mpz_cmp_ui(y, 0) == 0 || mpz_even_p(y))
-    return 0;
-
-  mpz_t a;
-  mpz_t b;
-  mpz_t c;
-  mpz_t t;
-  int j;
-
-  mpz_init(a);
-  mpz_init(b);
-  mpz_init(c);
-  mpz_init(t);
-  j = 0;
-
-  // a = x
-  mpz_set(a, x);
-  // b = y
-  mpz_set(b, y);
-  j = 1;
-
-  // if b < 0
-  if (mpz_cmp_ui(b, 0) < 0) {
-    // if a < 0
-    if (mpz_cmp_ui(a, 0) < 0)
-      j = -1;
-    // b = -b
-    mpz_neg(b, b);
-  }
-
-  for (;;) {
-    // if b == 1
-    if (mpz_cmp_ui(b, 1) == 0)
-      break;
-
-    // if a == 0
-    if (mpz_cmp_ui(a, 0) == 0) {
-      j = 0;
-      break;
-    }
-
-    // a = a % b
-    mpz_mod(a, a, b);
-
-    // if a == 0
-    if (mpz_cmp_ui(a, 0) == 0) {
-      j = 0;
-      break;
-    }
-
-    // s = bitlen(a)
-    unsigned long s = goo_zerobits(a);
-
-    if (s & 1) {
-      // bmod8 = b & 7
-      unsigned long bmod8 = mpz_mod_ui(t, b, 8);
-
-      if (bmod8 == 3 || bmod8 == 5)
-        j = -j;
-    }
-
-    // c = a >> s
-    mpz_fdiv_q_2exp(c, a, s);
-
-    // if b & 3 == 3 and c & 3 == 3
-    if (mpz_mod_ui(t, b, 4) == 3 && mpz_mod_ui(t, c, 4) == 3)
-      j = -j;
-
-    // a = b
-    mpz_set(a, b);
-    // b = c
-    mpz_set(b, c);
-  }
-
-  mpz_clear(a);
-  mpz_clear(b);
-  mpz_clear(c);
-  mpz_clear(t);
-
-  return j;
-}
-#endif
-
 static int
 goo_mod_sqrtp(mpz_t ret, const mpz_t n, const mpz_t p) {
-  if (mpz_cmp_ui(p, 0) < 0)
+  if (mpz_sgn(p) <= 0)
     return 0;
 
   int r = 0;
@@ -464,12 +393,12 @@ goo_mod_sqrtp(mpz_t ret, const mpz_t n, const mpz_t p) {
   mpz_mod(nn, n, p);
 
   // if n == 0
-  if (mpz_cmp_ui(nn, 0) == 0) {
+  if (mpz_sgn(nn) == 0) {
     mpz_set_ui(ret, 0);
     goto succeed;
   }
 
-  if (goo_jacobi(nn, p) == -1)
+  if (mpz_jacobi(nn, p) == -1)
     goto fail;
 
   // if p & 3 == 3
@@ -489,7 +418,7 @@ goo_mod_sqrtp(mpz_t ret, const mpz_t n, const mpz_t p) {
   mpz_sub_ui(t, t, 1);
 
   // s = zerobits(t)
-  s = goo_zerobits(t);
+  s = goo_mpz_zerobits(t);
   // Q = t >> s
   mpz_fdiv_q_2exp(Q, t, s);
 
@@ -497,7 +426,7 @@ goo_mod_sqrtp(mpz_t ret, const mpz_t n, const mpz_t p) {
   // w = 2
   mpz_set_ui(w, 2);
 
-  while (goo_jacobi(w, p) != -1)
+  while (mpz_jacobi(w, p) != -1)
     mpz_add_ui(w, w, 1);
 
   // w = modpow(w, Q, p)
@@ -701,7 +630,7 @@ goo_is_prime_mr(
   mpz_sub_ui(nm3, nm3, 2);
 
   // k = zero_bits(nm1)
-  k = goo_zerobits(nm1);
+  k = goo_mpz_zerobits(nm1);
   // q = nm1 >> k
   mpz_fdiv_q_2exp(q, nm1, k);
 
@@ -805,7 +734,7 @@ goo_is_prime_lucas(const mpz_t n) {
     // d = p * p - 4
     mpz_set_ui(d, p * p - 4);
 
-    int j = goo_jacobi(d, n);
+    int j = mpz_jacobi(d, n);
 
     if (j == -1)
       break;
@@ -818,7 +747,7 @@ goo_is_prime_lucas(const mpz_t n) {
     }
 
     if (p == 40) {
-      if (goo_is_square(n))
+      if (mpz_perfect_square_p(n))
         goto fail;
     }
 
@@ -831,7 +760,7 @@ goo_is_prime_lucas(const mpz_t n) {
   mpz_add_ui(s, n, 1);
 
   // r = zerobits(s)
-  unsigned long r = goo_zerobits(s);
+  unsigned long r = goo_mpz_zerobits(s);
 
   // nm2 = n - 2
   mpz_sub_ui(nm2, n, 2);
@@ -900,12 +829,12 @@ goo_is_prime_lucas(const mpz_t n) {
     mpz_mod(t3, t1, n);
 
     // if t3 == 0
-    if (mpz_cmp_ui(t3, 0) == 0)
+    if (mpz_sgn(t3) == 0)
       goto succeed;
   }
 
   for (long t = 0; t < (long)r - 1; t++) {
-    if (mpz_cmp_ui(vk, 0) == 0)
+    if (mpz_sgn(vk) == 0)
       goto succeed;
 
     if (mpz_cmp_ui(vk, 2) == 0)
@@ -938,7 +867,7 @@ fail:
 static int
 goo_is_prime(const mpz_t p, const unsigned char *key) {
   // if p <= 0
-  if (mpz_cmp_ui(p, 0) <= 0)
+  if (mpz_sgn(p) <= 0)
     return 0;
 
   for (long i = 0; i < GOO_TEST_PRIMES_LEN; i++) {
@@ -1274,7 +1203,7 @@ goo_to_comb_exp(goo_comb_t *comb, const mpz_t e) {
         long b = (i + k * comb->adds_per_shift) * comb->shifts + j;
 
         ret <<= 1;
-        ret += (long)mpz_tstbit(e, (comb->bits - 1) - b);
+        ret |= (long)mpz_tstbit(e, (comb->bits - 1) - b);
       }
 
       comb->wins[j][(comb->adds_per_shift - 1) - i] = ret;
@@ -1897,7 +1826,7 @@ goo_hash_item(
   assert(len <= (GOO_MAX_RSA_BITS + 7) / 8);
 
   // Commit to sign.
-  if (mpz_cmp_ui(n, 0) < 0)
+  if (mpz_sgn(n) < 0)
     len |= 0x8000;
 
   size[0] = len;
@@ -1999,7 +1928,7 @@ goo_group_randbits(goo_group_t *group, mpz_t ret, size_t size) {
 static int
 goo_group_expand_sprime(goo_group_t *group, mpz_t s, const mpz_t s_prime) {
   unsigned char key[32];
-  size_t bytes = goo_mpz_bytesize(s_prime);
+  size_t bytes = goo_mpz_bytelen(s_prime);
 
   if (bytes > 32)
     return 0;
@@ -2045,7 +1974,7 @@ goo_group_challenge(
   mpz_t s;
   mpz_init(s);
 
-  if (mpz_cmp_ui(n, 0) <= 0) {
+  if (mpz_sgn(n) <= 0) {
     // Invalid RSA public key.
     goto fail;
   }
@@ -2059,7 +1988,7 @@ goo_group_challenge(
     goto fail;
 
   // if s <= 0
-  if (mpz_cmp_ui(s, 0) <= 0)
+  if (mpz_sgn(s) <= 0)
     goto fail;
 
   // The challenge: a commitment to the RSA modulus.
@@ -2068,7 +1997,7 @@ goo_group_challenge(
     goto fail;
 
   // if C1 <= 0
-  if (mpz_cmp_ui(C1, 0) <= 0)
+  if (mpz_sgn(C1) <= 0)
     goto fail;
 
   // C1 = reduce(C1)
@@ -2139,11 +2068,11 @@ goo_group_sign(
   int r = 0;
 
   // if s_prime <= 0 or C1 <= 0 or n <= 0 or p <= 0 or q <= 0
-  if (mpz_cmp_ui(s_prime, 0) <= 0
-      || mpz_cmp_ui(C1, 0) <= 0
-      || mpz_cmp_ui(n, 0) <= 0
-      || mpz_cmp_ui(p, 0) <= 0
-      || mpz_cmp_ui(q, 0) <= 0) {
+  if (mpz_sgn(s_prime) <= 0
+      || mpz_sgn(C1) <= 0
+      || mpz_sgn(n) <= 0
+      || mpz_sgn(p) <= 0
+      || mpz_sgn(q) <= 0) {
     goto fail;
   }
 
@@ -2423,22 +2352,22 @@ goo_group_verify(
   mpz_t *elldiff = &group->elldiff;
 
   // Sanity check.
-  if (mpz_cmp_ui(C1, 0) <= 0
-      || mpz_cmp_ui(C2, 0) <= 0
-      || mpz_cmp_ui(t, 0) <= 0
-      || mpz_cmp_ui(chal, 0) <= 0
-      || mpz_cmp_ui(ell, 0) <= 0
-      || mpz_cmp_ui(Aq, 0) <= 0
-      || mpz_cmp_ui(Bq, 0) <= 0
-      || mpz_cmp_ui(Cq, 0) <= 0
-      || mpz_cmp_ui(Dq, 0) <= 0
-      || mpz_cmp_ui(z_w, 0) <= 0
-      || mpz_cmp_ui(z_w2, 0) <= 0
-      || mpz_cmp_ui(z_s1, 0) <= 0
-      || mpz_cmp_ui(z_a, 0) <= 0
-      || mpz_cmp_ui(z_an, 0) <= 0
-      || mpz_cmp_ui(z_s1w, 0) <= 0
-      || mpz_cmp_ui(z_sa, 0) <= 0) {
+  if (mpz_sgn(C1) <= 0
+      || mpz_sgn(C2) <= 0
+      || mpz_sgn(t) <= 0
+      || mpz_sgn(chal) <= 0
+      || mpz_sgn(ell) <= 0
+      || mpz_sgn(Aq) <= 0
+      || mpz_sgn(Bq) <= 0
+      || mpz_sgn(Cq) <= 0
+      || mpz_sgn(Dq) <= 0
+      || mpz_sgn(z_w) <= 0
+      || mpz_sgn(z_w2) <= 0
+      || mpz_sgn(z_s1) <= 0
+      || mpz_sgn(z_a) <= 0
+      || mpz_sgn(z_an) <= 0
+      || mpz_sgn(z_s1w) <= 0
+      || mpz_sgn(z_sa) <= 0) {
     return 0;
   }
 
@@ -2593,9 +2522,6 @@ goo_challenge(
     return 0;
   }
 
-  // if (n_len < GOO_MIN_RSA_BITS / 8 || n_len > GOO_MAX_RSA_BITS / 8)
-  //   return 0;
-
   mpz_t nn, spn;
   mpz_init(nn);
   mpz_init(spn);
@@ -2611,7 +2537,7 @@ goo_challenge(
   if (*s_prime == NULL)
     goto fail;
 
-  *C1_len = goo_mpz_bytesize(ctx->n);
+  *C1_len = goo_mpz_bytelen(ctx->n);
   *C1 = goo_mpz_pad(NULL, *C1_len, ctx->C1);
 
   if (*C1 == NULL) {
@@ -2627,7 +2553,7 @@ fail:
 }
 
 #define goo_write_item(n, size) do {     \
-  size_t bytes = goo_mpz_bytesize((n));  \
+  size_t bytes = goo_mpz_bytelen((n));   \
   if (bytes > (size)) {                  \
     free(data);                          \
     goto fail;                           \
@@ -2680,11 +2606,8 @@ goo_sign(
   if (s_prime_len != 32)
     return 0;
 
-  if (C1_len != goo_mpz_bytesize(ctx->n))
+  if (C1_len != goo_mpz_bytelen(ctx->n))
     return 0;
-
-  // if (n_len < GOO_MIN_RSA_BITS / 8 || n_len > GOO_MAX_RSA_BITS / 8)
-  //   return 0;
 
   mpz_t spn, nn, pn, qn;
 
@@ -2793,7 +2716,7 @@ goo_verify(
   if (msg_len < 20 || msg_len > 128)
     return 0;
 
-  if (C1_len != goo_mpz_bytesize(ctx->n))
+  if (C1_len != goo_mpz_bytelen(ctx->n))
     return 0;
 
   goo_mpz_import(ctx->msg, msg, msg_len);
