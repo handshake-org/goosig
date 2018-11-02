@@ -1,6 +1,6 @@
 [
   {
-    "group": "AOL",
+    "group": "AOL2",
     "bits": 2048,
     "key": {
       "kty": "RSA",
@@ -36,7 +36,7 @@
     }
   },
   {
-    "group": "AOL",
+    "group": "AOL2",
     "bits": 4096,
     "key": {
       "kty": "RSA",

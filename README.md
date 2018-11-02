@@ -55,6 +55,33 @@ const result = goo.verify(msg, sig, C1);
 result === true;
 ```
 
+## Moduli
+
+The design of GooSig requires a public RSA modulus whose prime factorization is
+unknown.
+
+There are 4 built-in moduli exposed on the `Goo` object.
+
+- [AOL1] - America Online Root CA 1 (now defunct) (2048 bit).
+- [AOL2] - America Online Root CA 2 (now defunct) (4096 bit) - notable for
+  being one of the few 4096 bit moduli in the wild.
+- [RSA617] - From the [RSA factoring challenge][challenge-wiki] (2048 bit).
+- [RSA2048] - Also from the factoring challenge, but at one point had a
+  $200,000 bounty on it (2048 bit).
+
+In the 1990s, RSA labs generated several [RSA moduli][numbers-wiki] for the
+[RSA factoring challenge][challenge-wiki]. RSA Labs claims to have [destroyed
+the hard drives][faq] containing the primes.
+
+Original Links (archive.org);
+
+- [Main Page][challenge]
+- [RSA Numbers][numbers]
+- [RSA Numbers Text File][txt]
+- [RSA-2048 Text File][RSA2048-txt]
+- [FAQ][faq]
+- [Another RSA Numbers List][list] (RSA-617 was generated later, in 1997)
+
 ## Benchmarks
 
 C verification time is currently around 1ms with highend consumer-grade
@@ -133,3 +160,15 @@ See LICENSE for more info.
 [protocol]: https://github.com/kwantam/GooSig/blob/master/protocol.txt
 [libgoopy]: https://github.com/kwantam/GooSig
 [c]: https://github.com/handshake-org/goosig/tree/master/src/goo
+[AOL1]: https://ssl-tools.net/subjects/3c8008731e5ff9a0e7a6b0fb906fc6e439cbe862
+[AOL2]: https://ssl-tools.net/subjects/28ecf0993d30f9e4e607bef4f5c487f64a2a71a6
+[RSA617]: https://en.wikipedia.org/wiki/RSA_numbers#RSA-617
+[RSA2048]: https://en.wikipedia.org/wiki/RSA_numbers#RSA-2048
+[RSA2048-txt]: https://web.archive.org/web/20130521022803/http://www.rsa.com/rsalabs/challenges/factoring/RSA-2048.txt
+[challenge-wiki]: https://en.wikipedia.org/wiki/RSA_Factoring_Challenge
+[numbers-wiki]: https://en.wikipedia.org/wiki/RSA_numbers
+[challenge]: https://web.archive.org/web/20130507091636/http://www.rsa.com/rsalabs/node.asp?id=2092
+[numbers]: https://web.archive.org/web/20130507115513/http://www.rsa.com/rsalabs/node.asp?id=2093
+[txt]: https://web.archive.org/web/20130507115513/http://www.rsa.com/rsalabs/challenges/factoring/challengenumbers.txt
+[faq]: https://web.archive.org/web/20130502202924/http://www.rsa.com/rsalabs/node.asp?id=2094
+[list]: http://www.ontko.com/pub/rayo/primes/rsa_fact.html

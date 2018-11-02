@@ -20,11 +20,11 @@ function runTests(name, Goo, Other, vectors) {
 
     // 4096-bit GoUO
     // 4096-bit RSA GoUO, 2048-bit Signer key
-    const gops_4_2_p = new Goo(Goo.AOL, 2, 3, 2048);
+    const gops_4_2_p = new Goo(Goo.AOL2, 2, 3, 2048);
     // 4096-bit RSA GoUO, 4096-bit Signer key
-    const gops_4_4_p = new Goo(Goo.AOL, 2, 3, 4096);
+    const gops_4_4_p = new Goo(Goo.AOL2, 2, 3, 4096);
     // 4096-bit RSA GoUO (verification)
-    const gops_4_v = new Goo(Goo.AOL, 2, 3, null);
+    const gops_4_v = new Goo(Goo.AOL2, 2, 3, null);
 
     // 2048-bit GoUO
     // 2048-bit RSA GoUO, 2048-bit Signer key
@@ -35,7 +35,7 @@ function runTests(name, Goo, Other, vectors) {
     const gops_2_v = new Goo(Goo.RSA2048, 2, 3, null);
 
     // Native 4096 bit
-    const other_4_v = new Other(Goo.AOL, 2, 3, null);
+    const other_4_v = new Other(Goo.AOL2, 2, 3, null);
     // Native 2048 bit
     const other_2_v = new Other(Goo.RSA2048, 2, 3, null);
 
@@ -95,7 +95,7 @@ function runTests(name, Goo, Other, vectors) {
       const msg = Buffer.from(vector.msg, 'hex');
       const s_prime = Buffer.from(vector.s_prime, 'hex');
       const C1 = Buffer.from(vector.C1, 'hex');
-      const gbits = vector.group === 'AOL' ? 4096 : 2048;
+      const gbits = vector.group === 'AOL2' ? 4096 : 2048;
       const sig = Signature.fromJSON(vector.sig).encode(gbits);
       const str = `${gbits}-bit RSA GoUO, ${bits}-bit Signer PK`;
 

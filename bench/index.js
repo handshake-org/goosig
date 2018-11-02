@@ -10,11 +10,11 @@ const Native = require('../lib/native');
 function main(Goo, nreps) {
   // 4096-bit GoUO
   // 4096-bit RSA GoUO, 2048-bit Signer key
-  const gops_4_2_p = new Goo(Goo.AOL, 2, 3, 2048);
+  const gops_4_2_p = new Goo(Goo.AOL2, 2, 3, 2048);
   // 4096-bit RSA GoUO, 4096-bit Signer key
-  const gops_4_4_p = new Goo(Goo.AOL, 2, 3, 4096);
+  const gops_4_4_p = new Goo(Goo.AOL2, 2, 3, 4096);
   // 4096-bit RSA GoUO (verification)
-  const gops_4_v = new Goo(Goo.AOL, 2, 3, null);
+  const gops_4_v = new Goo(Goo.AOL2, 2, 3, null);
 
   // 2048-bit GoUO
   // 2048-bit RSA GoUO, 2048-bit Signer key
