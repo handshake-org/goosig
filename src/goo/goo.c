@@ -2555,38 +2555,6 @@ goo_uninit(goo_ctx_t *ctx) {
     goo_group_uninit(ctx);
 }
 
-#define goo_write_item(n, size) do {     \
-  size_t bytes = goo_mpz_bytesize((n));  \
-  if (bytes > (size)) {                  \
-    free(data);                          \
-    goto fail;                           \
-  }                                      \
-  size_t pad = (size) - bytes;           \
-  memset(&data[pos], 0x00, pad);         \
-  pos += pad;                            \
-  goo_mpz_export(&data[pos], NULL, (n)); \
-  pos += bytes;                          \
-} while (0)
-
-#define goo_write_final() \
-  assert(pos == len)
-
-#define goo_read_item(n, size) do {       \
-  if (pos + (size) > sig_len)             \
-    return 0;                             \
-                                          \
-  goo_mpz_import((n), &sig[pos], (size)); \
-  pos += (size);                          \
-} while (0)                               \
-
-#define goo_read_final() do {     \
-  assert(pos <= sig_len);         \
-                                  \
-  /* non-minimal serialization */ \
-  if (pos != sig_len)             \
-    return 0;                     \
-} while (0)                       \
-
 int
 goo_challenge(
   goo_ctx_t *ctx,
@@ -2640,6 +2608,22 @@ fail:
   mpz_clear(spn);
   return r;
 }
+
+#define goo_write_item(n, size) do {     \
+  size_t bytes = goo_mpz_bytesize((n));  \
+  if (bytes > (size)) {                  \
+    free(data);                          \
+    goto fail;                           \
+  }                                      \
+  size_t pad = (size) - bytes;           \
+  memset(&data[pos], 0x00, pad);         \
+  pos += pad;                            \
+  goo_mpz_export(&data[pos], NULL, (n)); \
+  pos += bytes;                          \
+} while (0)
+
+#define goo_write_final() \
+  assert(pos == len)
 
 int
 goo_sign(
@@ -2759,6 +2743,22 @@ fail:
   mpz_clear(qn);
   return r;
 }
+
+#define goo_read_item(n, size) do {       \
+  if (pos + (size) > sig_len)             \
+    return 0;                             \
+                                          \
+  goo_mpz_import((n), &sig[pos], (size)); \
+  pos += (size);                          \
+} while (0)                               \
+
+#define goo_read_final() do {     \
+  assert(pos <= sig_len);         \
+                                  \
+  /* non-minimal serialization */ \
+  if (pos != sig_len)             \
+    return 0;                     \
+} while (0)                       \
 
 int
 goo_verify(
