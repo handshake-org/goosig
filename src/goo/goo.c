@@ -2690,11 +2690,11 @@ goo_sign(
     goto fail;
   }
 
-  size_t pos = 0;
-  size_t len = 0;
-
   size_t modbytes = (goo_mpz_bitlen(ctx->n) + 7) / 8;
   size_t chalbytes = (GOO_CHAL_BITS + 7) / 8;
+
+  size_t pos = 0;
+  size_t len = 0;
 
   len += modbytes; // C2
   len += 2; // t
