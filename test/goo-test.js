@@ -132,7 +132,6 @@ function runTests(name, Goo, Other) {
 
         assert.strictEqual(res1, false);
 
-
         C12[j] ^= 1;
         res2 = goo.verify(msg, sig2, C12);
         C12[j] ^= 1;
