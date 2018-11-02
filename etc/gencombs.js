@@ -6,16 +6,16 @@ const SHA256 = require('bcrypto/lib/sha256');
 const Goo = require('../lib/js/goo');
 
 const moduli = [
-  // ['aol1', Goo.AOL1],
-  // ['aol2', Goo.AOL2],
+  ['aol1', Goo.AOL1],
+  ['aol2', Goo.AOL2],
   ['rsa2048', Goo.RSA2048]
-  // ['rsa619', Goo.RSA617]
+  ['rsa619', Goo.RSA617]
 ];
 
 const sizes = [
   null,
-  // 1024,
-  // 2048,
+  1024,
+  2048,
   4096
 ];
 
