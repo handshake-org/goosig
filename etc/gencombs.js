@@ -107,7 +107,7 @@ function combsToC(name, bits, modulus, json) {
   let i = MAX_LEN - json.length;
 
   while (i > 0) {
-    lines.push('  NULL,');
+    lines.push('  {},');
     i -= 1;
   }
 
