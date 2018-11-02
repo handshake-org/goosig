@@ -1893,6 +1893,7 @@ goo_hash_item(
 
   goo_mpz_export(&buf[0], &len, n);
 
+  // Sanity check.
   assert(len <= (GOO_MAX_RSA_BITS + 7) / 8);
 
   // Commit to sign.
@@ -1998,10 +1999,12 @@ goo_group_randbits(goo_group_t *group, mpz_t ret, size_t size) {
 static int
 goo_group_expand_sprime(goo_group_t *group, mpz_t s, const mpz_t s_prime) {
   unsigned char key[32];
-  size_t pos = 32 - goo_mpz_bytesize(s_prime);
+  size_t bytes = goo_mpz_bytesize(s_prime);
 
-  if (pos > 32) // Overflow
+  if (bytes > 32)
     return 0;
+
+  size_t pos = 32 - bytes;
 
   memset(&key[0], 0x00, pos);
   goo_mpz_export(&key[pos], NULL, s_prime);
@@ -2041,6 +2044,11 @@ goo_group_challenge(
 
   mpz_t s;
   mpz_init(s);
+
+  if (mpz_cmp_ui(n, 0) <= 0) {
+    // Invalid RSA public key.
+    goto fail;
+  }
 
   // s_prime = randbits(256)
   if (!goo_group_randbits(group, s_prime, 256))
@@ -2130,18 +2138,27 @@ goo_group_sign(
 
   int r = 0;
 
-  // s = expand_sprime(s_prime)
-  if (!goo_group_expand_sprime(group, *s, s_prime))
-    goto fail;
-
-  // if s <= 0 or C1 <= 0 or n <= 0 or p <= 0 or q <= 0
-  if (mpz_cmp_ui(*s, 0) <= 0
+  // if s_prime <= 0 or C1 <= 0 or n <= 0 or p <= 0 or q <= 0
+  if (mpz_cmp_ui(s_prime, 0) <= 0
       || mpz_cmp_ui(C1, 0) <= 0
       || mpz_cmp_ui(n, 0) <= 0
       || mpz_cmp_ui(p, 0) <= 0
       || mpz_cmp_ui(q, 0) <= 0) {
     goto fail;
   }
+
+  // x = p * q
+  mpz_mul(*x, p, q);
+
+  // if x != n
+  if (mpz_cmp(*x, n) != 0) {
+    // Invalid RSA private key.
+    goto fail;
+  }
+
+  // s = expand_sprime(s_prime)
+  if (!goo_group_expand_sprime(group, *s, s_prime))
+    goto fail;
 
   // x = powgh(n, s)
   if (!goo_group_powgh(group, *x, n, *s))
@@ -2576,8 +2593,8 @@ goo_challenge(
     return 0;
   }
 
-  if (n_len < GOO_MIN_RSA_BITS / 8 || n_len > GOO_MAX_RSA_BITS / 8)
-    return 0;
+  // if (n_len < GOO_MIN_RSA_BITS / 8 || n_len > GOO_MAX_RSA_BITS / 8)
+  //   return 0;
 
   mpz_t nn, spn;
   mpz_init(nn);
@@ -2666,8 +2683,8 @@ goo_sign(
   if (C1_len != goo_mpz_bytesize(ctx->n))
     return 0;
 
-  if (n_len < GOO_MIN_RSA_BITS / 8 || n_len > GOO_MAX_RSA_BITS / 8)
-    return 0;
+  // if (n_len < GOO_MIN_RSA_BITS / 8 || n_len > GOO_MAX_RSA_BITS / 8)
+  //   return 0;
 
   mpz_t spn, nn, pn, qn;
 
