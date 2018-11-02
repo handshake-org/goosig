@@ -35,14 +35,8 @@
     "include_dirs": [
       "<!(node -e \"require('nan')\")"
     ],
-    "libraries": [
-      "-lgmp"
-    ],
     "variables": {
       "conditions": [
-        ["OS!='win'", {
-          "cc": "<!(echo $CC)"
-        }],
         ["OS=='win'", {
           "conditions": [
             ["target_arch=='ia32'", {
@@ -55,7 +49,7 @@
         ["OS=='win'", {
           "with_gmp%": "false"
         }, {
-          "with_gmp%": "<!(utils/has_lib.sh gmpxx && utils/has_lib.sh gmp)"
+          "with_gmp%": "<!(utils/has_lib.sh gmpxx gmp)"
         }]
       ]
     },
@@ -69,13 +63,17 @@
           "GOO_BIG_ENDIAN"
         ]
       }],
-      ["with_gmp=='false'", {
-        "sources": [
-          "./src/goo/mini-gmp.c"
-        ]
-      }, {
+      ["with_gmp=='true'", {
         "defines": [
           "GOO_HAS_GMP"
+        ],
+        "libraries": [
+          "-lgmpxx",
+          "-lgmp"
+        ]
+      }, {
+        "sources": [
+          "./src/goo/mini-gmp.c"
         ]
       }],
       ["OS=='win'", {
