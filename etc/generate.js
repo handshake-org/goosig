@@ -8,9 +8,13 @@ const Path = require('path');
 const BLAKE2b = require('bcrypto/lib/blake2b256');
 const BN = require('bcrypto/lib/bn.js');
 const rsa = require('bcrypto/lib/rsa');
+const SHA1 = require('bcrypto/lib/sha1');
 const SHA256 = require('bcrypto/lib/sha256');
 const SHA3 = require('bcrypto/lib/sha3-256');
 const x509 = require('bcrypto/lib/encoding/x509');
+
+const AOL1_FP = '3921c115c15d0eca5ccb5bc4f07d21d8050b566a';
+const AOL2_FP = '85b5ff679b0c79961fc86e4422004613db179284';
 
 function parseAOL(file) {
   assert(typeof file === 'string');
@@ -18,8 +22,21 @@ function parseAOL(file) {
   const path = Path.resolve(__dirname, file);
   const str = fs.readFileSync(path, 'utf8');
   const cert = x509.Certificate.fromPEM(str);
+  const fp = SHA1.digest(cert.raw);
   const spki = cert.tbsCertificate.subjectPublicKeyInfo;
   const key = rsa.publicKeyImportSPKI(spki.raw);
+
+  switch (file) {
+    case 'aol1.pem':
+      assert.strictEqual(fp.toString('hex'), AOL1_FP);
+      break;
+    case 'aol2.pem':
+      assert.strictEqual(fp.toString('hex'), AOL2_FP);
+      break;
+    default:
+      assert(false);
+      break;
+  }
 
   return key.n;
 }
