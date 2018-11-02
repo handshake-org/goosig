@@ -50,7 +50,7 @@ goo_mpz_bitlen(const mpz_t n) {
   return mpz_sizeinbase(n, 2);
 }
 
-static inline unsigned char *
+static inline void *
 goo_mpz_pad(void *out, size_t size, const mpz_t n) {
   size_t len = goo_mpz_bytelen(n);
 
@@ -103,10 +103,11 @@ goo_mpz_zerobits(const mpz_t n) {
 }
 
 static inline void
-goo_mpz_mask(mpz_t r, const mpz_t n, unsigned long bit) {
-  mpz_t mask;
-
-  mpz_init(mask);
+goo_mpz_mask(mpz_t r, const mpz_t n, unsigned long bit, mpz_t mask) {
+  if (bit == 0) {
+    mpz_set_ui(r, 0);
+    return;
+  }
 
   // mask = (1 << bit) - 1
   mpz_set_ui(mask, 1);
@@ -115,7 +116,6 @@ goo_mpz_mask(mpz_t r, const mpz_t n, unsigned long bit) {
 
   // r = n & mask
   mpz_and(r, n, mask);
-  mpz_clear(mask);
 }
 
 #ifndef GOO_HAS_GMP
@@ -279,12 +279,12 @@ goo_prng_seed(goo_prng_t *prng, const unsigned char *key) {
 }
 
 static void
-goo_prng_nextrand(goo_prng_t *prng, unsigned char out[32]) {
+goo_prng_nextrandom(goo_prng_t *prng, unsigned char out[32]) {
   goo_drbg_generate(&prng->ctx, &out[0], 32);
 }
 
 static void
-goo_prng_getrandbits(goo_prng_t *prng, mpz_t r, unsigned long nbits) {
+goo_prng_randombits(goo_prng_t *prng, mpz_t r, unsigned long nbits) {
   mpz_set(r, prng->save);
 
   unsigned long b = goo_mpz_bitlen(r);
@@ -294,7 +294,7 @@ goo_prng_getrandbits(goo_prng_t *prng, mpz_t r, unsigned long nbits) {
     // r = r << 256
     mpz_mul_2exp(r, r, 256);
     // tmp = nextrand()
-    goo_prng_nextrand(prng, &out[0]);
+    goo_prng_nextrandom(prng, &out[0]);
     goo_mpz_import(prng->tmp, &out[0], 32);
     // r = r | tmp
     mpz_ior(r, r, prng->tmp);
@@ -303,23 +303,15 @@ goo_prng_getrandbits(goo_prng_t *prng, mpz_t r, unsigned long nbits) {
 
   unsigned long left = b - nbits;
 
-  if (left == 0) {
-    mpz_set_ui(prng->save, 0);
-    return;
-  }
-
   // save = r & ((1 << left) - 1)
-  mpz_set_ui(prng->tmp, 1);
-  mpz_mul_2exp(prng->tmp, prng->tmp, left);
-  mpz_sub_ui(prng->tmp, prng->tmp, 1);
-  mpz_and(prng->save, r, prng->tmp);
+  goo_mpz_mask(prng->save, r, left, prng->tmp);
 
   // r >>= left;
   mpz_fdiv_q_2exp(r, r, left);
 }
 
 static void
-goo_prng_getrandint(goo_prng_t *prng, mpz_t ret, const mpz_t max) {
+goo_prng_randomint(goo_prng_t *prng, mpz_t ret, const mpz_t max) {
   // if max <= 0
   if (mpz_sgn(max) <= 0) {
     // ret = 0
@@ -338,7 +330,7 @@ goo_prng_getrandint(goo_prng_t *prng, mpz_t ret, const mpz_t max) {
 
   // while ret >= max
   while (mpz_cmp(ret, max) >= 0)
-    goo_prng_getrandbits(prng, ret, bits);
+    goo_prng_randombits(prng, ret, bits);
 }
 
 /*
@@ -637,7 +629,7 @@ goo_is_prime_mr(
       mpz_set_ui(x, 2);
     } else {
       // x = getrandint(nm3)
-      goo_prng_getrandint(&prng, x, nm3);
+      goo_prng_randomint(&prng, x, nm3);
       // x += 2
       mpz_add_ui(x, x, 2);
     }
@@ -680,7 +672,7 @@ fail:
 // https://github.com/golang/go/blob/aadaec5/src/math/big/prime.go#L150
 static int
 goo_is_prime_lucas(const mpz_t n) {
-  int ret = 0;
+  int r = 0;
   unsigned long p;
   mpz_t d;
   mpz_t s, nm2;
@@ -750,14 +742,14 @@ goo_is_prime_lucas(const mpz_t n) {
   // s = n + 1
   mpz_add_ui(s, n, 1);
 
-  // r = zerobits(s)
-  unsigned long r = goo_mpz_zerobits(s);
+  // zb = zerobits(s)
+  unsigned long zb = goo_mpz_zerobits(s);
 
   // nm2 = n - 2
   mpz_sub_ui(nm2, n, 2);
 
-  // s >>= r
-  mpz_fdiv_q_2exp(s, s, r);
+  // s >>= zb
+  mpz_fdiv_q_2exp(s, s, zb);
 
   unsigned long bp = p;
 
@@ -824,7 +816,7 @@ goo_is_prime_lucas(const mpz_t n) {
       goto succeed;
   }
 
-  for (long t = 0; t < (long)r - 1; t++) {
+  for (long t = 0; t < (long)zb - 1; t++) {
     if (mpz_sgn(vk) == 0)
       goto succeed;
 
@@ -842,7 +834,7 @@ goo_is_prime_lucas(const mpz_t n) {
   goto fail;
 
 succeed:
-  ret = 1;
+  r = 1;
 fail:
   mpz_clear(d);
   mpz_clear(s);
@@ -852,7 +844,7 @@ fail:
   mpz_clear(t1);
   mpz_clear(t2);
   mpz_clear(t3);
-  return ret;
+  return r;
 }
 
 static int
@@ -1885,8 +1877,8 @@ goo_group_fs_chal(
   goo_hash_all(&key[0], group, C1, C2, t, A, B, C, D, msg);
 
   goo_prng_seed(&group->prng, &key[0]);
-  goo_prng_getrandbits(&group->prng, chal, GOO_CHAL_BITS);
-  goo_prng_getrandbits(&group->prng, ell, GOO_CHAL_BITS);
+  goo_prng_randombits(&group->prng, chal, GOO_CHAL_BITS);
+  goo_prng_randombits(&group->prng, ell, GOO_CHAL_BITS);
 
   if (k != NULL)
     memcpy(k, key, 32);
@@ -1911,7 +1903,7 @@ goo_group_randbits(goo_group_t *group, mpz_t ret, size_t size) {
     return 0;
 
   goo_prng_seed(&group->prng, &key[0]);
-  goo_prng_getrandbits(&group->prng, ret, size);
+  goo_prng_randombits(&group->prng, ret, size);
 
   return 1;
 }
@@ -1930,7 +1922,7 @@ goo_group_expand_sprime(goo_group_t *group, mpz_t s, const mpz_t s_prime) {
   goo_mpz_export(&key[pos], NULL, s_prime);
 
   goo_prng_seed(&group->prng, &key[0]);
-  goo_prng_getrandbits(&group->prng, s, GOO_EXPONENT_SIZE);
+  goo_prng_randombits(&group->prng, s, GOO_EXPONENT_SIZE);
 
   return 1;
 }
@@ -1948,7 +1940,7 @@ goo_group_rand_scalar(goo_group_t *group, mpz_t ret) {
     return 0;
 
   goo_prng_seed(&group->prng, &key[0]);
-  goo_prng_getrandbits(&group->prng, ret, size);
+  goo_prng_randombits(&group->prng, ret, size);
 
   return 1;
 }
@@ -2011,7 +2003,7 @@ goo_group_sign(
   const mpz_t p,
   const mpz_t q
 ) {
-  goo_sig_init(sig);
+  int r = 0;
 
   mpz_t *C2 = &sig->C2;
   mpz_t *t = &sig->t;
@@ -2055,8 +2047,6 @@ goo_group_sign(
   mpz_t *B = &group->B;
   mpz_t *C = &group->C;
   mpz_t *D = &group->D;
-
-  int r = 0;
 
   // if s_prime <= 0 or C1 <= 0 or n <= 0 or p <= 0 or q <= 0
   if (mpz_sgn(s_prime) <= 0
@@ -2185,8 +2175,10 @@ goo_group_sign(
   // D = r_w2 - r_an
   mpz_sub(*D, *r_w2, *r_an);
 
+  int valid = 0;
+
   // V's message: random challenge and random prime.
-  while (r == 0 || goo_mpz_bitlen(*ell) != 128) {
+  while (valid == 0 || goo_mpz_bitlen(*ell) != 128) {
     // Randomize the signature until Fiat-Shamir
     // returns an admissable ell. Note that it's
     // not necessary to re-start the whole
@@ -2202,9 +2194,9 @@ goo_group_sign(
     goo_group_reduce(group, *A, *A);
 
     // [chal, ell] = fs_chal(C1, C2, t, A, B, C, D, msg)
-    r = goo_group_fs_chal(group,
-                          *chal, *ell, NULL, C1, *C2,
-                          *t, *A, *B, *C, *D, msg, 0);
+    valid = goo_group_fs_chal(group,
+                              *chal, *ell, NULL, C1, *C2,
+                              *t, *A, *B, *C, *D, msg, 0);
   }
 
   // P's second message: compute quotient message.
@@ -2289,10 +2281,9 @@ goo_group_sign(
   // z_prime: (z_w, z_w2, z_s1, z_a, z_an, z_s1w, z_sa).
   // Signature: (chal, ell, Aq, Bq, Cq, Dq, z_prime).
 
-  return 1;
+  r = 1;
 fail:
-  goo_sig_uninit(sig);
-  return 0;
+  return r;
 }
 
 static int
@@ -2612,6 +2603,7 @@ goo_sign(
   goo_mpz_import(qn, q, q_len);
 
   goo_sig_t sig;
+  goo_sig_init(&sig);
 
   if (!goo_group_sign(ctx, &sig, ctx->msg,
                       spn, ctx->C1, nn, pn, qn)) {
