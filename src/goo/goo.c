@@ -218,7 +218,104 @@ goo_clog2(const mpz_t val) {
 }
 
 static unsigned long
-goo_sqrt(unsigned long n) {
+goo_mpz_zerobits(const mpz_t n) {
+  if (mpz_cmp_ui(n, 0) == 0)
+    return 0;
+
+  mpz_t x;
+  mpz_init(x);
+
+  // x = n
+  mpz_set(x, n);
+
+  // if x < 0
+  if (mpz_cmp_ui(x, 0) < 0) {
+    // x = -x;
+    mpz_mul_si(x, x, -1);
+  }
+
+  unsigned long i = 0;
+
+  // while x & 1 == 0
+  while (mpz_even_p(x)) {
+    i += 1;
+    // x >>= 1
+    mpz_fdiv_q_2exp(x, x, 1);
+  }
+
+  mpz_clear(x);
+
+  return i;
+}
+
+// https://github.com/golang/go/blob/aadaec5/src/math/big/nat.go#L1335
+static void
+goo_isqrt(mpz_t r, const mpz_t x) {
+  if (mpz_cmp_ui(x, 1) <= 0) {
+    mpz_set(r, x);
+    return;
+  }
+
+  mpz_t z1, z2;
+  mpz_init(z1);
+  mpz_init(z2);
+
+  unsigned long bitlen = goo_mpz_bitlen(x);
+
+  // See https://members.loria.fr/PZimmermann/mca/pub226.html.
+  // z1 = 1 << ((bitlen(x) >> 1) + 1);
+  mpz_set_ui(z1, 1);
+  mpz_mul_2exp(z1, z1, (bitlen >> 1) + 1);
+
+  for (;;) {
+    // z2 = x / z1
+    mpz_fdiv_q(z2, x, z1);
+    // z2 += z1
+    mpz_add(z2, z2, z1);
+    // z2 >>= 1
+    mpz_fdiv_q_2exp(z2, z2, 1);
+
+    // if z2 >= z1
+    if (mpz_cmp(z2, z1) >= 0)
+      break;
+
+    // z1 = z2
+    mpz_set(z1, z2);
+  }
+
+  // r = z1
+  mpz_set(r, z1);
+  mpz_clear(z1);
+  mpz_clear(z2);
+}
+
+static int
+goo_is_square(const mpz_t n) {
+  int r = 0;
+
+  mpz_t x;
+  mpz_init(x);
+
+  // x = isqrt(n)
+  goo_isqrt(x, n);
+
+  // x = x * x
+  mpz_mul(x, x, x);
+
+  // if x == n
+  if (mpz_cmp(x, n) == 0)
+    goto succeed;
+
+  goto fail;
+succeed:
+  r = 1;
+fail:
+  mpz_clear(x);
+  return r;
+}
+
+static unsigned long
+goo_dsqrt(unsigned long n) {
   long len = 0;
 
   unsigned long nn = n;
@@ -255,7 +352,7 @@ combspec_size(long bits) {
 
   for (long ppa = 2; ppa < 18; ppa++) {
     long bpw = (bits + ppa - 1) / ppa;
-    long sqrt = goo_sqrt(bpw);
+    long sqrt = goo_dsqrt(bpw);
 
     for (long aps = 1; aps < sqrt + 2; aps++) {
       if (bpw % aps != 0)
@@ -316,7 +413,7 @@ goo_combspec_init(
 
   for (long ppa = 2; ppa < 18; ppa++) {
     long bpw = (bits + ppa - 1) / ppa;
-    long sqrt = goo_sqrt(bpw);
+    long sqrt = goo_dsqrt(bpw);
 
     for (long aps = 1; aps < sqrt + 2; aps++) {
       if (bpw % aps != 0) {
@@ -1130,19 +1227,118 @@ goo_hash_all(
   goo_sha256_final(&ctx, out);
 }
 
-static void
-goo_factor_twos(mpz_t d, unsigned long *s, const mpz_t n) {
-  mpz_set(d, n);
-  *s = 0;
+#ifdef GOO_HAS_GMP
+#define goo_mpz_jacobi mpz_jacobi
+#else
+// https://github.com/golang/go/blob/aadaec5/src/math/big/int.go#L754
+static int
+goo_mpz_jacobi(const mpz_t x, const mpz_t y) {
+  // Undefined behavior.
+  if (mpz_even_p(y))
+    return 0;
 
-  while (mpz_even_p(d)) {
-    mpz_fdiv_q_ui(d, d, 2);
-    *s += 1;
+  mpz_t a;
+  mpz_t b;
+  mpz_t c;
+  mpz_t t;
+  int j;
+
+  mpz_init(a);
+  mpz_init(b);
+  mpz_init(c);
+  mpz_init(t);
+  j = 0;
+
+  // a = x
+  mpz_set(a, x);
+  // b = y
+  mpz_set(b, y);
+  j = 1;
+
+  // if b < 0
+  if (mpz_cmp_ui(b, 0) < 0) {
+    // if a < 0
+    if (mpz_cmp_ui(a, 0) < 0)
+      j = -1;
+    // b = -b
+    mpz_mul_si(b, b, -1);
   }
+
+  for (;;) {
+    // if b == 1
+    if (mpz_cmp_ui(b, 1) == 0)
+      break;
+
+    // if a == 0
+    if (mpz_cmp_ui(a, 0) == 0) {
+      j = 0;
+      break;
+    }
+
+    // a = a % b
+    mpz_mod(a, a, b);
+
+    // if a == 0
+    if (mpz_cmp_ui(a, 0) == 0) {
+      j = 0;
+      break;
+    }
+
+    // s = bitlen(a)
+    unsigned long s = goo_mpz_zerobits(a);
+
+    if (s & 1) {
+      // bmod8 = b & 7
+      unsigned long bmod8 = mpz_mod_ui(t, b, 8);
+
+      if (bmod8 == 3 || bmod8 == 5)
+        j = -j;
+    }
+
+    // c = a >> s
+    mpz_fdiv_q_2exp(c, a, s);
+
+    // if b & 3 == 3 and c & 3 == 3
+    if (mpz_mod_ui(t, b, 4) == 3 && mpz_mod_ui(t, c, 4) == 3)
+      j = -j;
+
+    // a = b
+    mpz_set(a, b);
+    // b = c
+    mpz_set(b, c);
+  }
+
+  mpz_clear(a);
+  mpz_clear(b);
+  mpz_clear(c);
+  mpz_clear(t);
+
+  return j;
 }
+#endif
 
 static int
-goo_miller_rabin(
+goo_is_prime_div(const mpz_t n) {
+  int r = 0;
+  mpz_t tmp;
+  mpz_init(tmp);
+
+  for (long i = 0; i < GOO_TEST_PRIMES_LEN; i++) {
+    // if n % test_primes[i] == 0
+    if (mpz_mod_ui(tmp, n, goo_test_primes[i]) == 0)
+      goto fail;
+  }
+
+  r = 1;
+fail:
+  mpz_clear(tmp);
+  return r;
+}
+
+// https://github.com/golang/go/blob/aadaec5/src/math/big/prime.go#L81
+// https://github.com/indutny/miller-rabin/blob/master/lib/mr.js
+static int
+goo_is_prime_mr(
   const mpz_t n,
   const unsigned char *key,
   long reps,
@@ -1150,9 +1346,12 @@ goo_miller_rabin(
 ) {
   // if n < 7
   if (mpz_cmp_ui(n, 7) < 0) {
-    // if n == 3 or n == 5
-    if (mpz_cmp_ui(n, 3) == 0 || mpz_cmp_ui(n, 5) == 0)
+    // if n == 2 or n == 3 or n == 5
+    if (mpz_cmp_ui(n, 2) == 0
+        || mpz_cmp_ui(n, 3) == 0
+        || mpz_cmp_ui(n, 5) == 0) {
       return 1;
+    }
     return 0;
   }
 
@@ -1175,8 +1374,9 @@ goo_miller_rabin(
   mpz_sub_ui(nm3, nm3, 2);
 
   // k = zero_bits(nm1)
+  k = goo_mpz_zerobits(nm1);
   // q = nm1 >> k
-  goo_factor_twos(q, &k, nm1);
+  mpz_fdiv_q_2exp(q, nm1, k);
 
   // Setup PRNG.
   goo_prng_t prng;
@@ -1230,43 +1430,206 @@ fail:
   return r;
 }
 
+// https://github.com/golang/go/blob/aadaec5/src/math/big/prime.go#L150
 static int
-goo_lucas(const mpz_t n, long reps) {
-  // Placeholder.
-  return 1;
+goo_is_prime_lucas(const mpz_t n) {
+  int ret = 0;
+  unsigned long p;
+  mpz_t d;
+  mpz_t s, nm2;
+  mpz_t vk, vk1;
+  mpz_t t1, t2, t3;
+
+  mpz_init(d);
+  mpz_init(s);
+  mpz_init(nm2);
+  mpz_init(vk);
+  mpz_init(vk1);
+  mpz_init(t1);
+  mpz_init(t2);
+  mpz_init(t3);
+
+  // Ignore 0 and 1.
+  if (mpz_cmp_ui(n, 1) <= 0)
+    goto fail;
+
+  // Two is the only even prime.
+  // if n & 1 == 0
+  if (mpz_even_p(n)) {
+    // if n == 2
+    if (mpz_cmp_ui(n, 2) == 0)
+      goto succeed;
+    goto fail;
+  }
+
+  // Baillie-OEIS "method C" for choosing D, P, Q.
+  // See: https://oeis.org/A217719/a217719.txt.
+  // p = 3
+  p = 3;
+  // d = 1
+  mpz_set_ui(d, 1);
+
+  for (;;) {
+    if (p > 10000) {
+      // Thought to be impossible.
+      goto fail;
+    }
+
+    // d = p * p - 4
+    mpz_set_ui(d, p * p - 4);
+
+    int j = goo_mpz_jacobi(d, n);
+
+    if (j == -1)
+      break;
+
+    if (j == 0) {
+      // if n == p + 2
+      if (mpz_cmp_ui(n, p + 2) == 0)
+        goto succeed;
+      goto fail;
+    }
+
+    if (p == 40) {
+      if (goo_is_square(n))
+        goto fail;
+    }
+
+    p += 1;
+  }
+
+  // Check for Grantham definition of
+  // "extra strong Lucas pseudoprime".
+  // s = n + 1
+  mpz_add_ui(s, n, 1);
+
+  // r = zerobits(s)
+  unsigned long r = goo_mpz_zerobits(s);
+
+  // nm2 = n - 2
+  mpz_sub_ui(nm2, n, 2);
+
+  // s >>= r
+  mpz_fdiv_q_2exp(s, s, r);
+
+  unsigned long bp = p;
+
+  // vk = 2
+  mpz_set_ui(vk, 2);
+  // vk1 = p
+  mpz_set_ui(vk1, p);
+
+  for (long i = (long)goo_mpz_bitlen(s); i >= 0; i--) {
+    if (mpz_tstbit(s, i)) {
+      // t1 = vk * vk1
+      mpz_mul(t1, vk, vk1);
+      // t1 += n
+      mpz_add(t1, t1, n);
+      // t1 -= bp
+      mpz_sub_ui(t1, t1, bp);
+      // vk = t1 % n
+      mpz_mod(vk, t1, n);
+      // t1 = vk1 * vk1
+      mpz_mul(t1, vk1, vk1);
+      // t1 += nm2
+      mpz_add(t1, t1, nm2);
+      // vk1 = t1 % n
+      mpz_mod(vk1, t1, n);
+    } else {
+      // t1 = vk * vk1
+      mpz_mul(t1, vk, vk1);
+      // t1 += n
+      mpz_add(t1, t1, n);
+      // t1 -= bp
+      mpz_sub_ui(t1, t1, bp);
+      // vk1 = t1 % n
+      mpz_mod(vk1, t1, n);
+      // t1 = vk * vk
+      mpz_mul(t1, vk, vk);
+      // t1 += nm2
+      mpz_add(t1, t1, nm2);
+      // vk = t1 % n
+      mpz_mod(vk, t1, n);
+    }
+  }
+
+  // if vk == 2 or vk == nm2
+  if (mpz_cmp_ui(vk, 2) == 0 || mpz_cmp(vk, nm2) == 0) {
+    // t1 = vk * bp
+    mpz_mul_ui(t1, vk, bp);
+    // t2 = vk1 << 1
+    mpz_mul_2exp(t2, vk1, 1);
+
+    // if t1 < t2
+    if (mpz_cmp(t1, t2) < 0) {
+      // [t1, t2] = [t2, t1]
+      mpz_swap(t1, t2);
+    }
+
+    // t1 -= t2
+    mpz_sub(t1, t1, t2);
+
+    // t3 = t1 % n
+    mpz_mod(t3, t1, n);
+
+    // if t3 == 0
+    if (mpz_cmp_ui(t3, 0) == 0)
+      goto succeed;
+  }
+
+  for (long t = 0; t < (long)r - 1; t++) {
+    if (mpz_cmp_ui(vk, 0) == 0)
+      goto succeed;
+
+    if (mpz_cmp_ui(vk, 2) == 0)
+      goto fail;
+
+    // t1 = vk * vk
+    mpz_mul(t1, vk, vk);
+    // t1 -= 2
+    mpz_sub_ui(t1, t1, 2);
+    // vk = t1 % n
+    mpz_mod(vk, t1, n);
+  }
+
+  goto fail;
+
+succeed:
+  ret = 1;
+fail:
+  mpz_clear(d);
+  mpz_clear(s);
+  mpz_clear(nm2);
+  mpz_clear(vk);
+  mpz_clear(vk1);
+  mpz_clear(t1);
+  mpz_clear(t2);
+  mpz_clear(t3);
+  return ret;
 }
 
 static int
 goo_is_prime(const mpz_t p, const unsigned char *key) {
-  int r = 0;
-  mpz_t tmp;
-
-  mpz_init(tmp);
-
+  // if p <= 0
   if (mpz_cmp_ui(p, 0) <= 0)
-    goto fail;
+    return 0;
 
   for (long i = 0; i < GOO_TEST_PRIMES_LEN; i++) {
     // if p == test_primes[i]
     if (mpz_cmp_ui(p, goo_test_primes[i]) == 0)
-      goto succeed;
-
-    // if p % test_primes[i] == 0
-    if (mpz_mod_ui(tmp, p, goo_test_primes[i]) == 0)
-      goto fail;
+      return 1;
   }
 
-  if (!goo_miller_rabin(p, key, 16 + 1, 1))
-    goto fail;
+  if (!goo_is_prime_div(p))
+    return 0;
 
-  if (!goo_lucas(p, 2))
-    goto fail;
+  if (!goo_is_prime_mr(p, key, 16 + 1, 1))
+    return 0;
 
-succeed:
-  r = 1;
-fail:
-  mpz_clear(tmp);
-  return r;
+  if (!goo_is_prime_lucas(p))
+    return 0;
+
+  return 1;
 }
 
 static int
@@ -1614,70 +1977,6 @@ goo_sig_uninit(goo_sig_t *sig) {
   mpz_clear(sig->z_sa);
 }
 
-#ifdef GOO_HAS_GMP
-#define goo_mpz_jacobi mpz_jacobi
-#else
-static int
-goo_mpz_jacobi(const mpz_t a, const mpz_t b) {
-  // Supposed to be undefined behavior.
-  // Just return 0.
-  // if b <= 0 or b & 1 == 0
-  if (mpz_cmp_ui(b, 0) <= 0 || mpz_even_p(b))
-    return 0;
-
-  mpz_t x, y, t;
-
-  mpz_init(x);
-  mpz_init(y);
-  mpz_init(t);
-
-  // x = a % b
-  mpz_mod(x, a, b);
-
-  // y = b
-  mpz_set(y, b);
-
-  int negate = 0;
-  unsigned long r;
-
-  // while x != 0
-  while (mpz_cmp_ui(x, 0) != 0) {
-    // while x & 1 == 0
-    while (mpz_even_p(x)) {
-      // x >>= 1
-      mpz_fdiv_q_ui(x, x, 2);
-      // r = y % 8
-      r = mpz_mod_ui(t, y, 8);
-      if (r == 3 || r == 5)
-        negate ^= 1;
-    }
-
-    // if x % 4 == 3 and y % 4 == 3
-    if (mpz_mod_ui(t, x, 4) == 3
-        && mpz_mod_ui(t, y, 4) == 3) {
-      negate ^= 1;
-    }
-
-    // [x, y] = [y, x]
-    mpz_swap(x, y);
-    // x = x % y
-    mpz_mod(x, x, y);
-  }
-
-  r = mpz_cmp_ui(y, 1);
-
-  mpz_clear(x);
-  mpz_clear(y);
-  mpz_clear(t);
-
-  // if y == 1
-  if (r == 0)
-    return negate ? -1 : 1;
-
-  return 0;
-}
-#endif
-
 static int
 goo_mod_sqrtp(mpz_t ret, const mpz_t n, const mpz_t p) {
   if (mpz_cmp_ui(p, 0) < 0)
@@ -1723,8 +2022,10 @@ goo_mod_sqrtp(mpz_t ret, const mpz_t n, const mpz_t p) {
   mpz_set(t, p);
   mpz_sub_ui(t, t, 1);
 
-  // [Q, s] = factor_twos(t)
-  goo_factor_twos(Q, &s, t);
+  // s = zerobits(t)
+  s = goo_mpz_zerobits(t);
+  // Q = t >> s
+  mpz_fdiv_q_2exp(Q, t, s);
 
   // Find a non-residue mod p.
   // w = 2
