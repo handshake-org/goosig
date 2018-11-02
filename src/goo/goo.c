@@ -595,6 +595,58 @@ goo_group_init(
   mpz_init(group->nh);
   mpz_init(group->g);
   mpz_init(group->h);
+
+  // n = n
+  goo_mpz_import(group->n, n, n_len);
+
+  // nh = n >> 1
+  mpz_fdiv_q_2exp(group->nh, group->n, 1);
+
+  // g = g
+  mpz_set_ui(group->g, g);
+  // h = h
+  mpz_set_ui(group->h, h);
+
+  group->rand_bits = goo_clog2(group->n) - 1;
+
+  if (modbits != 0) {
+    long big1 = 2 * modbits;
+    long big2 = modbits + group->rand_bits;
+    long big = big1 > big2 ? big1 : big2;
+    long big_bits = big + GOO_CHAL_BITS + 1;
+
+    goo_combspec_t big_spec;
+    assert(goo_combspec_init(&big_spec, big_bits, GOO_MAX_COMB_SIZE));
+
+    long small_bits = group->rand_bits;
+    goo_combspec_t small_spec;
+    assert(goo_combspec_init(&small_spec, small_bits, GOO_MAX_COMB_SIZE));
+
+    group->combs_len = 2;
+    goo_comb_init(&group->combs[0].g, group, group->g, &small_spec, 0);
+    goo_comb_init(&group->combs[0].h, group, group->h, &small_spec, 0);
+    goo_comb_init(&group->combs[1].g, group, group->g, &big_spec, 0);
+    goo_comb_init(&group->combs[1].h, group, group->h, &big_spec, 0);
+  } else {
+    long tiny_bits = GOO_CHAL_BITS;
+
+    goo_combspec_t tiny_spec;
+    assert(goo_combspec_init(&tiny_spec, tiny_bits, GOO_MAX_COMB_SIZE));
+
+    group->combs_len = 1;
+    goo_comb_init(&group->combs[0].g, group, group->g, &tiny_spec, 1);
+    goo_comb_init(&group->combs[0].h, group, group->h, &tiny_spec, 1);
+  }
+
+  for (long i = 0; i < GOO_TABLEN; i++) {
+    mpz_init(group->pctab_p1[i]);
+    mpz_init(group->pctab_n1[i]);
+    mpz_init(group->pctab_p2[i]);
+    mpz_init(group->pctab_n2[i]);
+  }
+
+  goo_prng_init(&group->prng);
+
   mpz_init(group->b12);
   mpz_init(group->b34);
   mpz_init(group->b1234);
@@ -640,57 +692,6 @@ goo_group_init(
   mpz_init(group->z_s1w);
   mpz_init(group->z_sa);
 
-  for (long i = 0; i < GOO_TABLEN; i++) {
-    mpz_init(group->pctab_p1[i]);
-    mpz_init(group->pctab_n1[i]);
-    mpz_init(group->pctab_p2[i]);
-    mpz_init(group->pctab_n2[i]);
-  }
-
-  // n = n
-  goo_mpz_import(group->n, n, n_len);
-
-  // nh = n >> 1
-  mpz_fdiv_q_2exp(group->nh, group->n, 1);
-
-  // g = g
-  mpz_set_ui(group->g, g);
-  // h = h
-  mpz_set_ui(group->h, h);
-
-  group->rand_bits = goo_clog2(group->n) - 1;
-
-  if (modbits != 0) {
-    long big1 = 2 * modbits;
-    long big2 = modbits + group->rand_bits;
-    long big = big1 > big2 ? big1 : big2;
-    long big_bits = big + GOO_CHAL_BITS + 1;
-
-    goo_combspec_t big_spec;
-    assert(goo_combspec_init(&big_spec, big_bits, GOO_MAX_COMB_SIZE));
-
-    long small_bits = group->rand_bits;
-    goo_combspec_t small_spec;
-    assert(goo_combspec_init(&small_spec, small_bits, GOO_MAX_COMB_SIZE));
-
-    group->combs_len = 2;
-    goo_comb_init(&group->combs[0].g, group, group->g, &small_spec, 0);
-    goo_comb_init(&group->combs[0].h, group, group->h, &small_spec, 0);
-    goo_comb_init(&group->combs[1].g, group, group->g, &big_spec, 0);
-    goo_comb_init(&group->combs[1].h, group, group->h, &big_spec, 0);
-  } else {
-    long tiny_bits = GOO_CHAL_BITS;
-
-    goo_combspec_t tiny_spec;
-    assert(goo_combspec_init(&tiny_spec, tiny_bits, GOO_MAX_COMB_SIZE));
-
-    group->combs_len = 1;
-    goo_comb_init(&group->combs[0].g, group, group->g, &tiny_spec, 1);
-    goo_comb_init(&group->combs[0].h, group, group->h, &tiny_spec, 1);
-  }
-
-  goo_prng_init(&group->prng);
-
   return 1;
 }
 
@@ -700,6 +701,23 @@ goo_group_uninit(goo_group_t *group) {
   mpz_clear(group->nh);
   mpz_clear(group->g);
   mpz_clear(group->h);
+
+  for (long i = 0; i < group->combs_len; i++) {
+    goo_comb_uninit(&group->combs[i].g);
+    goo_comb_uninit(&group->combs[i].h);
+  }
+
+  group->combs_len = 0;
+
+  for (long i = 0; i < GOO_TABLEN; i++) {
+    mpz_clear(group->pctab_p1[i]);
+    mpz_clear(group->pctab_n1[i]);
+    mpz_clear(group->pctab_p2[i]);
+    mpz_clear(group->pctab_n2[i]);
+  }
+
+  goo_prng_uninit(&group->prng);
+
   mpz_clear(group->b12);
   mpz_clear(group->b34);
   mpz_clear(group->b1234);
@@ -744,22 +762,6 @@ goo_group_uninit(goo_group_t *group) {
   mpz_clear(group->z_an);
   mpz_clear(group->z_s1w);
   mpz_clear(group->z_sa);
-
-  for (long i = 0; i < GOO_TABLEN; i++) {
-    mpz_clear(group->pctab_p1[i]);
-    mpz_clear(group->pctab_n1[i]);
-    mpz_clear(group->pctab_p2[i]);
-    mpz_clear(group->pctab_n2[i]);
-  }
-
-  for (long i = 0; i < group->combs_len; i++) {
-    goo_comb_uninit(&group->combs[i].g);
-    goo_comb_uninit(&group->combs[i].h);
-  }
-
-  group->combs_len = 0;
-
-  goo_prng_uninit(&group->prng);
 }
 
 static void
