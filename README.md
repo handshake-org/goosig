@@ -60,18 +60,19 @@ result === true;
 The design of GooSig requires a public RSA modulus whose prime factorization is
 unknown.
 
+In the early 1990s, RSA labs generated several [RSA moduli][numbers-wiki] for
+the [RSA factoring challenge][challenge-wiki]. RSA Labs claims to have
+[destroyed the hard drives][faq] containing the primes.
+
 There are 4 built-in moduli exposed on the `Goo` object.
 
 - [AOL1] - America Online Root CA 1 (now defunct) (2048 bit).
 - [AOL2] - America Online Root CA 2 (now defunct) (4096 bit) - notable for
   being one of the few 4096 bit moduli in the wild.
-- [RSA617] - From the [RSA factoring challenge][challenge-wiki] (2048 bit).
-- [RSA2048] - Also from the factoring challenge, but at one point had a
-  $200,000 bounty on it (2048 bit).
-
-In the 1990s, RSA labs generated several [RSA moduli][numbers-wiki] for the
-[RSA factoring challenge][challenge-wiki]. RSA Labs claims to have [destroyed
-the hard drives][faq] containing the primes.
+- [RSA2048] - From the [RSA factoring challenge][challenge-wiki], and at one
+  point had a $200,000 bounty on it (2048 bit).
+- [RSA617] - Also from the factoring challenge (2048 bit). Generated later, in
+  1997.
 
 Original Links (archive.org);
 
@@ -80,7 +81,11 @@ Original Links (archive.org);
 - [RSA Numbers Text File][txt]
 - [RSA-2048 Text File][RSA2048-txt]
 - [FAQ][faq]
-- [Another RSA Numbers List][list] (RSA-617 was generated later, in 1997)
+- [Another RSA Numbers List][list] (includes RSA-617)
+
+The above links are preserved in the [/etc][etc] directory.
+
+The modulus definitions reside in [lib/constants.js][constants].
 
 ## Benchmarks
 
@@ -172,3 +177,5 @@ See LICENSE for more info.
 [txt]: https://web.archive.org/web/20130507115513/http://www.rsa.com/rsalabs/challenges/factoring/challengenumbers.txt
 [faq]: https://web.archive.org/web/20130502202924/http://www.rsa.com/rsalabs/node.asp?id=2094
 [list]: http://www.ontko.com/pub/rayo/primes/rsa_fact.html
+[etc]: https://github.com/handshake-org/goosig/tree/master/etc
+[constants]: https://github.com/handshake-org/goosig/blob/master/lib/constants.js
