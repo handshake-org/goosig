@@ -6,10 +6,10 @@
 
 const assert = require('./util/assert');
 const testUtil = require('./util');
-const BigMath = require('../lib/bigmath');
-const constants = require('../lib/constants');
-const Goo = require('../lib/goo');
-const util = require('../lib/util');
+const BigMath = require('../lib/js/bigmath');
+const constants = require('../lib/internal/constants');
+const Goo = require('../lib/js/goo');
+const util = require('../lib/js/util');
 const {mod, modPow} = BigMath;
 
 describe('Group Ops', function() {

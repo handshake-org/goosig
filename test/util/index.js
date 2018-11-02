@@ -5,9 +5,9 @@
 
 const assert = require('bsert');
 const rsa = require('bcrypto/lib/rsa');
-const BigMath = require('../../lib/bigmath');
-const primes = require('../../lib/primes');
-const util = require('../../lib/util');
+const BigMath = require('../../lib/js/bigmath');
+const primes = require('../../lib/js/primes');
+const util = require('../../lib/js/util');
 
 const testUtil = {
   log(...args) {

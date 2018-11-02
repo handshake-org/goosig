@@ -5,8 +5,8 @@
 const assert = require('../test/util/assert');
 const {performance} = require('perf_hooks');
 const testUtil = require('../test/util');
-const Goo = require('../lib/goo');
-const Native = require('../lib/native');
+const Goo = require('../lib/js/goo');
+const Native = require('../lib/native/goo');
 
 const gops_p = new Goo(Goo.RSA2048, 2, 3, 2048);
 const gops_v = new Goo(Goo.RSA2048, 2, 3, null);

@@ -4,8 +4,8 @@
 
 const {performance} = require('perf_hooks');
 const testUtil = require('../test/util');
-const Goo = require('../lib/goo');
-const Native = require('../lib/native');
+const Goo = require('../lib/js/goo');
+const Native = require('../lib/native/goo');
 
 function main(Goo, nreps) {
   // 4096-bit GoUO

@@ -8,9 +8,9 @@ const assert = require('./util/assert');
 const rsa = require('bcrypto/lib/rsa');
 const SHA256 = require('bcrypto/lib/sha256');
 const testUtil = require('./util');
-const Goo = require('../lib/goo');
-const Native = require('../lib/native');
-const Signature = require('../lib/signature');
+const Goo = require('../lib/js/goo');
+const Native = require('../lib/native/goo');
+const Signature = require('../lib/js/signature');
 const vectors = require('./data/vectors.json');
 const vectorsNative = require('./data/vectors-native.json');
 

@@ -5,7 +5,8 @@
   "description": "Group of unknown order signatures",
   "keywords": [
     "crypto",
-    "goosig"
+    "goosig",
+    "rsa"
   ],
   "license": "MIT",
   "repository": "git://github.com/handshake-org/goosig.git",
@@ -17,7 +18,7 @@
   "main": "./lib/goosig.js",
   "scripts": {
     "install": "node-gyp rebuild || echo 'Build failed.'",
-    "lint": "./eslint-bigint || exit 0",
+    "lint": "./utils/eslint-bigint || exit 0",
     "test": "GOOSIG_TEST=1 mocha --reporter spec test/*-test.js",
     "test-file": "GOOSIG_TEST=1 mocha --reporter spec"
   },
@@ -34,5 +35,7 @@
     "node": ">=8.0.0"
   },
   "gypfile": true,
-  "browser": {}
+  "browser": {
+    "./lib/goo": "./lib/goo-browser.js"
+  }
 }

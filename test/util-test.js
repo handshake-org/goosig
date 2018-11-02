@@ -7,8 +7,8 @@
 const assert = require('./util/assert');
 const BN = require('bcrypto/lib/bn.js');
 const testUtil = require('./util');
-const BigMath = require('../lib/bigmath');
-const util = require('../lib/util');
+const BigMath = require('../lib/js/bigmath');
+const util = require('../lib/js/util');
 const {mod, modPow, encode, decode} = BigMath;
 
 function modPowBN(x, y, m) {
