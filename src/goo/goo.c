@@ -231,10 +231,8 @@ goo_calloc(size_t nmemb, size_t size) {
 
 static inline void *
 goo_realloc(void *ptr, size_t size) {
-  if (size == 0) {
-    realloc(ptr, size);
-    return NULL;
-  }
+  if (size == 0)
+    return realloc(ptr, size);
 
   void *p = realloc(ptr, size);
   assert(p != NULL);
