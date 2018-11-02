@@ -130,7 +130,7 @@ typedef struct goo_group_s {
   mpz_t z_s1w;
   mpz_t z_sa;
 
-  unsigned char slab[1024];
+  unsigned char slab[2 + ((GOO_MAX_RSA_BITS + 7) / 8) * 2];
 } goo_group_t;
 
 typedef struct goo_sig_s {
