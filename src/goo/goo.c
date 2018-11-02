@@ -234,7 +234,7 @@ goo_zerobits(const mpz_t n) {
   // if x < 0
   if (mpz_cmp_ui(x, 0) < 0) {
     // x = -x;
-    mpz_mul_si(x, x, -1);
+    mpz_neg(x, x);
   }
 
   unsigned long i = 0;
@@ -387,7 +387,7 @@ goo_jacobi(const mpz_t x, const mpz_t y) {
     if (mpz_cmp_ui(a, 0) < 0)
       j = -1;
     // b = -b
-    mpz_mul_si(b, b, -1);
+    mpz_neg(b, b);
   }
 
   for (;;) {
