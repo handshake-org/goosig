@@ -1,7 +1,5 @@
 # GooSig
 
-More or less a line-for-line port of [libGooPy][libgoopy]. Experimental.
-
 GooSig was created specifically for the [Handshake Project][handshake] and
 addresses a very specific problem: an [airdrop] to Github users' RSA keys
 allows Github users to be _identified on-chain_. In order to anonymize who is
