@@ -26,10 +26,10 @@ function main(Goo, nreps) {
 
   // Measure times.
   const tests = [
-    ['4096-bit RSA GoUO, 2048-bit Signer PK', gops_4_2_p, gops_4_v],
-    ['4096-bit RSA GoUO, 4096-bit Signer PK', gops_4_4_p, gops_4_v],
-    ['2048-bit RSA GoUO, 2048-bit Signer PK', gops_2_2_p, gops_2_v],
-    ['2048-bit RSA GoUO, 4096-bit Signer PK', gops_2_4_p, gops_2_v]
+    ['4096-bit RSA GoUO, 2048-bit Signer PK', gops_4_2_p, gops_4_v, 2048],
+    ['4096-bit RSA GoUO, 4096-bit Signer PK', gops_4_4_p, gops_4_v, 4096],
+    ['2048-bit RSA GoUO, 2048-bit Signer PK', gops_2_2_p, gops_2_v, 2048],
+    ['2048-bit RSA GoUO, 4096-bit Signer PK', gops_2_4_p, gops_2_v, 4096]
   ];
 
   const times = [];
@@ -37,35 +37,32 @@ function main(Goo, nreps) {
   for (let i = 0; i < tests.length; i++)
     times.push([[], [], []]);
 
-  const lists = [testUtil.primes1024, testUtil.primes2048];
-
   const runTest = () => {
     const res = new Array(times.length);
 
-    for (const [i, [name, gops_p, gops_v]] of tests.entries()) {
+    for (const [i, [name, prover, verifier, bits]] of tests.entries()) {
       const msg = Buffer.from(name, 'binary');
 
       // Random signer modulus.
-      const [p, q] = testUtil.sample(lists[i % 2], 2);
-      const key = testUtil.rsaKey(p, q);
+      const key = testUtil.genKey(bits);
 
       let start_time, stop_time;
 
       // Generate the challenge token.
       start_time = performance.now();
-      const [s_prime, C1] = gops_p.challenge(key);
+      const [s_prime, C1] = prover.challenge(key);
       stop_time = performance.now();
       times[i][0].push(stop_time - start_time);
 
       // Generate the signature.
       start_time = performance.now();
-      const sig = gops_p.sign(msg, s_prime, C1, key);
+      const sig = prover.sign(msg, s_prime, C1, key);
       stop_time = performance.now();
       times[i][1].push(stop_time - start_time);
 
       // Verify the signature.
       start_time = performance.now();
-      res[i] = gops_v.verify(msg, sig, C1);
+      res[i] = verifier.verify(msg, sig, C1);
       stop_time = performance.now();
       times[i][2].push(stop_time - start_time);
     }

@@ -301,11 +301,14 @@ const testUtil = {
   },
 
   genKey(bits) {
-    if (bits === 4096)
-      bits = 1;
+    assert((bits >>> 0) === bits);
+    assert(bits === 2048 || bits === 4096);
 
-    const primes = [this.primes1024, this.primes2048];
-    const [p, q] = this.sample(primes[bits & 1], 2);
+    const primes = bits === 2048
+      ? this.primes1024
+      : this.primes2048;
+
+    const [p, q] = this.sample(primes, 2);
 
     return this.rsaKey(p, q);
   },

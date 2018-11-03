@@ -17,75 +17,54 @@ function runTests(name, Goo, Other) {
   describe(name, function() {
     this.timeout(60000);
 
-    // 4096-bit GoUO
-    // 4096-bit RSA GoUO, 2048-bit Signer key
-    const gops_4_2_p = () => new Goo(Goo.AOL2, 2, 3, 2048);
-    // 4096-bit RSA GoUO, 4096-bit Signer key
-    const gops_4_4_p = () => new Goo(Goo.AOL2, 2, 3, 4096);
-    // 4096-bit RSA GoUO (verification)
-    const gops_4_v = () => new Goo(Goo.AOL2, 2, 3, null);
-
-    // 2048-bit GoUO
-    // 2048-bit RSA GoUO, 2048-bit Signer key
-    const gops_2_2_p = () => new Goo(Goo.RSA2048, 2, 3, 2048);
-    // 2048-bit RSA GoUO, 4096-bit Signer key
-    const gops_2_4_p = () => new Goo(Goo.RSA2048, 2, 3, 4096);
-    // 2048-bit RSA GoUO (verification)
-    const gops_2_v = () => new Goo(Goo.RSA2048, 2, 3, null);
-
     const tests = [
-      ['4096-bit RSA GoUO, 2048-bit Signer PK', gops_4_2_p, gops_4_v],
-      ['4096-bit RSA GoUO, 4096-bit Signer PK', gops_4_4_p, gops_4_v],
-      ['2048-bit RSA GoUO, 2048-bit Signer PK', gops_2_2_p, gops_2_v],
-      ['2048-bit RSA GoUO, 4096-bit Signer PK', gops_2_4_p, gops_2_v]
+      ['2048-bit RSA GoUO, 2048-bit Signer PK', Goo.AOL1, 2, 3, 2048],
+      ['2048-bit RSA GoUO, 4096-bit Signer PK', Goo.AOL1, 2, 3, 4096],
+      ['4096-bit RSA GoUO, 2048-bit Signer PK', Goo.AOL2, 2, 3, 2048],
+      ['4096-bit RSA GoUO, 4096-bit Signer PK', Goo.AOL2, 2, 3, 4096],
+      ['2048-bit RSA GoUO, 2048-bit Signer PK', Goo.RSA2048, 2, 3, 2048],
+      ['2048-bit RSA GoUO, 4096-bit Signer PK', Goo.RSA2048, 2, 3, 4096],
+      ['2048-bit RSA GoUO, 2048-bit Signer PK', Goo.RSA617, 2, 3, 2048],
+      ['2048-bit RSA GoUO, 4096-bit Signer PK', Goo.RSA617, 2, 3, 4096]
     ];
 
-    const primes = [testUtil.primes1024, testUtil.primes2048];
+    const sigs = [];
 
-    const created = [];
-
-    for (const [i, [name, gops_p_, gops_v_]] of tests.entries()) {
+    for (const [i, [name, n, g, h, bits]] of tests.entries()) {
       it(`should sign and verify msg: "${name}"`, () => {
-        const gops_p = gops_p_();
-        const gops_v = gops_v_();
+        const prover = new Goo(n, g, h, bits);
+        const verifier = new Goo(n, g, h, null);
 
         const msg = SHA256.digest(Buffer.from(name, 'binary'));
 
         // Random signer modulus.
-        const [p, q] = testUtil.sample(primes[i % 2], 2);
-        const key = testUtil.rsaKey(p, q);
+        const key = testUtil.genKey(bits);
 
         // Generate the challenge token.
-        let [s_prime, C1] = gops_p.challenge(key);
+        let [s_prime, C1] = prover.challenge(key);
 
         // Encrypt to the recipient.
-        const ct = gops_p.encrypt(s_prime, C1, key);
+        const ct = prover.encrypt(s_prime, C1, key);
 
         // Recipient decrypts.
-        [s_prime, C1] = gops_p.decrypt(ct, key);
+        [s_prime, C1] = prover.decrypt(ct, key);
 
         // Generate the proof.
-        const sig = gops_p.sign(msg, s_prime, C1, key);
+        const sig = prover.sign(msg, s_prime, C1, key);
 
-        created.push([msg, sig, C1]);
+        sigs.push([n, g, h, msg, sig, C1]);
 
         // Verify the proof.
-        const result = gops_v.verify(msg, sig, C1);
+        const result = verifier.verify(msg, sig, C1);
 
         assert.strictEqual(result, true);
       });
     }
 
     it('should verify with opposite implementation', () => {
-      // Native 4096 bit
-      const other_4_v = new Other(Goo.AOL2, 2, 3, null);
-      // Native 2048 bit
-      const other_2_v = new Other(Goo.RSA2048, 2, 3, null);
-
-      for (let i = 0; i < created.length; i++) {
-        const group = i < 2 ? other_4_v : other_2_v;
-        const [msg, sig, C1] = created[i];
-        const result = group.verify(msg, sig, C1);
+      for (const [n, g, h, msg, sig, C1] of sigs) {
+        const goo = new Other(n, g, h, null);
+        const result = goo.verify(msg, sig, C1);
         assert.strictEqual(result, true);
       }
     });
