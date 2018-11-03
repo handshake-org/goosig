@@ -56,8 +56,8 @@ NAN_METHOD(Goo::New) {
 
   const uint8_t *n = (const uint8_t *)node::Buffer::Data(n_buf);
   size_t n_len = node::Buffer::Length(n_buf);
-  unsigned long g = (unsigned long)info[1]->IntegerValue();
-  unsigned long h = (unsigned long)info[2]->IntegerValue();
+  unsigned long g = (unsigned long)Nan::To<int64_t>(info[1]).FromJust();
+  unsigned long h = (unsigned long)Nan::To<int64_t>(info[2]).FromJust();
 
   unsigned long modbits = 0;
 
@@ -65,7 +65,7 @@ NAN_METHOD(Goo::New) {
     if (!info[3]->IsNumber())
       return Nan::ThrowTypeError("Fourth argument must be a number.");
 
-    modbits = (unsigned long)info[3]->IntegerValue();
+    modbits = (unsigned long)Nan::To<int64_t>(info[3]).FromJust();
   }
 
   Goo *goo = new Goo();
