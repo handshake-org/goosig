@@ -2951,7 +2951,7 @@ run_primes_test(void) {
     "6368689",
     "8725753",
     "80579735209",
-    "105919633",
+    "105919633"
   };
 
 #define GOO_ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
@@ -3100,10 +3100,10 @@ run_ops_test(void) {
   goo_group_init(goo, mod, 2048 / 8, 2, 3, 2048);
   free(mod);
 
-  printf("Testing pow2...\n");
-
   // test pow2
   {
+    printf("Testing pow2...\n");
+
     mpz_t b1, b2, e1, e2;
     mpz_t b1_inv, b2_inv;
     mpz_t r1, r2;
@@ -3141,10 +3141,10 @@ run_ops_test(void) {
     mpz_clear(r2);
   }
 
-  printf("Testing powgh...\n");
-
   // test powgh
   {
+    printf("Testing powgh...\n");
+
     mpz_t e1, e2;
     mpz_t r1, r2;
 
@@ -3168,10 +3168,10 @@ run_ops_test(void) {
     mpz_clear(r2);
   }
 
-  printf("Testing inv2...\n");
-
   // test inv2
   {
+    printf("Testing inv2...\n");
+
     mpz_t e1, e2;
     mpz_t e1_s, e2_s;
     mpz_t e1_si, e2_si;
@@ -3201,12 +3201,43 @@ run_ops_test(void) {
     mpz_mul(r2, e2_s, e2_si);
     mpz_mod(r2, r1, goo->n);
 
+    goo_group_reduce(goo, r1, r1);
+    goo_group_reduce(goo, r2, r2);
+
     assert(mpz_cmp_ui(r1, 1) == 0);
     assert(mpz_cmp_ui(r2, 1) == 0);
   }
 
-  // TODO: test inv5
-  printf("Testing inv5...\n");
+  // test inv5
+  {
+    printf("Testing inv5...\n");
+
+    mpz_t evals[5];
+    mpz_t einvs[5];
+
+    for (int i = 0; i < 5; i++) {
+      mpz_init(evals[i]);
+      mpz_init(einvs[i]);
+
+      assert(goo_group_randbits(goo, evals[i], 2048));
+    }
+
+    assert(goo_group_inv5(goo,
+      einvs[0], einvs[1], einvs[2], einvs[3], einvs[4],
+      evals[0], evals[1], evals[2], evals[3], evals[4]));
+
+    for (int i = 0; i < 5; i++) {
+      mpz_mul(evals[i], evals[i], einvs[i]);
+      mpz_mod(evals[i], evals[i], goo->n);
+
+      goo_group_reduce(goo, evals[i], evals[i]);
+
+      assert(mpz_cmp_ui(evals[i], 1) == 0);
+
+      mpz_clear(evals[i]);
+      mpz_clear(einvs[i]);
+    }
+  }
 
   goo_group_uninit(goo);
   free(goo);
@@ -3233,17 +3264,17 @@ goo_randomint(mpz_t ret, const mpz_t max) {
 void
 run_util_test(void) {
   // sqrt
-  printf("Testing sqrt...\n");
-
   {
+    printf("Testing sqrt...\n");
+
     assert(goo_dsqrt(1024) == 32);
     assert(goo_dsqrt(1025) == 32);
   }
 
   // test sqrts
-  printf("Testing roots...\n");
-
   {
+    printf("Testing roots...\n");
+
     static const char p_hex[] = ""
       "ccbf79ad1f5e47086062274ea9815042fd938149a5557c8cb3b0c33d"
       "dcd87c58a53760826a99d196852460762e16a715e40bee5847324aa1"
@@ -3277,8 +3308,9 @@ run_util_test(void) {
     mpz_mul(n, p, q);
 
     // test sqrt_modp
-    printf("Testing sqrt_modp...\n");
     {
+      printf("Testing sqrt_modp...\n");
+
       mpz_t r1;
       mpz_t sr1;
 
@@ -3299,8 +3331,9 @@ run_util_test(void) {
     }
 
     // test sqrt_modn
-    printf("Testing sqrt_modn...\n");
     {
+      printf("Testing sqrt_modn...\n");
+
       mpz_t r2;
       mpz_t sr2;
 
@@ -3347,8 +3380,9 @@ run_util_test(void) {
   };
 
   // test jacobi
-  printf("Testing jacobi...\n");
   {
+    printf("Testing jacobi...\n");
+
     for (int i = 0; i < 17; i++) {
       const int *v = symbols[i];
       mpz_t x, y;
