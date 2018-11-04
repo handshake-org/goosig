@@ -218,8 +218,7 @@ describe('Primes', function() {
     it(`should test composite (${i})`, () => {
       const p = decodeDecimal(str);
 
-      if (i === 1 || i === 6 || i === 7
-          || (i >= 43 && i <= 49) || i === 54) {
+      if (i === 6 || i === 7 || (i >= 43 && i <= 49) || i === 54) {
         assert(primes.isPrimeDiv(p));
       } else {
         // We actually catch a surpising

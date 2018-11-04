@@ -600,10 +600,14 @@ fail:
 
 static int
 goo_is_prime_div(const mpz_t n) {
+  // if n <= 1
+  if (mpz_cmp_ui(n, 1) <= 0)
+    return 0;
+
   for (long i = 0; i < GOO_TEST_PRIMES_LEN; i++) {
     // if p == test_primes[i]
     if (mpz_cmp_ui(n, goo_test_primes[i]) == 0)
-      return 1;
+      return 2;
 
     // if n % test_primes[i] == 0
     if (mpz_fdiv_ui(n, goo_test_primes[i]) == 0)
@@ -854,9 +858,11 @@ goo_is_prime_lucas(const mpz_t n) {
   }
 
   for (long t = 0; t < (long)zb - 1; t++) {
+    // if vk == 0
     if (mpz_sgn(vk) == 0)
       goto succeed;
 
+    // if vk == 2
     if (mpz_cmp_ui(vk, 2) == 0)
       goto fail;
 
@@ -886,12 +892,21 @@ fail:
 
 static int
 goo_is_prime(const mpz_t p, const unsigned char *key) {
-  // if p <= 0
-  if (mpz_sgn(p) <= 0)
+  // if p <= 1
+  if (mpz_cmp_ui(p, 1) <= 0)
     return 0;
 
-  if (!goo_is_prime_div(p))
+  // 0 = not prime
+  // 1 = maybe prime
+  // 2 = definitely prime
+  int ret = goo_is_prime_div(p);
+
+  if (ret == 0)
     return 0;
+
+  // Early exit.
+  if (ret == 2)
+    return 1;
 
   if (!goo_is_prime_mr(p, key, 16 + 1, 1))
     return 0;
@@ -2985,8 +3000,7 @@ run_primes_test(void) {
 
     assert(mpz_init_set_str(p, composites[i], 10) == 0);
 
-    if (i == 1 || i == 6 || i == 7
-        || (i >= 43 && i <= 49) || i == 54) {
+    if (i == 6 || i == 7 || (i >= 43 && i <= 49) || i == 54) {
       assert(goo_is_prime_div(p));
     } else {
       // We actually catch a surpising
