@@ -32,6 +32,9 @@ const goo = new Goo(Goo.RSA2048, 2, 3, 2048);
 // `s_prime` is the seed for the `s` scalar.
 let [s_prime, C1] = goo.challenge(pub);
 
+// At this point, C1 is inserted into a public
+// merkle tree and added to the HNS consensus rules.
+
 // Encrypt s_prime and C1 to user's pubkey.
 const ct = goo.encrypt(s_prime, C1, pub);
 
