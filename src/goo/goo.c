@@ -1672,7 +1672,7 @@ goo_group_wnaf(goo_group_t *group, const mpz_t e, long *out, long bitlen) {
   }
 
   // r == 0
-  assert(mpz_cmp_ui(group->r, 0) == 0);
+  assert(mpz_sgn(group->r) == 0);
 
   return out;
 }
@@ -2303,7 +2303,7 @@ goo_group_sign(
   mpz_sub(*Dq, *z_w2, *z_an);
   mpz_fdiv_q(*Dq, *Dq, *ell);
 
-  assert(mpz_cmp_ui(*Dq, 0) >= 0);
+  assert(mpz_sgn(*Dq) >= 0);
   assert(goo_mpz_bitlen(*Dq) <= 2048);
 
   mpz_mod(*z_w, *z_w, *ell);
@@ -2452,12 +2452,12 @@ goo_group_verify(
   mpz_sub(*D, *D, *tmp);
 
   // if z_w2_m_an < 0
-  if (mpz_cmp_ui(*z_w2_m_an, 0) < 0) {
+  if (mpz_sgn(*z_w2_m_an) < 0) {
     // D += ell
     mpz_add(*D, *D, ell);
   }
 
-  if (mpz_cmp_ui(*D, 0) < 0)
+  if (mpz_sgn(*D) < 0)
     return 0;
 
   // Step 2: recompute implicitly claimed V message, viz., chal and ell.
