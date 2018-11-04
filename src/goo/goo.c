@@ -119,6 +119,7 @@ goo_mpz_mask(mpz_t r, const mpz_t n, unsigned long bit, mpz_t mask) {
 }
 
 #if !defined(GOO_HAS_GMP) || defined(GOO_TEST)
+// https://github.com/golang/go/blob/aadaec5/src/math/big/int.go#L754
 static int
 goo_mpz_jacobi(const mpz_t x, const mpz_t y) {
   // Undefined behavior.
@@ -205,7 +206,6 @@ goo_mpz_jacobi(const mpz_t x, const mpz_t y) {
 
 #ifndef GOO_HAS_GMP
 // Jacobi is not implemented in mini-gmp.
-// https://github.com/golang/go/blob/aadaec5/src/math/big/int.go#L754
 #define mpz_jacobi goo_mpz_jacobi
 #endif
 
@@ -3313,7 +3313,7 @@ run_util_test(void) {
     {6, 5, 1},
     {6, -5, 1},
     {-6, 5, 1},
-    {-6, -5, -1},
+    {-6, -5, -1}
   };
 
   // test jacobi

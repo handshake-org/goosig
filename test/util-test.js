@@ -24,6 +24,26 @@ function modInverse(x, m) {
   return new BN(x.invm(m).toArrayLike(Buffer));
 }
 
+const symbols = [
+  [0, 1, 1],
+  [0, -1, 1],
+  [1, 1, 1],
+  [1, -1, 1],
+  [0, 5, 0],
+  [1, 5, 1],
+  [2, 5, -1],
+  [-2, 5, -1],
+  [2, -5, -1],
+  [-2, -5, 1],
+  [3, 5, -1],
+  [5, 5, 0],
+  [-5, 5, 0],
+  [6, 5, 1],
+  [6, -5, 1],
+  [-6, 5, 1],
+  [-6, -5, -1]
+];
+
 describe('Util', function() {
   this.timeout(10000);
 
@@ -115,4 +135,14 @@ describe('Util', function() {
 
     assert.strictEqual(mod(sqrtR2 ** 2n, n).toString(), r2.toString());
   });
+
+  for (const [x, y, z] of symbols) {
+    it(`should compute jacobi symbol for: ${x}, ${y}`, () => {
+      const xx = BigInt(x);
+      const yy = BigInt(y);
+      const zz = BigInt(z);
+
+      assert.strictEqual(util.jacobi(xx, yy).toString(), zz.toString());
+    });
+  }
 });
