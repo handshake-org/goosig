@@ -5,7 +5,7 @@
 'use strict';
 
 const assert = require('./util/assert');
-const BN = require('bcrypto/lib/bn');
+const BN = require('bcrypto/lib/bn.js');
 const random = require('bcrypto/lib/random');
 const BigMath = require('../lib/js/bigmath');
 const primes = require('../lib/js/primes');
