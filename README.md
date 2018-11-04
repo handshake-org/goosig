@@ -87,8 +87,9 @@ The modulus definitions reside in [lib/constants.js][constants].
 
 ## Benchmarks
 
-C verification time is currently around 1ms with highend consumer-grade
-hardware. We hope to get sub-1ms verification times by mainnet launch.
+GooSig verifications are fairly complex and difficult to optimize. C
+verification time is currently around 1ms with highend consumer-grade hardware.
+We hope to get sub-1ms verification times by mainnet launch.
 
 ### Javascript
 
