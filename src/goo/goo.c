@@ -5,6 +5,7 @@
  *
  * Parts of this software are based on kwantam/libGooPy:
  *   Copyright (c) 2018, Dan Boneh, Riad S. Wahby (Apache License).
+ *   https://github.com/kwantam/GooSig
  *
  * Parts of this software are based on golang/go:
  *   Copyright (c) 2009 The Go Authors. All rights reserved.

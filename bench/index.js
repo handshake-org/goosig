@@ -5,6 +5,7 @@
  *
  * Parts of this software are based on kwantam/libGooPy:
  *   Copyright (c) 2018, Dan Boneh, Riad S. Wahby (Apache License).
+ *   https://github.com/kwantam/GooSig
  *
  * Resources:
  *   https://github.com/kwantam/GooSig/blob/master/libGooPy/__main__.py
