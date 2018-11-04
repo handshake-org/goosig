@@ -19,7 +19,7 @@
   "scripts": {
     "install": "node-gyp rebuild || echo 'Build failed.'",
     "lint": "./utils/eslint-bigint || exit 0",
-    "test": "GOOSIG_TEST=1 mocha --reporter spec test/*-test.js",
+    "test": "node test/test-native.js && GOOSIG_TEST=1 mocha --reporter spec test/*-test.js",
     "test-file": "GOOSIG_TEST=1 mocha --reporter spec"
   },
   "dependencies": {

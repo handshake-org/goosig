@@ -2,4 +2,5 @@
 
 const {Goo} = require('../lib/native/binding');
 
-Goo.test();
+if (Goo.test)
+  Goo.test();
