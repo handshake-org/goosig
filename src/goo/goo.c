@@ -1130,8 +1130,7 @@ goo_comb_init(
   goo_comb_t *comb,
   goo_group_t *group,
   mpz_t base,
-  goo_combspec_t *spec,
-  int tiny
+  goo_combspec_t *spec
 ) {
   memset((void *)comb, 0x00, sizeof(goo_comb_t));
 
@@ -1144,16 +1143,6 @@ goo_comb_init(
   comb->bits = spec->bits_per_window * spec->points_per_add;
   comb->points_per_subcomb = skip;
   comb->size = spec->size;
-
-  if (tiny) {
-    assert(comb->points_per_add == 8);
-    assert(comb->adds_per_shift == 2);
-    assert(comb->shifts == 8);
-    assert(comb->bits_per_window == 16);
-    assert(comb->bits == 128);
-    assert(comb->points_per_subcomb == 255);
-    assert(comb->size == 510);
-  }
 
   comb->wins = (long **)goo_calloc(comb->shifts, sizeof(long *));
 
@@ -1289,10 +1278,10 @@ goo_group_init(
     assert(goo_combspec_init(&small_spec, small_bits, GOO_MAX_COMB_SIZE));
 
     group->combs_len = 2;
-    goo_comb_init(&group->combs[0].g, group, group->g, &small_spec, 0);
-    goo_comb_init(&group->combs[0].h, group, group->h, &small_spec, 0);
-    goo_comb_init(&group->combs[1].g, group, group->g, &big_spec, 0);
-    goo_comb_init(&group->combs[1].h, group, group->h, &big_spec, 0);
+    goo_comb_init(&group->combs[0].g, group, group->g, &small_spec);
+    goo_comb_init(&group->combs[0].h, group, group->h, &small_spec);
+    goo_comb_init(&group->combs[1].g, group, group->g, &big_spec);
+    goo_comb_init(&group->combs[1].h, group, group->h, &big_spec);
   } else {
     long tiny_bits = GOO_CHAL_BITS;
 
@@ -1300,8 +1289,8 @@ goo_group_init(
     assert(goo_combspec_init(&tiny_spec, tiny_bits, GOO_MAX_COMB_SIZE));
 
     group->combs_len = 1;
-    goo_comb_init(&group->combs[0].g, group, group->g, &tiny_spec, 1);
-    goo_comb_init(&group->combs[0].h, group, group->h, &tiny_spec, 1);
+    goo_comb_init(&group->combs[0].g, group, group->g, &tiny_spec);
+    goo_comb_init(&group->combs[0].h, group, group->h, &tiny_spec);
   }
 
   for (long i = 0; i < GOO_TABLEN; i++) {
@@ -3102,7 +3091,7 @@ run_ops_test(void) {
   unsigned char *mod = malloc(2048 / 8);
   assert(mod != NULL);
 
-  printf("Testing Group Ops...\n");
+  printf("Testing group ops...\n");
 
   mpz_t n;
   assert(mpz_init_set_str(n, mod_hex, 16) == 0);
@@ -3112,8 +3101,44 @@ run_ops_test(void) {
   goo_group_t *goo = malloc(sizeof(goo_group_t));
   assert(goo != NULL);
 
-  goo_group_init(goo, mod, 2048 / 8, 2, 3, 2048);
+  assert(goo_group_init(goo, mod, 2048 / 8, 2, 3, 2048));
   free(mod);
+
+  {
+    printf("Testing comb calculation...\n");
+
+    assert(goo->combs[0].g.points_per_add == 8);
+    assert(goo->combs[0].g.adds_per_shift == 2);
+    assert(goo->combs[0].g.shifts == 128);
+    assert(goo->combs[0].g.bits_per_window == 256);
+    assert(goo->combs[0].g.bits == 2048);
+    assert(goo->combs[0].g.points_per_subcomb == 255);
+    assert(goo->combs[0].g.size == 510);
+
+    assert(goo->combs[0].h.points_per_add == 8);
+    assert(goo->combs[0].h.adds_per_shift == 2);
+    assert(goo->combs[0].h.shifts == 128);
+    assert(goo->combs[0].h.bits_per_window == 256);
+    assert(goo->combs[0].h.bits == 2048);
+    assert(goo->combs[0].h.points_per_subcomb == 255);
+    assert(goo->combs[0].h.size == 510);
+
+    assert(goo->combs[1].g.points_per_add == 7);
+    assert(goo->combs[1].g.adds_per_shift == 4);
+    assert(goo->combs[1].g.shifts == 151);
+    assert(goo->combs[1].g.bits_per_window == 604);
+    assert(goo->combs[1].g.bits == 4228);
+    assert(goo->combs[1].g.points_per_subcomb == 127);
+    assert(goo->combs[1].g.size == 508);
+
+    assert(goo->combs[1].h.points_per_add == 7);
+    assert(goo->combs[1].h.adds_per_shift == 4);
+    assert(goo->combs[1].h.shifts == 151);
+    assert(goo->combs[1].h.bits_per_window == 604);
+    assert(goo->combs[1].h.bits == 4228);
+    assert(goo->combs[1].h.points_per_subcomb == 127);
+    assert(goo->combs[1].h.size == 508);
+  }
 
   // test pow2
   {
@@ -3415,12 +3440,77 @@ run_util_test(void) {
 }
 
 void
+run_combspec_test(void) {
+  goo_combspec_t spec;
+
+  printf("Testing combspec...\n");
+
+  assert(goo_combspec_init(&spec, GOO_CHAL_BITS, GOO_MAX_COMB_SIZE));
+
+  long bits = spec.bits_per_window * spec.points_per_add;
+  long points_per_subcomb = (1 << spec.points_per_add) - 1;
+
+  assert(spec.points_per_add == 8);
+  assert(spec.adds_per_shift == 2);
+  assert(spec.shifts == 8);
+  assert(spec.bits_per_window == 16);
+  assert(bits == 128);
+  assert(points_per_subcomb == 255);
+  assert(spec.size == 510);
+
+  static const char mod_hex[] = ""
+    "c7970ceedcc3b0754490201a7aa613cd73911081c790f5f1a8726f463550"
+    "bb5b7ff0db8e1ea1189ec72f93d1650011bd721aeeacc2acde32a04107f0"
+    "648c2813a31f5b0b7765ff8b44b4b6ffc93384b646eb09c7cf5e8592d40e"
+    "a33c80039f35b4f14a04b51f7bfd781be4d1673164ba8eb991c2c4d730bb"
+    "be35f592bdef524af7e8daefd26c66fc02c479af89d64d373f442709439d"
+    "e66ceb955f3ea37d5159f6135809f85334b5cb1813addc80cd05609f10ac"
+    "6a95ad65872c909525bdad32bc729592642920f24c61dc5b3c3b7923e56b"
+    "16a4d9d373d8721f24a3fc0f1b3131f55615172866bccc30f95054c824e7"
+    "33a5eb6817f7bc16399d48c6361cc7e5";
+
+  unsigned char *mod = malloc(2048 / 8);
+  assert(mod != NULL);
+
+  mpz_t n;
+  assert(mpz_init_set_str(n, mod_hex, 16) == 0);
+  goo_mpz_export(mod, NULL, n);
+  mpz_clear(n);
+
+  goo_group_t *goo = malloc(sizeof(goo_group_t));
+  assert(goo != NULL);
+
+  assert(goo_group_init(goo, mod, 2048 / 8, 2, 3, 0));
+  free(mod);
+
+  assert(goo->combs[0].g.points_per_add == 8);
+  assert(goo->combs[0].g.adds_per_shift == 2);
+  assert(goo->combs[0].g.shifts == 8);
+  assert(goo->combs[0].g.bits_per_window == 16);
+  assert(goo->combs[0].g.bits == 128);
+  assert(goo->combs[0].g.points_per_subcomb == 255);
+  assert(goo->combs[0].g.size == 510);
+
+  assert(goo->combs[0].h.points_per_add == 8);
+  assert(goo->combs[0].h.adds_per_shift == 2);
+  assert(goo->combs[0].h.shifts == 8);
+  assert(goo->combs[0].h.bits_per_window == 16);
+  assert(goo->combs[0].h.bits == 128);
+  assert(goo->combs[0].h.points_per_subcomb == 255);
+  assert(goo->combs[0].h.size == 510);
+
+  goo_group_uninit(goo);
+  free(goo);
+}
+
+void
 goo_test(void) {
   run_primes_test();
   run_hmac_test();
   run_drbg_test();
   run_ops_test();
   run_util_test();
+  run_combspec_test();
   printf("All tests passed!\n");
 }
 #endif
