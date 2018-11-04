@@ -15,7 +15,12 @@
  *   https://github.com/indutny/miller-rabin
  *
  * Resources:
- *   https://github.com/kwantam/GooSig/tree/master/libGooPy
+ *   https://github.com/kwantam/GooSig/blob/master/protocol.txt
+ *   https://github.com/kwantam/GooSig/blob/master/libGooPy/group_ops.py
+ *   https://github.com/kwantam/GooSig/blob/master/libGooPy/group_mixins.py
+ *   https://github.com/kwantam/GooSig/blob/master/libGooPy/tokengen.py
+ *   https://github.com/kwantam/GooSig/blob/master/libGooPy/sign.py
+ *   https://github.com/kwantam/GooSig/blob/master/libGooPy/verify.py
  *   https://github.com/golang/go/blob/master/src/math/big/prime.go
  *   https://github.com/golang/go/blob/master/src/math/big/int.go
  *   https://github.com/golang/go/blob/master/src/math/big/nat.go
