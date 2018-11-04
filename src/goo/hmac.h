@@ -1,3 +1,9 @@
+/*!
+ * hmac.c - hmac for C
+ * Copyright (c) 2018, Christopher Jeffrey (MIT License).
+ * https://github.com/handshake-org/goosig
+ */
+
 #ifndef _GOOSIG_HMAC_H
 #define _GOOSIG_HMAC_H
 

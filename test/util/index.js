@@ -1,7 +1,16 @@
-'use strict';
+/*!
+ * index.js - test util for javascript
+ * Copyright (c) 2018, Christopher Jeffrey (MIT License).
+ * https://github.com/handshake-org/goosig
+ *
+ * Parts of this software are based on kwantam/libGooPy:
+ *   Copyright (c) 2018, Dan Boneh, Riad S. Wahby (Apache License).
+ *
+ * Resources:
+ *   https://github.com/kwantam/GooSig/blob/master/libGooPy/test_util.py
+ */
 
-/* eslint camelcase: "off" */
-/* eslint max-len: "off" */
+'use strict';
 
 const assert = require('bsert');
 const rsa = require('bcrypto/lib/rsa');

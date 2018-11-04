@@ -1,6 +1,5 @@
 /* eslint-env mocha */
 /* eslint prefer-arrow-callback: 'off' */
-/* eslint camelcase: "off" */
 
 'use strict';
 

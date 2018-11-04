@@ -1,3 +1,9 @@
+/*!
+ * random.c - random number generation for C
+ * Copyright (c) 2018, Christopher Jeffrey (MIT License).
+ * https://github.com/handshake-org/goosig
+ */
+
 #include <assert.h>
 #include <stdlib.h>
 #include "openssl/rand.h"

@@ -1,3 +1,28 @@
+/*!
+ * goo.c - groups of unknown order for C
+ * Copyright (c) 2018, Christopher Jeffrey (MIT License).
+ * https://github.com/handshake-org/goosig
+ *
+ * Parts of this software are based on kwantam/libGooPy:
+ *   Copyright (c) 2018, Dan Boneh, Riad S. Wahby (Apache License).
+ *
+ * Parts of this software are based on golang/go:
+ *   Copyright (c) 2009 The Go Authors. All rights reserved.
+ *   https://github.com/golang/go
+ *
+ * Parts of this software are based on indutny/miller-rabin:
+ *   Copyright (c) 2014, Fedor Indutny (MIT License).
+ *   https://github.com/indutny/miller-rabin
+ *
+ * Resources:
+ *   https://github.com/kwantam/GooSig/tree/master/libGooPy
+ *   https://github.com/golang/go/blob/master/src/math/big/prime.go
+ *   https://github.com/golang/go/blob/master/src/math/big/int.go
+ *   https://github.com/golang/go/blob/master/src/math/big/nat.go
+ *   https://github.com/golang/go/blob/master/src/crypto/rand/util.go
+ *   https://github.com/indutny/miller-rabin/blob/master/lib/mr.js
+ */
+
 #include <assert.h>
 #include <string.h>
 #include <stdlib.h>

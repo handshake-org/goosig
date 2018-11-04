@@ -1,3 +1,9 @@
+/*!
+ * goo.c - groups of unknown order for C
+ * Copyright (c) 2018, Christopher Jeffrey (MIT License).
+ * https://github.com/handshake-org/goosig
+ */
+
 #ifndef _GOOSIG_H
 #define _GOOSIG_H
 

@@ -1,3 +1,9 @@
+/*!
+ * sha256.h - sha256 for C
+ * Copyright (c) 2018, Christopher Jeffrey (MIT License).
+ * https://github.com/handshake-org/goosig
+ */
+
 #ifndef _GOO_SHA256_H
 #define _GOO_SHA256_H
 

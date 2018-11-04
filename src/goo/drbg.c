@@ -1,3 +1,13 @@
+/*!
+ * drbg.c - hmac-drbg for C
+ * Copyright (c) 2018, Christopher Jeffrey (MIT License).
+ * https://github.com/handshake-org/goosig
+ *
+ * Resources:
+ *   https://tools.ietf.org/html/rfc6979
+ *   https://csrc.nist.gov/publications/detail/sp/800-90a/archive/2012-01-23
+ */
+
 #include <assert.h>
 #include <stdlib.h>
 #include <string.h>
