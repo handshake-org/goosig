@@ -1927,7 +1927,7 @@ goo_group_fs_chal(
 }
 
 static int
-goo_group_randbits(goo_group_t *group, mpz_t ret, size_t size) {
+goo_group_randombits(goo_group_t *group, mpz_t ret, size_t size) {
   unsigned char key[32];
 
   if (!goo_random(&key[0], 32))
@@ -1994,7 +1994,7 @@ goo_group_challenge(
   }
 
   // s_prime = randbits(256)
-  if (!goo_group_randbits(group, s_prime, 256))
+  if (!goo_group_randombits(group, s_prime, 256))
     goto fail;
 
   // s = expand_sprime(s_prime)
@@ -3119,10 +3119,10 @@ run_ops_test(void) {
     mpz_init(r1);
     mpz_init(r2);
 
-    assert(goo_group_randbits(goo, b1, 2048));
-    assert(goo_group_randbits(goo, b2, 2048));
-    assert(goo_group_randbits(goo, e1, 128));
-    assert(goo_group_randbits(goo, e2, 128));
+    assert(goo_group_randombits(goo, b1, 2048));
+    assert(goo_group_randombits(goo, b2, 2048));
+    assert(goo_group_randombits(goo, e1, 128));
+    assert(goo_group_randombits(goo, e2, 128));
 
     assert(goo_group_inv2(goo, b1_inv, b2_inv, b1, b2));
 
@@ -3154,8 +3154,8 @@ run_ops_test(void) {
     mpz_init(r1);
     mpz_init(r2);
 
-    assert(goo_group_randbits(goo, e1, 2048 + GOO_CHAL_BITS + 2 - 1));
-    assert(goo_group_randbits(goo, e2, 2048 + GOO_CHAL_BITS + 2 - 1));
+    assert(goo_group_randombits(goo, e1, 2048 + GOO_CHAL_BITS + 2 - 1));
+    assert(goo_group_randombits(goo, e2, 2048 + GOO_CHAL_BITS + 2 - 1));
 
     assert(goo_group_powgh_slow(goo, r1, e1, e2));
     assert(goo_group_powgh(goo, r2, e1, e2));
@@ -3187,8 +3187,8 @@ run_ops_test(void) {
     mpz_init(r1);
     mpz_init(r2);
 
-    assert(goo_group_randbits(goo, e1, 2048));
-    assert(goo_group_randbits(goo, e2, 2048));
+    assert(goo_group_randombits(goo, e1, 2048));
+    assert(goo_group_randombits(goo, e2, 2048));
 
     mpz_fdiv_q_2exp(e1_s, e1, 1536);
     mpz_fdiv_q_2exp(e2_s, e2, 1536);
@@ -3219,7 +3219,7 @@ run_ops_test(void) {
       mpz_init(evals[i]);
       mpz_init(einvs[i]);
 
-      assert(goo_group_randbits(goo, evals[i], 2048));
+      assert(goo_group_randombits(goo, evals[i], 2048));
     }
 
     assert(goo_group_inv5(goo,
