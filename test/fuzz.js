@@ -9,19 +9,24 @@ const Goo = require('../lib/goo');
 const Signature = require('../lib/js/signature');
 
 const SIG_LENGTH = new Signature().encode(2048).length;
-const ZERO = Buffer.alloc(1, 0x00);
 
 const goo = new Goo(Goo.RSA2048, 2, 3, 2048);
 const ver = new Goo(Goo.RSA2048, 2, 3, null);
 const key = rsa.privateKeyGenerate(2048);
 const pub = rsa.publicKeyCreate(key);
 
-function concat(...items) {
-  return Buffer.concat(items);
-}
-
 function rand(num) {
   return (Math.random() * num) >>> 0;
+}
+
+function concat(data, side) {
+  let x = Buffer.from([rand(0x100)]);
+  let y = data;
+
+  if (side)
+    [x, y] = [y, x];
+
+  return Buffer.concat([x, y]);
 }
 
 console.log('Fuzzing with random bytes.');
@@ -100,9 +105,9 @@ for (let i = 0; i < Infinity; i++) {
   assert(ver.verify(msg, sig, C1));
 
   for (let i = 0; i < 100; i++) {
-    let msg2 = Buffer.from(msg);
+    const msg2 = Buffer.from(msg);
     let sig2 = Buffer.from(sig);
-    let C12 = Buffer.from(C1);
+    const C12 = Buffer.from(C1);
 
     switch (rand(20)) {
       case 0:
@@ -112,16 +117,10 @@ for (let i = 0; i < Infinity; i++) {
         sig2 = sig2.slice(1);
         break;
       case 2:
-        sig2 = Buffer.concat([
-          sig2,
-          Buffer.from([rand(0x100)])
-        ]);
+        sig2 = concat(sig2, 0);
         break;
       case 3:
-        sig2 = Buffer.concat([
-          Buffer.from([rand(0x100)]),
-          sig2
-        ]);
+        sig2 = concat(sig2, 1);
         break;
       default:
         sig2[rand(sig2.length)] ^= 1;

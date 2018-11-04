@@ -183,7 +183,7 @@ const composites = [
   '6368689',
   '8725753',
   '80579735209',
-  '105919633',
+  '105919633'
 ];
 
 function decodeDecimal(str) {

@@ -30,7 +30,7 @@ function runTests(name, Goo, Other) {
 
     const sigs = [];
 
-    for (const [i, [name, n, g, h, bits]] of tests.entries()) {
+    for (const [name, n, g, h, bits] of tests) {
       it(`should sign and verify msg: "${name}"`, () => {
         const prover = new Goo(n, g, h, bits);
         const verifier = new Goo(n, g, h, null);
@@ -103,16 +103,14 @@ function runTests(name, Goo, Other) {
         const i = (Math.random() * sig2.length) | 0;
         const j = (Math.random() * C12.length) | 0;
 
-        let res1, res2;
-
         sig2[i] ^= 1;
-        res1 = goo.verify(msg, sig2, C12);
+        const res1 = goo.verify(msg, sig2, C12);
         sig2[i] ^= 1;
 
         assert.strictEqual(res1, false);
 
         C12[j] ^= 1;
-        res2 = goo.verify(msg, sig2, C12);
+        const res2 = goo.verify(msg, sig2, C12);
         C12[j] ^= 1;
 
         assert.strictEqual(res2, false);

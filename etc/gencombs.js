@@ -8,8 +8,8 @@ const Goo = require('../lib/js/goo');
 const moduli = [
   ['aol1', Goo.AOL1],
   ['aol2', Goo.AOL2],
-  ['rsa2048', Goo.RSA2048]
-  ['rsa619', Goo.RSA617]
+  ['rsa2048', Goo.RSA2048],
+  ['rsa617', Goo.RSA617]
 ];
 
 const sizes = [
@@ -48,20 +48,20 @@ function combToC(lines, name, comb) {
   lines.push(`        .bits = ${comb.bits},`);
   lines.push(`        .points_per_subcomb = ${comb.pointsPerSubcomb},`);
   lines.push(`        .size = ${comb.size},`);
-  lines.push(`        .items = {`);
+  lines.push('        .items = {');
 
   for (const item of comb.items)
     lines.push(`          "${item}",`);
 
-  lines.push(`        },`);
-  lines.push(`      },`);
+  lines.push('        },');
+  lines.push('      },');
 }
 
 function combItemToC(lines, item) {
-  lines.push(`    {`);
+  lines.push('    {');
   combToC(lines, 'g', item.g);
   combToC(lines, 'h', item.h);
-  lines.push(`    },`);
+  lines.push('    },');
 }
 
 const HEADER = `
@@ -99,7 +99,7 @@ function combsToC(name, bits, modulus, json) {
   lines.push(`static const goo_precombs_t GOO_COMB_${def} = {`);
   lines.push(`  .hash = "${hash}",`);
   lines.push(`  .size = ${len},`);
-  lines.push(`  .items = {`);
+  lines.push('  .items = {');
 
   for (const item of json)
     combItemToC(lines, item);
@@ -111,8 +111,8 @@ function combsToC(name, bits, modulus, json) {
     i -= 1;
   }
 
-  lines.push(`  },`);
-  lines.push(`};`);
+  lines.push('  },');
+  lines.push('};');
 
   return lines.join('\n');
 }
