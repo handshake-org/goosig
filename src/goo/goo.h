@@ -207,6 +207,11 @@ goo_verify(
   size_t C1_len
 );
 
+#ifdef GOO_TEST
+void
+goo_test(void);
+#endif
+
 #if defined(__cplusplus)
 }
 #endif

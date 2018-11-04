@@ -21,6 +21,9 @@ private:
   static NAN_METHOD(Challenge);
   static NAN_METHOD(Sign);
   static NAN_METHOD(Verify);
+#ifdef GOO_TEST
+  static NAN_METHOD(Test);
+#endif
 };
 #endif
 
