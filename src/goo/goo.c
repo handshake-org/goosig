@@ -2796,6 +2796,280 @@ goo_verify(
 #ifdef GOO_TEST
 #include <stdio.h>
 
+static int
+goo_randomint(mpz_t ret, const mpz_t max) {
+  unsigned char key[32];
+
+  if (!goo_random(&key[0], 32))
+    return 0;
+
+  goo_prng_t prng;
+  goo_prng_init(&prng);
+
+  goo_prng_seed(&prng, &key[0]);
+  goo_prng_randomint(&prng, ret, max);
+
+  goo_prng_uninit(&prng);
+
+  return 1;
+}
+
+static void
+run_hmac_test(void) {
+  static const char data[] = "hello world";
+  unsigned char key[32];
+  unsigned char out[32];
+
+  static const char expect[] =
+    "42eb78776ad82f001179f44e9e88264f2d804251e02d988c1194b95de823a14e";
+
+  memset(&key[0], 0xff, 32);
+
+  printf("Testing HMAC...\n");
+
+  goo_hmac_t ctx;
+  goo_hmac_init(&ctx, &key[0], 32);
+  goo_hmac_update(&ctx, (unsigned char *)data, sizeof(data) - 1);
+
+  goo_hmac_final(&ctx, &out[0]);
+
+  mpz_t n, e;
+  mpz_init(n);
+  goo_mpz_import(n, out, 32);
+  assert(mpz_init_set_str(e, expect, 16) == 0);
+  assert(mpz_cmp(n, e) == 0);
+
+  mpz_clear(n);
+  mpz_clear(e);
+}
+
+static void
+run_drbg_test(void) {
+  unsigned char entropy[64];
+  unsigned char out[32];
+
+  static const char expect[] =
+    "40e95c4dba22fd05d15784075b05ca7c0b063a43dcec3307122575a7b5e32d3b";
+
+  memset(&entropy[0], 0xaa, 64);
+
+  printf("Testing DRBG...\n");
+
+  goo_drbg_t ctx;
+  goo_drbg_init(&ctx, &entropy[0], 64);
+  goo_drbg_generate(&ctx, &out[0], 32);
+
+  mpz_t n, e;
+  mpz_init(n);
+  goo_mpz_import(n, out, 32);
+  assert(mpz_init_set_str(e, expect, 16) == 0);
+  assert(mpz_cmp(n, e) == 0);
+
+  mpz_clear(n);
+  mpz_clear(e);
+}
+
+void
+run_util_test(void) {
+  // test bitlen and zerobits
+  {
+    printf("Testing bitlen & zerobits...\n");
+
+    mpz_t n;
+    mpz_init(n);
+
+    mpz_set_ui(n, 0x010001);
+
+    assert(goo_mpz_zerobits(n) == 0);
+    assert(goo_mpz_bitlen(n) == 17);
+
+    mpz_set_si(n, -0x010001);
+
+    assert(goo_mpz_zerobits(n) == 0);
+    assert(goo_mpz_bitlen(n) == 17);
+
+    mpz_set_ui(n, 0x20000);
+
+    assert(goo_mpz_zerobits(n) == 17);
+    assert(goo_mpz_bitlen(n) == 18);
+
+    mpz_set_si(n, -0x20000);
+
+    assert(goo_mpz_zerobits(n) == 17);
+    assert(goo_mpz_bitlen(n) == 18);
+
+    mpz_clear(n);
+  }
+
+  // test mask
+  {
+    printf("Testing mask...\n");
+
+    mpz_t n, t;
+
+    mpz_init(n);
+    mpz_init(t);
+
+    mpz_set_ui(n, 0xffff1234);
+
+    goo_mpz_mask(n, n, 16, t);
+
+    assert(mpz_get_ui(n) == 0x1234);
+
+    mpz_clear(n);
+    mpz_clear(t);
+  }
+
+  // test clog2
+  {
+    printf("Testing clog2...\n");
+
+    mpz_t n;
+    mpz_init(n);
+
+    mpz_set_ui(n, 0x10000);
+
+    assert(goo_clog2(n) == 16);
+
+    mpz_clear(n);
+  }
+
+  // test sqrt
+  {
+    printf("Testing sqrt...\n");
+
+    assert(goo_dsqrt(1024) == 32);
+    assert(goo_dsqrt(1025) == 32);
+  }
+
+  // test sqrts
+  {
+    printf("Testing roots...\n");
+
+    static const char p_hex[] = ""
+      "ccbf79ad1f5e47086062274ea9815042fd938149a5557c8cb3b0c33d"
+      "dcd87c58a53760826a99d196852460762e16a715e40bee5847324aa1"
+      "9911e98bf58e8c9af65e06182bb307c706069df394e5d098fbe85701"
+      "eb2e88089913834aadba3b134f646f6d48f2dacba00a5bfd15e8b8d9"
+      "c0efe1f4209595b920691aeebfc4ba1b28592d88fc0f565b0d3dbcf2"
+      "e3dda7b02e5452660c4bd4485e23cb68e1fdc9f3647f85c5ee0c3555"
+      "c21ce8307320257fae148887af5412db2cece240044cd668c72c7219"
+      "b2e6a32f5da0e0cd52ec9078e7ef521461f2fe5d83b240c412507961"
+      "0512976d1c3b65fcb0ad75133012e2c7329ce55177556f07bdabb271"
+      "622466fb";
+
+    static const char q_hex[] = ""
+      "842d18ae53b1e47aac1d2c7ff91ee656f669ce9676edc2689f39b2cd"
+      "3052c9157e65b16241bb9d6eb0d15adfb4baa97a7f6f4b9d0621ef84"
+      "d1ba262f5b3b98ec7b47a5492631e282ade5108d02fc14c965d9dbfd"
+      "4683f740abc8f9120d0c7e2f79b0c94f68f0c91acdbd977a66f9a9e1"
+      "59e680ec12ba632ed36f54f438e0eaefc24b6e25c6fd32da9a9c9271"
+      "0cede05462335178baa574e2519aa0bd55a69e5ca130405174271afe"
+      "9b92ad5e82c5ceae9f9124f1b361e22503ad1ca0bad526a2eef833ad"
+      "84efc4203137b10704bab5ce6bb2eb58a2209ef738c44b7127655ed9"
+      "37c5a937ae6ac9beaace7ece9fb33ae60e980da73730a6144e38ca9a"
+      "537fe02d";
+
+    mpz_t p, q, n;
+
+    assert(mpz_init_set_str(p, p_hex, 16) == 0);
+    assert(mpz_init_set_str(q, q_hex, 16) == 0);
+
+    mpz_init(n);
+    mpz_mul(n, p, q);
+
+    // test sqrt_modp
+    {
+      printf("Testing sqrt_modp...\n");
+
+      mpz_t r1;
+      mpz_t sr1;
+
+      mpz_init(r1);
+      mpz_init(sr1);
+
+      goo_randomint(r1, p);
+      mpz_powm_ui(r1, r1, 2, p);
+
+      assert(goo_mod_sqrtp(sr1, r1, p));
+
+      mpz_powm_ui(sr1, sr1, 2, p);
+
+      assert(mpz_cmp(sr1, r1) == 0);
+
+      mpz_clear(r1);
+      mpz_clear(sr1);
+    }
+
+    // test sqrt_modn
+    {
+      printf("Testing sqrt_modn...\n");
+
+      mpz_t r2;
+      mpz_t sr2;
+
+      mpz_init(r2);
+      mpz_init(sr2);
+
+      goo_randomint(r2, n);
+      mpz_powm_ui(r2, r2, 2, n);
+
+      assert(goo_mod_sqrtn(sr2, r2, p, q));
+
+      mpz_powm_ui(sr2, sr2, 2, n);
+
+      assert(mpz_cmp(sr2, r2) == 0);
+
+      mpz_clear(r2);
+      mpz_clear(sr2);
+    }
+
+    mpz_clear(p);
+    mpz_clear(q);
+    mpz_clear(n);
+  }
+
+  // https://github.com/golang/go/blob/aadaec5/src/math/big/int_test.go#L1590
+  static const int symbols[17][3] = {
+    {0, 1, 1},
+    {0, -1, 1},
+    {1, 1, 1},
+    {1, -1, 1},
+    {0, 5, 0},
+    {1, 5, 1},
+    {2, 5, -1},
+    {-2, 5, -1},
+    {2, -5, -1},
+    {-2, -5, 1},
+    {3, 5, -1},
+    {5, 5, 0},
+    {-5, 5, 0},
+    {6, 5, 1},
+    {6, -5, 1},
+    {-6, 5, 1},
+    {-6, -5, -1}
+  };
+
+  // test jacobi
+  {
+    printf("Testing jacobi...\n");
+
+    for (int i = 0; i < 17; i++) {
+      const int *v = symbols[i];
+      mpz_t x, y;
+
+      mpz_init_set_si(x, v[0]);
+      mpz_init_set_si(y, v[1]);
+
+      assert(mpz_jacobi(x, y) == v[2]);
+      assert(goo_mpz_jacobi(x, y) == v[2]);
+
+      mpz_clear(x);
+      mpz_clear(y);
+    }
+  }
+}
+
 static void
 run_primes_test(void) {
   // https://github.com/golang/go/blob/aadaec5/src/math/big/prime_test.go
@@ -3036,61 +3310,6 @@ run_primes_test(void) {
 }
 
 static void
-run_hmac_test(void) {
-  static const char data[] = "hello world";
-  unsigned char key[32];
-  unsigned char out[32];
-
-  static const char expect[] =
-    "42eb78776ad82f001179f44e9e88264f2d804251e02d988c1194b95de823a14e";
-
-  memset(&key[0], 0xff, 32);
-
-  printf("Testing HMAC...\n");
-
-  goo_hmac_t ctx;
-  goo_hmac_init(&ctx, &key[0], 32);
-  goo_hmac_update(&ctx, (unsigned char *)data, sizeof(data) - 1);
-
-  goo_hmac_final(&ctx, &out[0]);
-
-  mpz_t n, e;
-  mpz_init(n);
-  goo_mpz_import(n, out, 32);
-  assert(mpz_init_set_str(e, expect, 16) == 0);
-  assert(mpz_cmp(n, e) == 0);
-
-  mpz_clear(n);
-  mpz_clear(e);
-}
-
-static void
-run_drbg_test(void) {
-  unsigned char entropy[64];
-  unsigned char out[32];
-
-  static const char expect[] =
-    "40e95c4dba22fd05d15784075b05ca7c0b063a43dcec3307122575a7b5e32d3b";
-
-  memset(&entropy[0], 0xaa, 64);
-
-  printf("Testing DRBG...\n");
-
-  goo_drbg_t ctx;
-  goo_drbg_init(&ctx, &entropy[0], 64);
-  goo_drbg_generate(&ctx, &out[0], 32);
-
-  mpz_t n, e;
-  mpz_init(n);
-  goo_mpz_import(n, out, 32);
-  assert(mpz_init_set_str(e, expect, 16) == 0);
-  assert(mpz_cmp(n, e) == 0);
-
-  mpz_clear(n);
-  mpz_clear(e);
-}
-
-static void
 run_ops_test(void) {
   static const char mod_hex[] = ""
     "c7970ceedcc3b0754490201a7aa613cd73911081c790f5f1a8726f463550"
@@ -3306,225 +3525,6 @@ run_ops_test(void) {
   mpz_clear(n);
   goo_group_uninit(goo);
   goo_free(goo);
-}
-
-static int
-goo_randomint(mpz_t ret, const mpz_t max) {
-  unsigned char key[32];
-
-  if (!goo_random(&key[0], 32))
-    return 0;
-
-  goo_prng_t prng;
-  goo_prng_init(&prng);
-
-  goo_prng_seed(&prng, &key[0]);
-  goo_prng_randomint(&prng, ret, max);
-
-  goo_prng_uninit(&prng);
-
-  return 1;
-}
-
-void
-run_util_test(void) {
-  // test bitlen and zerobits
-  {
-    printf("Testing bitlen & zerobits...\n");
-
-    mpz_t n;
-    mpz_init(n);
-
-    mpz_set_ui(n, 0x010001);
-
-    assert(goo_mpz_zerobits(n) == 0);
-    assert(goo_mpz_bitlen(n) == 17);
-
-    mpz_set_si(n, -0x010001);
-
-    assert(goo_mpz_zerobits(n) == 0);
-    assert(goo_mpz_bitlen(n) == 17);
-
-    mpz_set_ui(n, 0x20000);
-
-    assert(goo_mpz_zerobits(n) == 17);
-    assert(goo_mpz_bitlen(n) == 18);
-
-    mpz_set_si(n, -0x20000);
-
-    assert(goo_mpz_zerobits(n) == 17);
-    assert(goo_mpz_bitlen(n) == 18);
-
-    mpz_clear(n);
-  }
-
-  // test mask
-  {
-    printf("Testing mask...\n");
-
-    mpz_t n, t;
-
-    mpz_init(n);
-    mpz_init(t);
-
-    mpz_set_ui(n, 0xffff1234);
-
-    goo_mpz_mask(n, n, 16, t);
-
-    assert(mpz_get_ui(n) == 0x1234);
-
-    mpz_clear(n);
-    mpz_clear(t);
-  }
-
-  // test clog2
-  {
-    printf("Testing clog2...\n");
-
-    mpz_t n;
-    mpz_init(n);
-
-    mpz_set_ui(n, 0x10000);
-
-    assert(goo_clog2(n) == 16);
-
-    mpz_clear(n);
-  }
-
-  // test sqrt
-  {
-    printf("Testing sqrt...\n");
-
-    assert(goo_dsqrt(1024) == 32);
-    assert(goo_dsqrt(1025) == 32);
-  }
-
-  // test sqrts
-  {
-    printf("Testing roots...\n");
-
-    static const char p_hex[] = ""
-      "ccbf79ad1f5e47086062274ea9815042fd938149a5557c8cb3b0c33d"
-      "dcd87c58a53760826a99d196852460762e16a715e40bee5847324aa1"
-      "9911e98bf58e8c9af65e06182bb307c706069df394e5d098fbe85701"
-      "eb2e88089913834aadba3b134f646f6d48f2dacba00a5bfd15e8b8d9"
-      "c0efe1f4209595b920691aeebfc4ba1b28592d88fc0f565b0d3dbcf2"
-      "e3dda7b02e5452660c4bd4485e23cb68e1fdc9f3647f85c5ee0c3555"
-      "c21ce8307320257fae148887af5412db2cece240044cd668c72c7219"
-      "b2e6a32f5da0e0cd52ec9078e7ef521461f2fe5d83b240c412507961"
-      "0512976d1c3b65fcb0ad75133012e2c7329ce55177556f07bdabb271"
-      "622466fb";
-
-    static const char q_hex[] = ""
-      "842d18ae53b1e47aac1d2c7ff91ee656f669ce9676edc2689f39b2cd"
-      "3052c9157e65b16241bb9d6eb0d15adfb4baa97a7f6f4b9d0621ef84"
-      "d1ba262f5b3b98ec7b47a5492631e282ade5108d02fc14c965d9dbfd"
-      "4683f740abc8f9120d0c7e2f79b0c94f68f0c91acdbd977a66f9a9e1"
-      "59e680ec12ba632ed36f54f438e0eaefc24b6e25c6fd32da9a9c9271"
-      "0cede05462335178baa574e2519aa0bd55a69e5ca130405174271afe"
-      "9b92ad5e82c5ceae9f9124f1b361e22503ad1ca0bad526a2eef833ad"
-      "84efc4203137b10704bab5ce6bb2eb58a2209ef738c44b7127655ed9"
-      "37c5a937ae6ac9beaace7ece9fb33ae60e980da73730a6144e38ca9a"
-      "537fe02d";
-
-    mpz_t p, q, n;
-
-    assert(mpz_init_set_str(p, p_hex, 16) == 0);
-    assert(mpz_init_set_str(q, q_hex, 16) == 0);
-
-    mpz_init(n);
-    mpz_mul(n, p, q);
-
-    // test sqrt_modp
-    {
-      printf("Testing sqrt_modp...\n");
-
-      mpz_t r1;
-      mpz_t sr1;
-
-      mpz_init(r1);
-      mpz_init(sr1);
-
-      goo_randomint(r1, p);
-      mpz_powm_ui(r1, r1, 2, p);
-
-      assert(goo_mod_sqrtp(sr1, r1, p));
-
-      mpz_powm_ui(sr1, sr1, 2, p);
-
-      assert(mpz_cmp(sr1, r1) == 0);
-
-      mpz_clear(r1);
-      mpz_clear(sr1);
-    }
-
-    // test sqrt_modn
-    {
-      printf("Testing sqrt_modn...\n");
-
-      mpz_t r2;
-      mpz_t sr2;
-
-      mpz_init(r2);
-      mpz_init(sr2);
-
-      goo_randomint(r2, n);
-      mpz_powm_ui(r2, r2, 2, n);
-
-      assert(goo_mod_sqrtn(sr2, r2, p, q));
-
-      mpz_powm_ui(sr2, sr2, 2, n);
-
-      assert(mpz_cmp(sr2, r2) == 0);
-
-      mpz_clear(r2);
-      mpz_clear(sr2);
-    }
-
-    mpz_clear(p);
-    mpz_clear(q);
-    mpz_clear(n);
-  }
-
-  // https://github.com/golang/go/blob/aadaec5/src/math/big/int_test.go#L1590
-  static const int symbols[17][3] = {
-    {0, 1, 1},
-    {0, -1, 1},
-    {1, 1, 1},
-    {1, -1, 1},
-    {0, 5, 0},
-    {1, 5, 1},
-    {2, 5, -1},
-    {-2, 5, -1},
-    {2, -5, -1},
-    {-2, -5, 1},
-    {3, 5, -1},
-    {5, 5, 0},
-    {-5, 5, 0},
-    {6, 5, 1},
-    {6, -5, 1},
-    {-6, 5, 1},
-    {-6, -5, -1}
-  };
-
-  // test jacobi
-  {
-    printf("Testing jacobi...\n");
-
-    for (int i = 0; i < 17; i++) {
-      const int *v = symbols[i];
-      mpz_t x, y;
-
-      mpz_init_set_si(x, v[0]);
-      mpz_init_set_si(y, v[1]);
-
-      assert(mpz_jacobi(x, y) == v[2]);
-      assert(goo_mpz_jacobi(x, y) == v[2]);
-
-      mpz_clear(x);
-      mpz_clear(y);
-    }
-  }
 }
 
 void
