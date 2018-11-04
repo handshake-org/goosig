@@ -1,8 +1,8 @@
 # GooSig
 
-GooSig was created specifically for the [Handshake Project][handshake] and
-addresses a very specific problem: an [airdrop] to Github users' RSA keys
-allows Github users to be _identified on-chain_. In order to anonymize who is
+GooSig was created specifically for the [Handshake Project][handshake] to
+address a very specific problem: an [airdrop] to Github users' RSA keys allows
+Github users to be _identified on-chain_. In order to anonymize who is
 receiving coins from the airdrop, cryptographic trickery is required: GooSig
 allows the creation of signatures originating from RSA private keys _without
 revealing the RSA public key_.
