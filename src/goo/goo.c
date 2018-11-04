@@ -3103,21 +3103,20 @@ run_ops_test(void) {
     "16a4d9d373d8721f24a3fc0f1b3131f55615172866bccc30f95054c824e7"
     "33a5eb6817f7bc16399d48c6361cc7e5";
 
-  unsigned char *mod = malloc(2048 / 8);
-  assert(mod != NULL);
+  unsigned char *mod;
+  mpz_t n;
+  goo_group_t *goo;
+
+  mod = goo_malloc(2048 / 8);
 
   printf("Testing group ops...\n");
 
-  mpz_t n;
   assert(mpz_init_set_str(n, mod_hex, 16) == 0);
   goo_mpz_export(mod, NULL, n);
-  mpz_clear(n);
 
-  goo_group_t *goo = malloc(sizeof(goo_group_t));
-  assert(goo != NULL);
+  goo = goo_malloc(sizeof(goo_group_t));
 
   assert(goo_group_init(goo, mod, 2048 / 8, 2, 3, 2048));
-  free(mod);
 
   {
     printf("Testing comb calculation...\n");
@@ -3303,8 +3302,10 @@ run_ops_test(void) {
     }
   }
 
+  goo_free(mod);
+  mpz_clear(n);
   goo_group_uninit(goo);
-  free(goo);
+  goo_free(goo);
 }
 
 static int
@@ -3556,19 +3557,18 @@ run_combspec_test(void) {
     "16a4d9d373d8721f24a3fc0f1b3131f55615172866bccc30f95054c824e7"
     "33a5eb6817f7bc16399d48c6361cc7e5";
 
-  unsigned char *mod = malloc(2048 / 8);
-  assert(mod != NULL);
-
+  unsigned char *mod;
   mpz_t n;
+  goo_group_t *goo;
+
+  mod = goo_malloc(2048 / 8);
+
   assert(mpz_init_set_str(n, mod_hex, 16) == 0);
   goo_mpz_export(mod, NULL, n);
-  mpz_clear(n);
 
-  goo_group_t *goo = malloc(sizeof(goo_group_t));
-  assert(goo != NULL);
+  goo = goo_malloc(sizeof(goo_group_t));
 
   assert(goo_group_init(goo, mod, 2048 / 8, 2, 3, 0));
-  free(mod);
 
   assert(goo->combs[0].g.points_per_add == 8);
   assert(goo->combs[0].g.adds_per_shift == 2);
@@ -3586,18 +3586,115 @@ run_combspec_test(void) {
   assert(goo->combs[0].h.points_per_subcomb == 255);
   assert(goo->combs[0].h.size == 510);
 
+  goo_free(mod);
+  mpz_clear(n);
   goo_group_uninit(goo);
-  free(goo);
+  goo_free(goo);
+}
+
+void
+run_goo_test(void) {
+  printf("Testing signing/verifying...\n");
+
+  static const char p_hex[] = ""
+    "ccbf79ad1f5e47086062274ea9815042fd938149a5557c8cb3b0c33d"
+    "dcd87c58a53760826a99d196852460762e16a715e40bee5847324aa1"
+    "9911e98bf58e8c9af65e06182bb307c706069df394e5d098fbe85701"
+    "eb2e88089913834aadba3b134f646f6d48f2dacba00a5bfd15e8b8d9"
+    "c0efe1f4209595b920691aeebfc4ba1b28592d88fc0f565b0d3dbcf2"
+    "e3dda7b02e5452660c4bd4485e23cb68e1fdc9f3647f85c5ee0c3555"
+    "c21ce8307320257fae148887af5412db2cece240044cd668c72c7219"
+    "b2e6a32f5da0e0cd52ec9078e7ef521461f2fe5d83b240c412507961"
+    "0512976d1c3b65fcb0ad75133012e2c7329ce55177556f07bdabb271"
+    "622466fb";
+
+  static const char q_hex[] = ""
+    "842d18ae53b1e47aac1d2c7ff91ee656f669ce9676edc2689f39b2cd"
+    "3052c9157e65b16241bb9d6eb0d15adfb4baa97a7f6f4b9d0621ef84"
+    "d1ba262f5b3b98ec7b47a5492631e282ade5108d02fc14c965d9dbfd"
+    "4683f740abc8f9120d0c7e2f79b0c94f68f0c91acdbd977a66f9a9e1"
+    "59e680ec12ba632ed36f54f438e0eaefc24b6e25c6fd32da9a9c9271"
+    "0cede05462335178baa574e2519aa0bd55a69e5ca130405174271afe"
+    "9b92ad5e82c5ceae9f9124f1b361e22503ad1ca0bad526a2eef833ad"
+    "84efc4203137b10704bab5ce6bb2eb58a2209ef738c44b7127655ed9"
+    "37c5a937ae6ac9beaace7ece9fb33ae60e980da73730a6144e38ca9a"
+    "537fe02d";
+
+  static const char mod_hex[] = ""
+    "c7970ceedcc3b0754490201a7aa613cd73911081c790f5f1a8726f463550"
+    "bb5b7ff0db8e1ea1189ec72f93d1650011bd721aeeacc2acde32a04107f0"
+    "648c2813a31f5b0b7765ff8b44b4b6ffc93384b646eb09c7cf5e8592d40e"
+    "a33c80039f35b4f14a04b51f7bfd781be4d1673164ba8eb991c2c4d730bb"
+    "be35f592bdef524af7e8daefd26c66fc02c479af89d64d373f442709439d"
+    "e66ceb955f3ea37d5159f6135809f85334b5cb1813addc80cd05609f10ac"
+    "6a95ad65872c909525bdad32bc729592642920f24c61dc5b3c3b7923e56b"
+    "16a4d9d373d8721f24a3fc0f1b3131f55615172866bccc30f95054c824e7"
+    "33a5eb6817f7bc16399d48c6361cc7e5";
+
+  mpz_t p, q, n;
+  mpz_t mod_n;
+  mpz_t s_prime, C1;
+  mpz_t msg;
+  goo_sig_t sig;
+  unsigned char *mod;
+  goo_group_t *goo;
+
+  assert(mpz_init_set_str(p, p_hex, 16) == 0);
+  assert(mpz_init_set_str(q, q_hex, 16) == 0);
+
+  mpz_init(n);
+  mpz_mul(n, p, q);
+
+  mod = goo_malloc(2048 / 8);
+
+  assert(mpz_init_set_str(mod_n, mod_hex, 16) == 0);
+  goo_mpz_export(mod, NULL, mod_n);
+
+  goo = goo_malloc(sizeof(goo_group_t));
+
+  assert(goo_group_init(goo, mod, 2048 / 8, 2, 3, 4096));
+
+  mpz_init(s_prime);
+  mpz_init(C1);
+
+  assert(goo_group_challenge(goo, s_prime, C1, n));
+
+  mpz_init(msg);
+  mpz_set_ui(msg, 0xdeadbeef);
+
+  goo_sig_init(&sig);
+
+  assert(goo_group_sign(goo, &sig, msg, s_prime, C1, n, p, q));
+
+  assert(goo_group_verify(goo, msg, C1, sig.C2, sig.t,
+                          sig.chal, sig.ell, sig.Aq,
+                          sig.Bq, sig.Cq, sig.Dq,
+                          sig.z_w, sig.z_w2, sig.z_s1,
+                          sig.z_a, sig.z_an, sig.z_s1w,
+                          sig.z_sa));
+
+  mpz_clear(p);
+  mpz_clear(q);
+  mpz_clear(n);
+  mpz_clear(mod_n);
+  mpz_clear(s_prime);
+  mpz_clear(C1);
+  mpz_clear(msg);
+  goo_sig_uninit(&sig);
+  goo_free(mod);
+  goo_group_uninit(goo);
+  goo_free(goo);
 }
 
 void
 goo_test(void) {
-  run_primes_test();
   run_hmac_test();
   run_drbg_test();
-  run_ops_test();
   run_util_test();
+  run_primes_test();
+  run_ops_test();
   run_combspec_test();
+  run_goo_test();
   printf("All tests passed!\n");
 }
 #endif
