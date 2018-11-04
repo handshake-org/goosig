@@ -3246,6 +3246,15 @@ run_ops_test(void) {
 
     assert(mpz_cmp_ui(r1, 1) == 0);
     assert(mpz_cmp_ui(r2, 1) == 0);
+
+    mpz_clear(e1);
+    mpz_clear(e2);
+    mpz_clear(e1_s);
+    mpz_clear(e2_s);
+    mpz_clear(e1_si);
+    mpz_clear(e2_si);
+    mpz_clear(r1);
+    mpz_clear(r2);
   }
 
   // test inv5
