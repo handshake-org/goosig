@@ -3018,6 +3018,21 @@ run_primes_test(void) {
   }
 
 #undef GOO_ARRAY_SIZE
+
+  // test next_prime
+  {
+    printf("Testing next_prime...\n");
+
+    mpz_t n;
+    mpz_init(n);
+    mpz_set_ui(n, 4);
+
+    assert(goo_next_prime(n, n, zero, 512));
+
+    assert(mpz_get_ui(n) == 5);
+
+    mpz_clear(n);
+  }
 }
 
 static void
@@ -3312,7 +3327,70 @@ goo_randomint(mpz_t ret, const mpz_t max) {
 
 void
 run_util_test(void) {
-  // sqrt
+  // test bitlen and zerobits
+  {
+    printf("Testing bitlen & zerobits...\n");
+
+    mpz_t n;
+    mpz_init(n);
+
+    mpz_set_ui(n, 0x010001);
+
+    assert(goo_mpz_zerobits(n) == 0);
+    assert(goo_mpz_bitlen(n) == 17);
+
+    mpz_set_si(n, -0x010001);
+
+    assert(goo_mpz_zerobits(n) == 0);
+    assert(goo_mpz_bitlen(n) == 17);
+
+    mpz_set_ui(n, 0x20000);
+
+    assert(goo_mpz_zerobits(n) == 17);
+    assert(goo_mpz_bitlen(n) == 18);
+
+    mpz_set_si(n, -0x20000);
+
+    assert(goo_mpz_zerobits(n) == 17);
+    assert(goo_mpz_bitlen(n) == 18);
+
+    mpz_clear(n);
+  }
+
+  // test mask
+  {
+    printf("Testing mask...\n");
+
+    mpz_t n, t;
+
+    mpz_init(n);
+    mpz_init(t);
+
+    mpz_set_ui(n, 0xffff1234);
+
+    goo_mpz_mask(n, n, 16, t);
+
+    assert(mpz_get_ui(n) == 0x1234);
+
+    mpz_clear(n);
+    mpz_clear(t);
+  }
+
+  // test clog2
+  {
+    printf("Testing clog2...\n");
+
+    mpz_t n;
+    mpz_init(n);
+
+    mpz_set_ui(n, 0x10000);
+
+    assert(goo_clog2(n) == 16);
+
+    mpz_clear(n);
+  }
+
+  // test sqrt
   {
     printf("Testing sqrt...\n");
 

@@ -244,4 +244,8 @@ describe('Primes', function() {
       assert(!primes.isPrime(p, key));
     });
   }
+
+  it('should get next prime', () => {
+    assert(primes.nextPrime(4n, zero, 512n) === 5n);
+  });
 });

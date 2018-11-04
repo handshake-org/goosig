@@ -51,6 +51,21 @@ describe('Util', function() {
   const [p, q] = [decode(p_), decode(q_)];
   const n = p * q;
 
+  it('should count bits and zero bits', () => {
+    assert(BigMath.zeroBits(0x010001n) === 0);
+    assert(BigMath.bitLength(0x010001n) === 17);
+    assert(BigMath.zeroBits(-0x010001n) === 0);
+    assert(BigMath.bitLength(-0x010001n) === 17);
+    assert(BigMath.zeroBits(0x20000n) === 17);
+    assert(BigMath.bitLength(0x20000n) === 18);
+    assert(BigMath.zeroBits(-0x20000n) === 17);
+    assert(BigMath.bitLength(-0x20000n) === 18);
+  });
+
+  it('should calculate clog2', () => {
+    assert(util.clog2(0x10000n) === 16);
+  });
+
   it('should compute sqrt', () => {
     assert.strictEqual(util.isqrt(1024n).toString(), (32n).toString());
     assert.strictEqual(util.isqrt(1025n).toString(), (32n).toString());
