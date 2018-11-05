@@ -660,7 +660,7 @@ goo_mod_sqrtn(mpz_t ret, const mpz_t x, const mpz_t p, const mpz_t q) {
   mpz_mul(yy, sp, mq);
   mpz_mul(yy, yy, q);
 
-  // xx = xx + y
+  // xx = xx + yy
   mpz_add(xx, xx, yy);
 
   // yy = p * q
