@@ -1749,6 +1749,47 @@ goo_group_wnaf(goo_group_t *group, const mpz_t e, long *out, long bitlen) {
   return out;
 }
 
+static long *
+goo_group_wnaf2(goo_group_t *group, const mpz_t e, long *out, long bitlen) {
+  mpz_t *r = &group->r;
+  long w = GOO_WINDOW_SIZE;
+  long mask = (1 << w) - 1;
+  long val;
+
+  // r = e
+  mpz_set(*r, e);
+
+  for (long i = bitlen - 1; i >= 0; i--) {
+    val = 0;
+
+    // if r & 1
+    if (mpz_tstbit(*r, 0)) {
+      // val = r & mask;
+      val = (long)mpz_fdiv_ui(*r, mask + 1);
+
+      if (val & (1 << (w - 1)))
+        val -= 1 << w;
+
+      // r = r - val
+      if (val < 0)
+        mpz_add_ui(*r, *r, -val);
+      else
+        mpz_sub_ui(*r, *r, val);
+    }
+
+    // out[i] = val
+    out[i] = val;
+
+    // r = r >> 1
+    mpz_fdiv_q_2exp(*r, *r, 1);
+  }
+
+  // r == 0
+  assert(mpz_sgn(*r) == 0);
+
+  return out;
+}
+
 static void
 goo_group_one_mul(
   goo_group_t *group,
