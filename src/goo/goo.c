@@ -2199,6 +2199,9 @@ goo_group_sign(
     goto fail;
   }
 
+  // assert w > 0
+  assert(mpz_sgn(w) > 0);
+
   // a = (w ** 2 - t) / n
   mpz_pow_ui(a, w, 2);
   mpz_sub(a, a, *t);
