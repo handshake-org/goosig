@@ -1413,19 +1413,6 @@ goo_group_init(
   mpz_init(group->ell_r_out);
   mpz_init(group->elldiff);
 
-  mpz_init(group->b12);
-  mpz_init(group->b34);
-  mpz_init(group->b1234);
-  mpz_init(group->b12345);
-  mpz_init(group->b12_inv);
-  mpz_init(group->b34_inv);
-  mpz_init(group->b1234_inv);
-  mpz_init(group->b12345_inv);
-
-  mpz_init(group->bsq);
-
-  mpz_init(group->val);
-  mpz_init(group->mask);
   mpz_init(group->e);
 
   mpz_init(group->gh);
@@ -1474,19 +1461,6 @@ goo_group_uninit(goo_group_t *group) {
   mpz_clear(group->ell_r_out);
   mpz_clear(group->elldiff);
 
-  mpz_clear(group->b12);
-  mpz_clear(group->b34);
-  mpz_clear(group->b1234);
-  mpz_clear(group->b12345);
-  mpz_clear(group->b12_inv);
-  mpz_clear(group->b34_inv);
-  mpz_clear(group->b1234_inv);
-  mpz_clear(group->b12345_inv);
-
-  mpz_clear(group->bsq);
-
-  mpz_clear(group->val);
-  mpz_clear(group->mask);
   mpz_clear(group->e);
 
   mpz_clear(group->gh);
@@ -1547,18 +1521,18 @@ goo_group_inv2(
   const mpz_t b2
 ) {
   int r = 0;
-  mpz_t *b12_inv = &group->b12_inv;
+  mpz_ptr b12_inv = r2;
 
   // b12_inv = modinverse(b1 * b2)
-  mpz_mul(*b12_inv, b1, b2);
+  mpz_mul(b12_inv, b1, b2);
 
-  if (!goo_group_inv(group, *b12_inv, *b12_inv))
+  if (!goo_group_inv(group, b12_inv, b12_inv))
     goto fail;
 
   // r1 = (b2 * b12_inv) % n
-  goo_group_mul(group, r1, b2, *b12_inv);
+  goo_group_mul(group, r1, b2, b12_inv);
   // r2 = (b1 * b12_inv) % n
-  goo_group_mul(group, r2, b1, *b12_inv);
+  goo_group_mul(group, r2, b1, b12_inv);
 
   r = 1;
 fail:
@@ -1580,45 +1554,48 @@ goo_group_inv5(
   const mpz_t b5
 ) {
   int r = 0;
-  mpz_t *b12 = &group->b12;
-  mpz_t *b34 = &group->b34;
-  mpz_t *b1234 = &group->b1234;
-  mpz_t *b12345 = &group->b12345;
-  mpz_t *b12345_inv = &group->b12345_inv;
-  mpz_t *b1234_inv = &group->b1234_inv;
-  mpz_t *b34_inv = &group->b34_inv;
-  mpz_t *b12_inv = &group->b12_inv;
+
+  // Tricky memory management
+  // to avoid allocations.
+  mpz_ptr b12 = r4;
+  mpz_ptr b34 = r2;
+  mpz_ptr b1234 = r1;
+  mpz_ptr b12345 = r5;
+  mpz_ptr b12345_inv = r5;
+  mpz_ptr b1234_inv = r3;
+  mpz_ptr b34_inv = r4;
+  mpz_ptr b12_inv = r2;
 
   // b12 = (b1 * b2) % n
-  goo_group_mul(group, *b12, b1, b2);
+  goo_group_mul(group, b12, b1, b2);
   // b34 = (b3 * b4) % n
-  goo_group_mul(group, *b34, b3, b4);
+  goo_group_mul(group, b34, b3, b4);
   // b1234 = (b12 * b34) % n
-  goo_group_mul(group, *b1234, *b12, *b34);
+  goo_group_mul(group, b1234, b12, b34);
   // b12345 = (b1234 * b5) % n
-  goo_group_mul(group, *b12345, *b1234, b5);
+  goo_group_mul(group, b12345, b1234, b5);
 
   // b12345_inv = modinverse(b12345);
-  if (!goo_group_inv(group, *b12345_inv, *b12345))
+  if (!goo_group_inv(group, b12345_inv, b12345))
     goto fail;
 
   // b1234_inv = (b12345_inv * b5) % n
-  goo_group_mul(group, *b1234_inv, *b12345_inv, b5);
+  goo_group_mul(group, b1234_inv, b12345_inv, b5);
   // b34_inv = (b1234_inv * b12) % n
-  goo_group_mul(group, *b34_inv, *b1234_inv, *b12);
+  goo_group_mul(group, b34_inv, b1234_inv, b12);
   // b12_inv = (b1234_inv * b34) % n
-  goo_group_mul(group, *b12_inv, *b1234_inv, *b34);
+  goo_group_mul(group, b12_inv, b1234_inv, b34);
 
-  // r1 = (b12_inv * b2) % n
-  goo_group_mul(group, r1, *b12_inv, b2);
-  // r2 = (b12_inv * b1) % n
-  goo_group_mul(group, r2, *b12_inv, b1);
-  // r3 = (b34_inv * b4) % n
-  goo_group_mul(group, r3, *b34_inv, b4);
-  // r4 = (b34_inv * b3) % n
-  goo_group_mul(group, r4, *b34_inv, b3);
   // r5 = (b12345_inv * b1234) % n
-  goo_group_mul(group, r5, *b12345_inv, *b1234);
+  goo_group_mul(group, r5, b12345_inv, b1234);
+  // r1 = (b12_inv * b2) % n
+  goo_group_mul(group, r1, b12_inv, b2);
+  // r2 = (b12_inv * b1) % n
+  goo_group_mul(group, r2, b12_inv, b1);
+  // r3 = (b34_inv * b4) % n
+  goo_group_mul(group, r3, b34_inv, b4);
+  // r4 = (b34_inv * b3) % n
+  goo_group_mul(group, r4, b34_inv, b3);
 
   r = 1;
 fail:
@@ -1705,7 +1682,7 @@ goo_group_powgh_slow(
 
 static void
 goo_group_wnaf_pc_help(goo_group_t *group, const mpz_t b, mpz_t *out) {
-  mpz_t *bsq = &group->bsq;
+  mpz_t *bsq = &out[GOO_TABLEN - 1];
 
   // bsq = b * b
   goo_group_sqr(group, *bsq, b);
@@ -1729,49 +1706,6 @@ goo_group_precomp_wnaf(
 ) {
   goo_group_wnaf_pc_help(group, b, p);
   goo_group_wnaf_pc_help(group, b_inv, n);
-}
-
-static long *
-goo_group_wnaf_slow(goo_group_t *group, const mpz_t exp, long *out, long bitlen) {
-  mpz_t *e = &group->e;
-  mpz_t *mask = &group->mask;
-  mpz_t *val = &group->val;
-  long w = GOO_WINDOW_SIZE;
-
-  // e = exp
-  mpz_set(*e, exp);
-
-  // mask = (1 << w) - 1
-  mpz_set_ui(*mask, (1 << w) - 1);
-
-  for (long i = bitlen - 1; i >= 0; i--) {
-    // val = 0
-    mpz_set_ui(*val, 0);
-
-    // if e & 1
-    if (mpz_odd_p(*e)) {
-      // val = e & mask
-      mpz_and(*val, *e, *mask);
-      // if val & (1 << (w - 1))
-      if (mpz_tstbit(*val, w - 1)) {
-        // val -= 1 << w
-        mpz_sub_ui(*val, *val, 1 << w);
-      }
-      // e = e - val
-      mpz_sub(*e, *e, *val);
-    }
-
-    // out[i] = val
-    out[i] = mpz_get_si(*val);
-
-    // e = e >> 1
-    mpz_fdiv_q_2exp(*e, *e, 1);
-  }
-
-  // e == 0
-  assert(mpz_sgn(*e) == 0);
-
-  return out;
 }
 
 static long *
@@ -1952,18 +1886,19 @@ goo_group_recon(
   const mpz_t e4
 ) {
   int r = 0;
+  mpz_ptr pow = ret;
   mpz_t *gh = &group->gh;
 
-  // ret = pow2(b1, b1_inv, e1, b2, b2_inv, e2)
-  if (!goo_group_pow2(group, ret, b1, b1_inv, e1, b2, b2_inv, e2))
+  // pow = pow2(b1, b1_inv, e1, b2, b2_inv, e2)
+  if (!goo_group_pow2(group, pow, b1, b1_inv, e1, b2, b2_inv, e2))
     goto fail;
 
   // gh = powgh(e3, e4)
   if (!goo_group_powgh(group, *gh, e3, e4))
     goto fail;
 
-  // ret = ret * gh
-  goo_group_mul(group, ret, ret, *gh);
+  // ret = pow * gh
+  goo_group_mul(group, ret, pow, *gh);
 
   // ret = reduce(ret)
   goo_group_reduce(group, ret, ret);

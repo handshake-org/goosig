@@ -128,22 +128,7 @@ typedef struct goo_group_s {
   mpz_t ell_r_out;
   mpz_t elldiff;
 
-  /* goo_group_inv2() / goo_group_inv5() */
-  mpz_t b12;
-  mpz_t b34;
-  mpz_t b1234;
-  mpz_t b12345;
-  mpz_t b12_inv;
-  mpz_t b34_inv;
-  mpz_t b1234_inv;
-  mpz_t b12345_inv;
-
-  /* goo_group_wnaf_pc_help() */
-  mpz_t bsq;
-
   /* goo_group_wnaf() */
-  mpz_t val;
-  mpz_t mask;
   mpz_t e;
 
   /* goo_group_recon() */
