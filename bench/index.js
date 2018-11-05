@@ -23,26 +23,26 @@ const Native = require('../lib/native/goo');
 function main(Goo, nreps) {
   // 4096-bit GoUO
   // 4096-bit RSA GoUO, 2048-bit Signer key
-  const gops_4_2_p = new Goo(Goo.AOL2, 2, 3, 2048);
+  const prover42 = new Goo(Goo.AOL2, 2, 3, 2048);
   // 4096-bit RSA GoUO, 4096-bit Signer key
-  const gops_4_4_p = new Goo(Goo.AOL2, 2, 3, 4096);
+  const prover44 = new Goo(Goo.AOL2, 2, 3, 4096);
   // 4096-bit RSA GoUO (verification)
-  const gops_4_v = new Goo(Goo.AOL2, 2, 3, null);
+  const verifier40 = new Goo(Goo.AOL2, 2, 3, null);
 
   // 2048-bit GoUO
   // 2048-bit RSA GoUO, 2048-bit Signer key
-  const gops_2_2_p = new Goo(Goo.RSA2048, 2, 3, 2048);
+  const prover22 = new Goo(Goo.RSA2048, 2, 3, 2048);
   // 2048-bit RSA GoUO, 4096-bit Signer key
-  const gops_2_4_p = new Goo(Goo.RSA2048, 2, 3, 4096);
+  const prover24 = new Goo(Goo.RSA2048, 2, 3, 4096);
   // 2048-bit RSA GoUO (verification)
-  const gops_2_v = new Goo(Goo.RSA2048, 2, 3, null);
+  const verifier20 = new Goo(Goo.RSA2048, 2, 3, null);
 
   // Measure times.
   const tests = [
-    ['4096-bit RSA GoUO, 2048-bit Signer PK', gops_4_2_p, gops_4_v, 2048],
-    ['4096-bit RSA GoUO, 4096-bit Signer PK', gops_4_4_p, gops_4_v, 4096],
-    ['2048-bit RSA GoUO, 2048-bit Signer PK', gops_2_2_p, gops_2_v, 2048],
-    ['2048-bit RSA GoUO, 4096-bit Signer PK', gops_2_4_p, gops_2_v, 4096]
+    ['4096-bit RSA GoUO, 2048-bit Signer PK', prover42, verifier40, 2048],
+    ['4096-bit RSA GoUO, 4096-bit Signer PK', prover44, verifier40, 4096],
+    ['2048-bit RSA GoUO, 2048-bit Signer PK', prover22, verifier20, 2048],
+    ['2048-bit RSA GoUO, 4096-bit Signer PK', prover24, verifier20, 4096]
   ];
 
   const times = [];
@@ -59,25 +59,25 @@ function main(Goo, nreps) {
       // Random signer modulus.
       const key = testUtil.genKey(bits);
 
-      let start_time, stop_time;
+      let start, stop;
 
       // Generate the challenge token.
-      start_time = performance.now();
+      start = performance.now();
       const [s_prime, C1] = prover.challenge(key);
-      stop_time = performance.now();
-      times[i][0].push(stop_time - start_time);
+      stop = performance.now();
+      times[i][0].push(stop - start);
 
       // Generate the signature.
-      start_time = performance.now();
+      start = performance.now();
       const sig = prover.sign(msg, s_prime, C1, key);
-      stop_time = performance.now();
-      times[i][1].push(stop_time - start_time);
+      stop = performance.now();
+      times[i][1].push(stop - start);
 
       // Verify the signature.
-      start_time = performance.now();
+      start = performance.now();
       res[i] = verifier.verify(msg, sig, C1);
-      stop_time = performance.now();
-      times[i][2].push(stop_time - start_time);
+      stop = performance.now();
+      times[i][2].push(stop - start);
     }
 
     return res;
