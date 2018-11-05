@@ -3776,6 +3776,62 @@ run_combspec_test(void) {
 }
 
 void
+run_sig_test(void) {
+  goo_sig_t sig1;
+  goo_sig_t sig2;
+  unsigned char *data = NULL;
+  size_t size;
+
+  printf("Testing signatures...\n");
+
+  goo_sig_init(&sig1);
+  goo_sig_init(&sig2);
+
+  mpz_set_ui(sig1.C2, 0x01);
+  mpz_set_ui(sig1.t, 0x02);
+  mpz_set_ui(sig1.chal, 0x03);
+  mpz_set_ui(sig1.ell, 0x04);
+  mpz_set_ui(sig1.Aq, 0x05);
+  mpz_set_ui(sig1.Bq, 0x06);
+  mpz_set_ui(sig1.Cq, 0x07);
+  mpz_set_ui(sig1.Dq, 0x08);
+  mpz_set_ui(sig1.z_w, 0x09);
+  mpz_set_ui(sig1.z_w2, 0x0a);
+  mpz_set_ui(sig1.z_s1, 0x0b);
+  mpz_set_ui(sig1.z_a, 0x0c);
+  mpz_set_ui(sig1.z_an, 0x0d);
+  mpz_set_ui(sig1.z_s1w, 0x0e);
+  mpz_set_ui(sig1.z_sa, 0x0f);
+
+  size = goo_sig_size(&sig1, 2048);
+  data = goo_malloc(size);
+
+  assert(goo_sig_export(data, &sig1, 2048));
+
+  assert(goo_sig_import(&sig2, data, size, 2048));
+
+  assert(mpz_cmp_ui(sig2.C2, 0x01) == 0);
+  assert(mpz_cmp_ui(sig2.t, 0x02) == 0);
+  assert(mpz_cmp_ui(sig2.chal, 0x03) == 0);
+  assert(mpz_cmp_ui(sig2.ell, 0x04) == 0);
+  assert(mpz_cmp_ui(sig2.Aq, 0x05) == 0);
+  assert(mpz_cmp_ui(sig2.Bq, 0x06) == 0);
+  assert(mpz_cmp_ui(sig2.Cq, 0x07) == 0);
+  assert(mpz_cmp_ui(sig2.Dq, 0x08) == 0);
+  assert(mpz_cmp_ui(sig2.z_w, 0x09) == 0);
+  assert(mpz_cmp_ui(sig2.z_w2, 0x0a) == 0);
+  assert(mpz_cmp_ui(sig2.z_s1, 0x0b) == 0);
+  assert(mpz_cmp_ui(sig2.z_a, 0x0c) == 0);
+  assert(mpz_cmp_ui(sig2.z_an, 0x0d) == 0);
+  assert(mpz_cmp_ui(sig2.z_s1w, 0x0e) == 0);
+  assert(mpz_cmp_ui(sig2.z_sa, 0x0f) == 0);
+
+  goo_sig_uninit(&sig1);
+  goo_sig_uninit(&sig2);
+  goo_free(data);
+}
+
+void
 run_goo_test(void) {
   printf("Testing signing/verifying...\n");
 
@@ -3872,6 +3928,7 @@ goo_test(void) {
   run_primes_test();
   run_ops_test();
   run_combspec_test();
+  run_sig_test();
   run_goo_test();
   printf("All tests passed!\n");
 }
