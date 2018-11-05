@@ -8,7 +8,13 @@ const random = require('bcrypto/lib/random');
 const Goo = require('../lib/goo');
 const Signature = require('../lib/js/signature');
 
-const SIG_LENGTH = new Signature().encode(2048).length;
+const SIG_LENGTH = new Signature().encode(2048).length; // 1426
+assert(SIG_LENGTH === 1426);
+
+const DQ_START = 1058;
+const DQ_PAD = 16;
+// const DQ_SIZE = 240;
+// const DQ_END = 1314;
 
 const goo = new Goo(Goo.RSA2048, 2, 3, 2048);
 const ver = new Goo(Goo.RSA2048, 2, 3, null);
@@ -75,6 +81,9 @@ for (let i = 0; i < 10000000; i++) {
       }
       break;
   }
+
+  if (sig.length > 0)
+    sig.fill(0x00, DQ_START, DQ_START + DQ_PAD);
 
   assert(!ver.verify(msg, sig, C1));
 }
