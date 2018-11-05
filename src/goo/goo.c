@@ -110,6 +110,7 @@ static inline unsigned long
 goo_mpz_zerobits(const mpz_t n) {
   int sgn = mpz_sgn(n);
 
+  // if n == 0
   if (sgn == 0)
     return 0;
 
@@ -281,6 +282,72 @@ goo_free(void *ptr) {
 }
 
 /*
+ * RNG
+ */
+
+static int
+goo_random_bits(mpz_t ret, unsigned long bits) {
+  int r = 0;
+  unsigned long b = 0;
+  unsigned char out[32];
+
+  mpz_t tmp;
+  mpz_init(tmp);
+
+  // ret = 0
+  mpz_set_ui(ret, 0);
+
+  while (b < bits) {
+    // ret = ret << 256
+    mpz_mul_2exp(ret, ret, 256);
+    // tmp = nextrand()
+    if (!goo_random(&out[0], 32))
+      goto fail;
+    goo_mpz_import(tmp, &out[0], 32);
+    // ret = ret | tmp
+    mpz_ior(ret, ret, tmp);
+    b += 256;
+  }
+
+  unsigned long left = b - bits;
+
+  // ret >>= left;
+  mpz_fdiv_q_2exp(ret, ret, left);
+
+  r = 1;
+fail:
+  mpz_clear(tmp);
+  return r;
+}
+
+static int
+goo_random_int(mpz_t ret, const mpz_t max) {
+  // if max <= 0
+  if (mpz_sgn(max) <= 0) {
+    // ret = 0
+    mpz_set_ui(ret, 0);
+    return 1;
+  }
+
+  // ret = max - 1
+  mpz_sub_ui(ret, max, 1);
+
+  // bits = bitlen(ret)
+  size_t bits = goo_mpz_bitlen(ret);
+
+  // ret += 1
+  mpz_add_ui(ret, ret, 1);
+
+  // while ret >= max
+  while (mpz_cmp(ret, max) >= 0) {
+    if (!goo_random_bits(ret, bits))
+      return 0;
+  }
+
+  return 1;
+}
+
+/*
  * PRNG
  */
 
@@ -312,39 +379,40 @@ goo_prng_seed(goo_prng_t *prng, const unsigned char *key) {
 }
 
 static void
-goo_prng_nextrandom(goo_prng_t *prng, unsigned char out[32]) {
-  goo_drbg_generate(&prng->ctx, &out[0], 32);
+goo_prng_next_random(goo_prng_t *prng, unsigned char *out) {
+  goo_drbg_generate(&prng->ctx, out, 32);
 }
 
 static void
-goo_prng_randombits(goo_prng_t *prng, mpz_t r, unsigned long nbits) {
-  mpz_set(r, prng->save);
+goo_prng_random_bits(goo_prng_t *prng, mpz_t ret, unsigned long bits) {
+  // ret = save
+  mpz_set(ret, prng->save);
 
-  unsigned long b = goo_mpz_bitlen(r);
+  unsigned long b = goo_mpz_bitlen(ret);
   unsigned char out[32];
 
-  while (b < nbits) {
-    // r = r << 256
-    mpz_mul_2exp(r, r, 256);
+  while (b < bits) {
+    // ret = ret << 256
+    mpz_mul_2exp(ret, ret, 256);
     // tmp = nextrand()
-    goo_prng_nextrandom(prng, &out[0]);
+    goo_prng_next_random(prng, &out[0]);
     goo_mpz_import(prng->tmp, &out[0], 32);
-    // r = r | tmp
-    mpz_ior(r, r, prng->tmp);
+    // ret = ret | tmp
+    mpz_ior(ret, ret, prng->tmp);
     b += 256;
   }
 
-  unsigned long left = b - nbits;
+  unsigned long left = b - bits;
 
-  // save = r & ((1 << left) - 1)
-  goo_mpz_mask(prng->save, r, left, prng->tmp);
+  // save = ret & ((1 << left) - 1)
+  goo_mpz_mask(prng->save, ret, left, prng->tmp);
 
-  // r >>= left;
-  mpz_fdiv_q_2exp(r, r, left);
+  // ret >>= left;
+  mpz_fdiv_q_2exp(ret, ret, left);
 }
 
 static void
-goo_prng_randomint(goo_prng_t *prng, mpz_t ret, const mpz_t max) {
+goo_prng_random_int(goo_prng_t *prng, mpz_t ret, const mpz_t max) {
   // if max <= 0
   if (mpz_sgn(max) <= 0) {
     // ret = 0
@@ -363,7 +431,7 @@ goo_prng_randomint(goo_prng_t *prng, mpz_t ret, const mpz_t max) {
 
   // while ret >= max
   while (mpz_cmp(ret, max) >= 0)
-    goo_prng_randombits(prng, ret, bits);
+    goo_prng_random_bits(prng, ret, bits);
 }
 
 /*
@@ -408,6 +476,7 @@ goo_dsqrt(unsigned long x) {
 
 static int
 goo_mod_sqrtp(mpz_t ret, const mpz_t n, const mpz_t p) {
+  // if p <= 0
   if (mpz_sgn(p) <= 0)
     return 0;
 
@@ -458,8 +527,10 @@ goo_mod_sqrtp(mpz_t ret, const mpz_t n, const mpz_t p) {
   // w = 2
   mpz_set_ui(w, 2);
 
-  while (mpz_jacobi(w, p) != -1)
+  while (mpz_jacobi(w, p) != -1) {
+    // w += 1
     mpz_add_ui(w, w, 1);
+  }
 
   // w = modpow(w, Q, p)
   mpz_powm(w, w, Q, p);
@@ -583,7 +654,6 @@ goo_mod_sqrtn(mpz_t ret, const mpz_t x, const mpz_t p, const mpz_t q) {
   mpz_mod(ret, xx, yy);
 
   r = 1;
-
 fail:
   mpz_clear(sp);
   mpz_clear(sq);
@@ -670,7 +740,7 @@ goo_is_prime_mr(
       mpz_set_ui(x, 2);
     } else {
       // x = getrandint(nm3)
-      goo_prng_randomint(&prng, x, nm3);
+      goo_prng_random_int(&prng, x, nm3);
       // x += 2
       mpz_add_ui(x, x, 2);
     }
@@ -730,6 +800,7 @@ goo_is_prime_lucas(const mpz_t n) {
   mpz_init(t3);
 
   // Ignore 0 and 1.
+  // if n <= 1
   if (mpz_cmp_ui(n, 1) <= 0)
     goto fail;
 
@@ -771,6 +842,7 @@ goo_is_prime_lucas(const mpz_t n) {
     }
 
     if (p == 40) {
+      // if is_square(n)
       if (mpz_perfect_square_p(n))
         goto fail;
     }
@@ -926,6 +998,7 @@ goo_next_prime(
 ) {
   unsigned long inc = 0;
 
+  // ret = p
   mpz_set(ret, p);
 
   // if ret & 1 == 0
@@ -1543,12 +1616,14 @@ goo_group_powgh(goo_group_t *group, mpz_t ret, const mpz_t e1, const mpz_t e2) {
   if (!goo_to_comb_exp(hcomb, e2))
     return 0;
 
+  // ret = 1
   mpz_set_ui(ret, 1);
 
   for (long i = 0; i < gcomb->shifts; i++) {
     long *e1vs = gcomb->wins[i];
     long *e2vs = hcomb->wins[i];
 
+    // if ret != 1
     if (mpz_cmp_ui(ret, 1) != 0)
       goo_group_sqr(group, ret, ret);
 
@@ -1646,7 +1721,6 @@ goo_group_wnaf(goo_group_t *group, const mpz_t e, long *out, long bitlen) {
     }
 
     // out[i] = val
-    // assert(mpz_fits_slong_p(group->val));
     out[i] = mpz_get_si(group->val);
 
     // r = r >> 1
@@ -1827,6 +1901,7 @@ goo_hash_item(
   assert(len <= (GOO_MAX_RSA_BITS + 7) / 8);
 
   // Commit to sign.
+  // if n < 0
   if (mpz_sgn(n) < 0)
     len |= 0x8000;
 
@@ -1895,8 +1970,8 @@ goo_group_fs_chal(
   goo_hash_all(&key[0], group, C1, C2, t, A, B, C, D, msg);
 
   goo_prng_seed(&group->prng, &key[0]);
-  goo_prng_randombits(&group->prng, chal, GOO_CHAL_BITS);
-  goo_prng_randombits(&group->prng, ell, GOO_CHAL_BITS);
+  goo_prng_random_bits(&group->prng, chal, GOO_CHAL_BITS);
+  goo_prng_random_bits(&group->prng, ell, GOO_CHAL_BITS);
 
   if (k != NULL)
     memcpy(k, key, 32);
@@ -1909,19 +1984,6 @@ goo_group_fs_chal(
       return 0;
     }
   }
-
-  return 1;
-}
-
-static int
-goo_group_randombits(goo_group_t *group, mpz_t ret, size_t size) {
-  unsigned char key[32];
-
-  if (!goo_random(&key[0], 32))
-    return 0;
-
-  goo_prng_seed(&group->prng, &key[0]);
-  goo_prng_randombits(&group->prng, ret, size);
 
   return 1;
 }
@@ -1940,27 +2002,19 @@ goo_group_expand_sprime(goo_group_t *group, mpz_t s, const mpz_t s_prime) {
   goo_mpz_export(&key[pos], NULL, s_prime);
 
   goo_prng_seed(&group->prng, &key[0]);
-  goo_prng_randombits(&group->prng, s, GOO_EXPONENT_SIZE);
+  goo_prng_random_bits(&group->prng, s, GOO_EXPONENT_SIZE);
 
   return 1;
 }
 
 static int
-goo_group_rand_scalar(goo_group_t *group, mpz_t ret) {
+goo_group_random_scalar(goo_group_t *group, mpz_t ret) {
   size_t size = group->rand_bits;
 
   if (size > GOO_EXPONENT_SIZE)
     size = GOO_EXPONENT_SIZE;
 
-  unsigned char key[32];
-
-  if (!goo_random(&key[0], 32))
-    return 0;
-
-  goo_prng_seed(&group->prng, &key[0]);
-  goo_prng_randombits(&group->prng, ret, size);
-
-  return 1;
+  return goo_random_bits(ret, size);
 }
 
 static int
@@ -1975,13 +2029,14 @@ goo_group_challenge(
   mpz_t s;
   mpz_init(s);
 
+  // if n <= 0
   if (mpz_sgn(n) <= 0) {
     // Invalid RSA public key.
     goto fail;
   }
 
   // s_prime = randbits(256)
-  if (!goo_group_randombits(group, s_prime, 256))
+  if (!goo_random_bits(s_prime, 256))
     goto fail;
 
   // s = expand_sprime(s_prime)
@@ -2143,7 +2198,7 @@ goo_group_sign(
   // Commitment to `w`.
   // s1 = rand_scalar()
   // C2 = powgh(w, s1)
-  if (!goo_group_rand_scalar(group, s1)
+  if (!goo_group_random_scalar(group, s1)
       || !goo_group_powgh(group, *C2, w, s1)) {
     goto fail;
   }
@@ -2158,12 +2213,12 @@ goo_group_sign(
   // P's first message: commit to randomness.
   // P's randomness (except for r_s1; see "V's message", below).
   // [r_w, r_w2, r_a, r_an, r_s1w, r_sa] = rand_scalar(7)
-  if (!goo_group_rand_scalar(group, r_w)
-      || !goo_group_rand_scalar(group, r_w2)
-      || !goo_group_rand_scalar(group, r_a)
-      || !goo_group_rand_scalar(group, r_an)
-      || !goo_group_rand_scalar(group, r_s1w)
-      || !goo_group_rand_scalar(group, r_sa)) {
+  if (!goo_group_random_scalar(group, r_w)
+      || !goo_group_random_scalar(group, r_w2)
+      || !goo_group_random_scalar(group, r_a)
+      || !goo_group_random_scalar(group, r_an)
+      || !goo_group_random_scalar(group, r_s1w)
+      || !goo_group_random_scalar(group, r_sa)) {
     goto fail;
   }
 
@@ -2206,7 +2261,7 @@ goo_group_sign(
     // only requires re-computing A.
     // r_s1 = rand_scalar()
     // A = powgh(r_w, r_s1)
-    if (!goo_group_rand_scalar(group, r_s1)
+    if (!goo_group_random_scalar(group, r_s1)
         || !goo_group_powgh(group, A, r_w, r_s1)) {
       goto fail;
     }
@@ -2785,24 +2840,6 @@ goo_verify(
 #ifdef GOO_TEST
 #include <stdio.h>
 
-static int
-goo_randomint(mpz_t ret, const mpz_t max) {
-  unsigned char key[32];
-
-  if (!goo_random(&key[0], 32))
-    return 0;
-
-  goo_prng_t prng;
-  goo_prng_init(&prng);
-
-  goo_prng_seed(&prng, &key[0]);
-  goo_prng_randomint(&prng, ret, max);
-
-  goo_prng_uninit(&prng);
-
-  return 1;
-}
-
 static void
 run_hmac_test(void) {
   static const char data[] = "hello world";
@@ -2856,6 +2893,57 @@ run_drbg_test(void) {
 
   mpz_clear(n);
   mpz_clear(e);
+}
+
+void
+run_rng_test(void) {
+  mpz_t x, y;
+
+  printf("Testing RNG...\n");
+
+  mpz_init(x);
+  mpz_init(y);
+
+  assert(goo_random_bits(x, 256));
+  assert(mpz_sgn(x) > 0);
+  assert(goo_mpz_bitlen(x) <= 256);
+
+  assert(goo_random_int(y, x));
+  assert(mpz_sgn(y) > 0);
+  assert(goo_mpz_bitlen(y) <= 256);
+  assert(mpz_cmp(y, x) < 0);
+
+  mpz_clear(x);
+  mpz_clear(y);
+}
+
+void
+run_prng_test(void) {
+  goo_prng_t prng;
+  unsigned char key[32];
+  mpz_t x, y;
+
+  printf("Testing PRNG...\n");
+
+  memset(&key[0], 0xaa, 32);
+  goo_prng_init(&prng);
+  mpz_init(x);
+  mpz_init(y);
+
+  goo_prng_seed(&prng, key);
+
+  goo_prng_random_bits(&prng, x, 256);
+  assert(mpz_sgn(x) > 0);
+  assert(goo_mpz_bitlen(x) <= 256);
+
+  goo_prng_random_int(&prng, y, x);
+  assert(mpz_sgn(y) > 0);
+  assert(goo_mpz_bitlen(y) <= 256);
+  assert(mpz_cmp(y, x) < 0);
+
+  mpz_clear(x);
+  mpz_clear(y);
+  goo_prng_uninit(&prng);
 }
 
 void
@@ -2977,7 +3065,7 @@ run_util_test(void) {
       mpz_init(r1);
       mpz_init(sr1);
 
-      goo_randomint(r1, p);
+      assert(goo_random_int(r1, p));
       mpz_powm_ui(r1, r1, 2, p);
 
       assert(goo_mod_sqrtp(sr1, r1, p));
@@ -3000,7 +3088,7 @@ run_util_test(void) {
       mpz_init(r2);
       mpz_init(sr2);
 
-      goo_randomint(r2, n);
+      assert(goo_random_int(r2, n));
       mpz_powm_ui(r2, r2, 2, n);
 
       assert(goo_mod_sqrtn(sr2, r2, p, q));
@@ -3377,10 +3465,10 @@ run_ops_test(void) {
     mpz_init(r1);
     mpz_init(r2);
 
-    assert(goo_group_randombits(goo, b1, 2048));
-    assert(goo_group_randombits(goo, b2, 2048));
-    assert(goo_group_randombits(goo, e1, 128));
-    assert(goo_group_randombits(goo, e2, 128));
+    assert(goo_random_bits(b1, 2048));
+    assert(goo_random_bits(b2, 2048));
+    assert(goo_random_bits(e1, 128));
+    assert(goo_random_bits(e2, 128));
 
     assert(goo_group_inv2(goo, b1_inv, b2_inv, b1, b2));
 
@@ -3412,8 +3500,8 @@ run_ops_test(void) {
     mpz_init(r1);
     mpz_init(r2);
 
-    assert(goo_group_randombits(goo, e1, 2048 + GOO_CHAL_BITS + 2 - 1));
-    assert(goo_group_randombits(goo, e2, 2048 + GOO_CHAL_BITS + 2 - 1));
+    assert(goo_random_bits(e1, 2048 + GOO_CHAL_BITS + 2 - 1));
+    assert(goo_random_bits(e2, 2048 + GOO_CHAL_BITS + 2 - 1));
 
     assert(goo_group_powgh_slow(goo, r1, e1, e2));
     assert(goo_group_powgh(goo, r2, e1, e2));
@@ -3445,8 +3533,8 @@ run_ops_test(void) {
     mpz_init(r1);
     mpz_init(r2);
 
-    assert(goo_group_randombits(goo, e1, 2048));
-    assert(goo_group_randombits(goo, e2, 2048));
+    assert(goo_random_bits(e1, 2048));
+    assert(goo_random_bits(e2, 2048));
 
     mpz_fdiv_q_2exp(e1_s, e1, 1536);
     mpz_fdiv_q_2exp(e2_s, e2, 1536);
@@ -3486,7 +3574,7 @@ run_ops_test(void) {
       mpz_init(evals[i]);
       mpz_init(einvs[i]);
 
-      assert(goo_group_randombits(goo, evals[i], 2048));
+      assert(goo_random_bits(evals[i], 2048));
     }
 
     assert(goo_group_inv5(goo,
@@ -3659,6 +3747,8 @@ void
 goo_test(void) {
   run_hmac_test();
   run_drbg_test();
+  run_rng_test();
+  run_prng_test();
   run_util_test();
   run_primes_test();
   run_ops_test();
