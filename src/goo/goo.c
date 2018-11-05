@@ -1080,6 +1080,118 @@ goo_sig_uninit(goo_sig_t *sig) {
   mpz_clear(sig->z_sa);
 }
 
+static inline size_t
+goo_sig_size(const goo_sig_t *sig, size_t bits) {
+  size_t modbytes = (bits + 7) / 8;
+  size_t chalbytes = (GOO_CHAL_BITS + 7) / 8;
+  size_t len = 0;
+
+  len += modbytes; // C2
+  len += 2; // t
+  len += chalbytes; // chal
+  len += chalbytes; // ell
+  len += modbytes; // Aq
+  len += modbytes; // Bq
+  len += modbytes; // Cq
+  len += 2048 / 8; // Dq
+  len += chalbytes * 7; // z_prime
+
+  return len;
+}
+
+#define goo_write_int(n, size) do {     \
+  size_t bytes = goo_mpz_bytelen((n));  \
+                                        \
+  if (bytes > (size))                   \
+    return 0;                           \
+                                        \
+  size_t pad = (size) - bytes;          \
+  memset(&out[pos], 0x00, pad);         \
+  pos += pad;                           \
+                                        \
+  goo_mpz_export(&out[pos], NULL, (n)); \
+  pos += bytes;                         \
+} while (0)
+
+static inline int
+goo_sig_export(unsigned char *out, const goo_sig_t *sig, size_t bits) {
+  size_t modbytes = (bits + 7) / 8;
+  size_t chalbytes = (GOO_CHAL_BITS + 7) / 8;
+  size_t pos = 0;
+
+  goo_write_int(sig->C2, modbytes);
+  goo_write_int(sig->t, 2);
+
+  goo_write_int(sig->chal, chalbytes);
+  goo_write_int(sig->ell, chalbytes);
+  goo_write_int(sig->Aq, modbytes);
+  goo_write_int(sig->Bq, modbytes);
+  goo_write_int(sig->Cq, modbytes);
+  goo_write_int(sig->Dq, 2048 / 8);
+
+  goo_write_int(sig->z_w, chalbytes);
+  goo_write_int(sig->z_w2, chalbytes);
+  goo_write_int(sig->z_s1, chalbytes);
+  goo_write_int(sig->z_a, chalbytes);
+  goo_write_int(sig->z_an, chalbytes);
+  goo_write_int(sig->z_s1w, chalbytes);
+  goo_write_int(sig->z_sa, chalbytes);
+
+  assert(goo_sig_size(sig, bits) == pos);
+
+  return 1;
+}
+
+#undef goo_write_int
+
+#define goo_read_int(n, size) do {         \
+  if (pos + (size) > data_len)             \
+    return 0;                              \
+                                           \
+  goo_mpz_import((n), &data[pos], (size)); \
+  pos += (size);                           \
+} while (0)                                \
+
+static inline int
+goo_sig_import(
+  goo_sig_t *sig,
+  const unsigned char *data,
+  size_t data_len,
+  size_t bits
+) {
+  size_t modbytes = (bits + 7) / 8;
+  size_t chalbytes = (GOO_CHAL_BITS + 7) / 8;
+  size_t pos = 0;
+
+  goo_read_int(sig->C2, modbytes);
+  goo_read_int(sig->t, 2);
+
+  goo_read_int(sig->chal, chalbytes);
+  goo_read_int(sig->ell, chalbytes);
+  goo_read_int(sig->Aq, modbytes);
+  goo_read_int(sig->Bq, modbytes);
+  goo_read_int(sig->Cq, modbytes);
+  goo_read_int(sig->Dq, 2048 / 8);
+
+  goo_read_int(sig->z_w, chalbytes);
+  goo_read_int(sig->z_w2, chalbytes);
+  goo_read_int(sig->z_s1, chalbytes);
+  goo_read_int(sig->z_a, chalbytes);
+  goo_read_int(sig->z_an, chalbytes);
+  goo_read_int(sig->z_s1w, chalbytes);
+  goo_read_int(sig->z_sa, chalbytes);
+
+  assert(pos <= data_len);
+
+  // non-minimal serialization
+  if (pos != data_len)
+    return 0;
+
+  return 1;
+}
+
+#undef goo_read_int
+
 /*
  * CombSpec
  */
@@ -1346,6 +1458,8 @@ goo_group_init(
 
   // n = n
   mpz_set(group->n, n);
+
+  group->bits = goo_mpz_bitlen(group->n);
 
   // nh = n >> 1
   mpz_fdiv_q_2exp(group->nh, group->n, 1);
@@ -2039,6 +2153,21 @@ goo_group_random_scalar(goo_group_t *group, mpz_t ret) {
   return goo_random_bits(ret, size);
 }
 
+static inline int
+goo_is_valid_rsa(const mpz_t n) {
+  // if n <= 0
+  if (mpz_sgn(n) <= 0)
+    return 0;
+
+  size_t bits = goo_mpz_bitlen(n);
+
+  // if bitlen(n) < 1024 or bitlen(n) > 4096
+  if (bits < GOO_MIN_RSA_BITS || bits > GOO_MAX_RSA_BITS)
+    return 0;
+
+  return 1;
+}
+
 static int
 goo_group_challenge(
   goo_group_t *group,
@@ -2051,8 +2180,8 @@ goo_group_challenge(
   mpz_t s;
   mpz_init(s);
 
-  // if n <= 0
-  if (mpz_sgn(n) <= 0) {
+  // if n < 2 ** 1023 or n > 2 ** 4096 - 1
+  if (!goo_is_valid_rsa(n)) {
     // Invalid RSA public key.
     goto fail;
   }
@@ -2151,6 +2280,12 @@ goo_group_sign(
       || mpz_sgn(n) <= 0
       || mpz_sgn(p) <= 0
       || mpz_sgn(q) <= 0) {
+    goto fail;
+  }
+
+  // if n < 2 ** 1023 or n > 2 ** 4096 - 1
+  if (!goo_is_valid_rsa(n)) {
+    // Invalid RSA public key.
     goto fail;
   }
 
@@ -2664,22 +2799,6 @@ fail:
   return r;
 }
 
-#define goo_write_item(n, size) do {     \
-  size_t bytes = goo_mpz_bytelen((n));   \
-  if (bytes > (size)) {                  \
-    free(data);                          \
-    goto fail;                           \
-  }                                      \
-  size_t pad = (size) - bytes;           \
-  memset(&data[pos], 0x00, pad);         \
-  pos += pad;                            \
-  goo_mpz_export(&data[pos], NULL, (n)); \
-  pos += bytes;                          \
-} while (0)
-
-#define goo_write_final() \
-  assert(pos == len)
-
 int
 goo_sign(
   goo_ctx_t *ctx,
@@ -2718,11 +2837,13 @@ goo_sign(
   if (s_prime_len != 32)
     return 0;
 
-  if (C1_len != goo_mpz_bytelen(ctx->n))
+  if (C1_len != (ctx->bits + 7) / 8)
     return 0;
 
   mpz_t msg_n, s_prime_n, C1_n, n_n, p_n, q_n;
   goo_sig_t sig;
+  size_t size;
+  unsigned char *data = NULL;
 
   mpz_init(msg_n);
   mpz_init(s_prime_n);
@@ -2745,49 +2866,17 @@ goo_sign(
     goto fail;
   }
 
-  size_t modbytes = (goo_mpz_bitlen(ctx->n) + 7) / 8;
-  size_t chalbytes = (GOO_CHAL_BITS + 7) / 8;
-
-  size_t pos = 0;
-  size_t len = 0;
-
-  len += modbytes; // C2
-  len += 2; // t
-  len += chalbytes; // chal
-  len += chalbytes; // ell
-  len += modbytes; // Aq
-  len += modbytes; // Bq
-  len += modbytes; // Cq
-  len += 2048 / 8; // Dq
-  len += chalbytes * 7; // z_prime
-
-  unsigned char *data = malloc(len);
+  size = goo_sig_size(&sig, ctx->bits);
+  data = malloc(size);
 
   if (data == NULL)
     goto fail;
 
-  goo_write_item(sig.C2, modbytes);
-  goo_write_item(sig.t, 2);
-
-  goo_write_item(sig.chal, chalbytes);
-  goo_write_item(sig.ell, chalbytes);
-  goo_write_item(sig.Aq, modbytes);
-  goo_write_item(sig.Bq, modbytes);
-  goo_write_item(sig.Cq, modbytes);
-  goo_write_item(sig.Dq, 2048 / 8);
-
-  goo_write_item(sig.z_w, chalbytes);
-  goo_write_item(sig.z_w2, chalbytes);
-  goo_write_item(sig.z_s1, chalbytes);
-  goo_write_item(sig.z_a, chalbytes);
-  goo_write_item(sig.z_an, chalbytes);
-  goo_write_item(sig.z_s1w, chalbytes);
-  goo_write_item(sig.z_sa, chalbytes);
-
-  goo_write_final();
+  if (!goo_sig_export(data, &sig, ctx->bits))
+    goto fail;
 
   *out = data;
-  *out_len = len;
+  *out_len = size;
 
   r = 1;
 fail:
@@ -2798,24 +2887,12 @@ fail:
   mpz_clear(p_n);
   mpz_clear(q_n);
   goo_sig_uninit(&sig);
+
+  if (r == 0)
+    goo_free(data);
+
   return r;
 }
-
-#define goo_read_item(n, size) do {       \
-  if (pos + (size) > sig_len)             \
-    return 0;                             \
-                                          \
-  goo_mpz_import((n), &sig[pos], (size)); \
-  pos += (size);                          \
-} while (0)                               \
-
-#define goo_read_final() do {     \
-  assert(pos <= sig_len);         \
-                                  \
-  /* non-minimal serialization */ \
-  if (pos != sig_len)             \
-    return 0;                     \
-} while (0)                       \
 
 int
 goo_verify(
@@ -2833,40 +2910,16 @@ goo_verify(
   if (msg_len < 20 || msg_len > 128)
     return 0;
 
-  if (C1_len != goo_mpz_bytelen(ctx->n))
+  if (C1_len != (ctx->bits + 7) / 8)
     return 0;
 
   goo_mpz_import(ctx->msg, msg, msg_len);
   goo_mpz_import(ctx->C1, C1, C1_len);
 
-  size_t pos = 0;
+  if (!goo_sig_import(&ctx->sig, sig, sig_len, ctx->bits))
+    return 0;
 
-  size_t modbytes = (goo_mpz_bitlen(ctx->n) + 7) / 8;
-  size_t chalbytes = (GOO_CHAL_BITS + 7) / 8;
-
-  goo_sig_t *s = &ctx->sig;
-
-  goo_read_item(s->C2, modbytes);
-  goo_read_item(s->t, 2);
-
-  goo_read_item(s->chal, chalbytes);
-  goo_read_item(s->ell, chalbytes);
-  goo_read_item(s->Aq, modbytes);
-  goo_read_item(s->Bq, modbytes);
-  goo_read_item(s->Cq, modbytes);
-  goo_read_item(s->Dq, 2048 / 8);
-
-  goo_read_item(s->z_w, chalbytes);
-  goo_read_item(s->z_w2, chalbytes);
-  goo_read_item(s->z_s1, chalbytes);
-  goo_read_item(s->z_a, chalbytes);
-  goo_read_item(s->z_an, chalbytes);
-  goo_read_item(s->z_s1w, chalbytes);
-  goo_read_item(s->z_sa, chalbytes);
-
-  goo_read_final();
-
-  return goo_group_verify(ctx, ctx->msg, s, ctx->C1);
+  return goo_group_verify(ctx, ctx->msg, &ctx->sig, ctx->C1);
 }
 
 #ifdef GOO_TEST

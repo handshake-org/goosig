@@ -89,6 +89,7 @@ typedef struct goo_sig_s {
 typedef struct goo_group_s {
   /* Parameters */
   mpz_t n;
+  size_t bits;
   mpz_t nh;
   mpz_t g;
   mpz_t h;
