@@ -1741,14 +1741,15 @@ goo_group_wnaf(goo_group_t *group, const mpz_t e, long *out, long bitlen) {
   // r = e
   mpz_set(*r, e);
 
+  // mask = (1 << w) - 1
+  mpz_set_ui(*mask, (1 << w) - 1);
+
   for (long i = bitlen - 1; i >= 0; i--) {
     // val = 0
     mpz_set_ui(*val, 0);
 
     // if r & 1
     if (mpz_odd_p(*r)) {
-      // mask = (1 << w) - 1
-      mpz_set_ui(*mask, (1 << w) - 1);
       // val = r & mask
       mpz_and(*val, *r, *mask);
       // if val & (1 << (w - 1))
