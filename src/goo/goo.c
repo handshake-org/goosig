@@ -2862,6 +2862,25 @@ goo_verify(
 #ifdef GOO_TEST
 #include <stdio.h>
 
+static int
+goo_hex_cmp(const unsigned char *data, size_t len, const char *expect) {
+  mpz_t x, y;
+
+  mpz_init(x);
+  mpz_init(y);
+
+  goo_mpz_import(x, data, len);
+
+  assert(mpz_set_str(y, expect, 16) == 0);
+
+  int r = mpz_cmp(x, y);
+
+  mpz_clear(x);
+  mpz_clear(y);
+
+  return r;
+}
+
 static void
 run_hmac_test(void) {
   static const char data[] = "hello world";
@@ -2881,14 +2900,7 @@ run_hmac_test(void) {
 
   goo_hmac_final(&ctx, &out[0]);
 
-  mpz_t n, e;
-  mpz_init(n);
-  goo_mpz_import(n, out, 32);
-  assert(mpz_init_set_str(e, expect, 16) == 0);
-  assert(mpz_cmp(n, e) == 0);
-
-  mpz_clear(n);
-  mpz_clear(e);
+  assert(goo_hex_cmp(&out[0], 32, expect) == 0);
 }
 
 static void
@@ -2896,8 +2908,11 @@ run_drbg_test(void) {
   unsigned char entropy[64];
   unsigned char out[32];
 
-  static const char expect[] =
+  static const char expect1[] =
     "40e95c4dba22fd05d15784075b05ca7c0b063a43dcec3307122575a7b5e32d3b";
+
+  static const char expect2[] = "4d065662afc2927a3426c12dd1c35262";
+  static const char expect3[] = "705119fd1536e2a7ec804db49f8262ce";
 
   memset(&entropy[0], 0xaa, 64);
 
@@ -2905,16 +2920,15 @@ run_drbg_test(void) {
 
   goo_drbg_t ctx;
   goo_drbg_init(&ctx, &entropy[0], 64);
+
   goo_drbg_generate(&ctx, &out[0], 32);
+  assert(goo_hex_cmp(&out[0], 32, expect1) == 0);
 
-  mpz_t n, e;
-  mpz_init(n);
-  goo_mpz_import(n, out, 32);
-  assert(mpz_init_set_str(e, expect, 16) == 0);
-  assert(mpz_cmp(n, e) == 0);
+  goo_drbg_generate(&ctx, &out[0], 16);
+  assert(goo_hex_cmp(&out[0], 16, expect2) == 0);
 
-  mpz_clear(n);
-  mpz_clear(e);
+  goo_drbg_generate(&ctx, &out[0], 16);
+  assert(goo_hex_cmp(&out[0], 16, expect3) == 0);
 }
 
 void
@@ -2962,6 +2976,14 @@ run_prng_test(void) {
   assert(mpz_sgn(y) > 0);
   assert(goo_mpz_bitlen(y) <= 256);
   assert(mpz_cmp(y, x) < 0);
+
+  goo_prng_random_bits(&prng, x, 30);
+  assert(mpz_cmp_ui(x, 540405817) == 0);
+  goo_prng_random_bits(&prng, x, 31);
+  assert(mpz_cmp_ui(x, 1312024779) == 0);
+  goo_prng_random_bits(&prng, x, 31);
+  goo_prng_random_int(&prng, y, x);
+  assert(mpz_cmp_ui(y, 1679635921) == 0);
 
   mpz_clear(x);
   mpz_clear(y);
@@ -3071,10 +3093,13 @@ run_util_test(void) {
 
     mpz_t p, q, n;
 
-    assert(mpz_init_set_str(p, p_hex, 16) == 0);
-    assert(mpz_init_set_str(q, q_hex, 16) == 0);
-
+    mpz_init(p);
+    mpz_init(q);
     mpz_init(n);
+
+    assert(mpz_set_str(p, p_hex, 16) == 0);
+    assert(mpz_set_str(q, q_hex, 16) == 0);
+
     mpz_mul(n, p, q);
 
     // test sqrt_modp
@@ -3345,13 +3370,17 @@ run_primes_test(void) {
 
   for (int i = 0; i < (int)GOO_ARRAY_SIZE(primes); i++) {
     mpz_t p;
-    assert(mpz_init_set_str(p, primes[i], 10) == 0);
+
+    mpz_init(p);
+
+    assert(mpz_set_str(p, primes[i], 10) == 0);
     assert(goo_is_prime_div(p));
     assert(goo_is_prime_mr(p, key, 16 + 1, 1));
     assert(goo_is_prime_mr(p, key, 1, 1));
     assert(goo_is_prime_mr(p, key, 1, 0));
     assert(goo_is_prime_lucas(p));
     assert(goo_is_prime(p, key));
+
     mpz_clear(p);
   }
 
@@ -3360,7 +3389,9 @@ run_primes_test(void) {
   for (int i = 0; i < (int)GOO_ARRAY_SIZE(composites); i++) {
     mpz_t p;
 
-    assert(mpz_init_set_str(p, composites[i], 10) == 0);
+    mpz_init(p);
+
+    assert(mpz_set_str(p, composites[i], 10) == 0);
 
     if (i == 6 || i == 7 || (i >= 43 && i <= 49) || i == 54) {
       assert(goo_is_prime_div(p));
@@ -3421,15 +3452,15 @@ run_ops_test(void) {
     "16a4d9d373d8721f24a3fc0f1b3131f55615172866bccc30f95054c824e7"
     "33a5eb6817f7bc16399d48c6361cc7e5";
 
+  printf("Testing group ops...\n");
+
   mpz_t n;
   goo_group_t *goo;
 
-  printf("Testing group ops...\n");
-
-  assert(mpz_init_set_str(n, mod_hex, 16) == 0);
-
+  mpz_init(n);
   goo = goo_malloc(sizeof(goo_group_t));
 
+  assert(mpz_set_str(n, mod_hex, 16) == 0);
   assert(goo_group_init(goo, n, 2, 3, 2048));
 
   {
@@ -3654,10 +3685,10 @@ run_combspec_test(void) {
   mpz_t n;
   goo_group_t *goo;
 
-  assert(mpz_init_set_str(n, mod_hex, 16) == 0);
-
+  mpz_init(n);
   goo = goo_malloc(sizeof(goo_group_t));
 
+  assert(mpz_set_str(n, mod_hex, 16) == 0);
   assert(goo_group_init(goo, n, 2, 3, 0));
 
   assert(goo->combs[0].g.points_per_add == 8);
@@ -3722,32 +3753,35 @@ run_goo_test(void) {
 
   mpz_t p, q, n;
   mpz_t mod_n;
+  goo_group_t *goo;
   mpz_t s_prime, C1;
   mpz_t msg;
   goo_sig_t sig;
-  goo_group_t *goo;
 
-  assert(mpz_init_set_str(p, p_hex, 16) == 0);
-  assert(mpz_init_set_str(q, q_hex, 16) == 0);
-
+  mpz_init(p);
+  mpz_init(q);
   mpz_init(n);
-  mpz_mul(n, p, q);
-
-  assert(mpz_init_set_str(mod_n, mod_hex, 16) == 0);
+  mpz_init(mod_n);
 
   goo = goo_malloc(sizeof(goo_group_t));
 
-  assert(goo_group_init(goo, mod_n, 2, 3, 4096));
-
   mpz_init(s_prime);
   mpz_init(C1);
+  mpz_init(msg);
+  goo_sig_init(&sig);
+
+  assert(mpz_set_str(p, p_hex, 16) == 0);
+  assert(mpz_set_str(q, q_hex, 16) == 0);
+
+  mpz_mul(n, p, q);
+
+  assert(mpz_set_str(mod_n, mod_hex, 16) == 0);
+
+  assert(goo_group_init(goo, mod_n, 2, 3, 4096));
 
   assert(goo_group_challenge(goo, s_prime, C1, n));
 
-  mpz_init(msg);
   mpz_set_ui(msg, 0xdeadbeef);
-
-  goo_sig_init(&sig);
 
   assert(goo_group_sign(goo, &sig, msg, s_prime, C1, n, p, q));
 
