@@ -6,7 +6,7 @@ const assert = require('bsert');
 const fs = require('fs');
 const Path = require('path');
 const BLAKE2b = require('bcrypto/lib/blake2b256');
-const BN = require('bcrypto/lib/bn.js');
+const BigMath = require('../lib/js/bigmath');
 const rsa = require('bcrypto/lib/rsa');
 const SHA1 = require('bcrypto/lib/sha1');
 const SHA256 = require('bcrypto/lib/sha256');
@@ -47,9 +47,9 @@ function parseRSA(file) {
   const path = Path.resolve(__dirname, file);
   const str = fs.readFileSync(path, 'utf8');
   const base10 = str.trim().split(/\n+/).pop();
-  const num = new BN(base10, 10);
+  const num = BigMath.fromString(base10, 10);
 
-  return num.toArrayLike(Buffer);
+  return BigMath.toBuffer(num);
 }
 
 function encode(name, data, desc) {
@@ -63,7 +63,7 @@ function encode(name, data, desc) {
   const hex = data.toString('hex');
 
   // Digit Sum (used for RSA-2048 -- see challengenumbers.txt)
-  const num = new BN(data);
+  const num = BigMath.fromBuffer(data);
   const base10 = num.toString(10);
 
   let sum = 0;
@@ -71,7 +71,7 @@ function encode(name, data, desc) {
     sum += Number(base10[i]);
 
   // Checksum (used for RSA-617 -- see rsa-fact.txt)
-  const checksum = num.modn(991889);
+  const checksum = Number(num % 991889n);
 
   let out = '';
 
