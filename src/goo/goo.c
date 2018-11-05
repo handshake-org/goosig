@@ -2204,6 +2204,9 @@ goo_group_sign(
   mpz_sub(a, a, *t);
   mpz_fdiv_q(a, a, n);
 
+  // assert a >= 0
+  assert(mpz_sgn(a) >= 0);
+
   // x = a * n
   mpz_mul(x, a, n);
 
@@ -2271,6 +2274,9 @@ goo_group_sign(
 
   // D = r_w2 - r_an
   mpz_sub(D, r_w2, r_an);
+
+  // assert D >= 0
+  assert(mpz_sgn(D) >= 0);
 
   int valid = 0;
 
@@ -2364,6 +2370,7 @@ goo_group_sign(
   mpz_sub(*Dq, *z_w2, *z_an);
   mpz_fdiv_q(*Dq, *Dq, *ell);
 
+  // assert Dq >= 0
   assert(mpz_sgn(*Dq) >= 0);
   assert(goo_mpz_bitlen(*Dq) <= 2048);
 
