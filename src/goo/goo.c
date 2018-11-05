@@ -1238,12 +1238,16 @@ goo_to_comb_exp(goo_comb_t *comb, const mpz_t e) {
 static int
 goo_group_init(
   goo_group_t *group,
-  const unsigned char *n,
-  size_t n_len,
+  const mpz_t n,
   unsigned long g,
   unsigned long h,
   unsigned long modbits
 ) {
+  if (modbits != 0) {
+    if (modbits < GOO_MIN_RSA_BITS || modbits > GOO_MAX_RSA_BITS)
+      return 0;
+  }
+
   memset((void *)group, 0x00, sizeof(goo_group_t));
 
   mpz_init(group->n);
@@ -1252,7 +1256,7 @@ goo_group_init(
   mpz_init(group->h);
 
   // n = n
-  goo_mpz_import(group->n, n, n_len);
+  mpz_set(group->n, n);
 
   // nh = n >> 1
   mpz_fdiv_q_2exp(group->nh, group->n, 1);
@@ -2489,15 +2493,23 @@ goo_init(
   unsigned long h,
   unsigned long modbits
 ) {
+  int r = 0;
+
   if (ctx == NULL || n == NULL)
     return 0;
 
-  if (modbits != 0) {
-    if (modbits < GOO_MIN_RSA_BITS || modbits > GOO_MAX_RSA_BITS)
-      return 0;
-  }
+  mpz_t n_n;
+  mpz_init(n_n);
 
-  return goo_group_init(ctx, n, n_len, g, h, modbits);
+  goo_mpz_import(n_n, n, n_len);
+
+  if (!goo_group_init(ctx, n_n, g, h, modbits))
+    goto fail;
+
+  r = 1;
+fail:
+  mpz_clear(n_n);
+  return r;
 }
 
 void
@@ -2527,23 +2539,24 @@ goo_challenge(
     return 0;
   }
 
-  mpz_t nn, spn;
-  mpz_init(nn);
-  mpz_init(spn);
+  mpz_t s_prime_n, C1_n, n_n;
+  mpz_init(s_prime_n);
+  mpz_init(C1_n);
+  mpz_init(n_n);
 
-  goo_mpz_import(nn, n, n_len);
+  goo_mpz_import(n_n, n, n_len);
 
-  if (!goo_group_challenge(ctx, spn, ctx->C1, nn))
+  if (!goo_group_challenge(ctx, s_prime_n, C1_n, n_n))
     goto fail;
 
   *s_prime_len = 32;
-  *s_prime = goo_mpz_pad(NULL, *s_prime_len, spn);
+  *s_prime = goo_mpz_pad(NULL, *s_prime_len, s_prime_n);
 
   if (*s_prime == NULL)
     goto fail;
 
   *C1_len = goo_mpz_bytelen(ctx->n);
-  *C1 = goo_mpz_pad(NULL, *C1_len, ctx->C1);
+  *C1 = goo_mpz_pad(NULL, *C1_len, C1_n);
 
   if (*C1 == NULL) {
     free(*s_prime);
@@ -2552,8 +2565,9 @@ goo_challenge(
 
   r = 1;
 fail:
-  mpz_clear(nn);
-  mpz_clear(spn);
+  mpz_clear(s_prime_n);
+  mpz_clear(C1_n);
+  mpz_clear(n_n);
   return r;
 }
 
@@ -2614,25 +2628,27 @@ goo_sign(
   if (C1_len != goo_mpz_bytelen(ctx->n))
     return 0;
 
-  mpz_t spn, nn, pn, qn;
-
-  mpz_init(spn);
-  mpz_init(nn);
-  mpz_init(pn);
-  mpz_init(qn);
-
-  goo_mpz_import(ctx->msg, msg, msg_len);
-  goo_mpz_import(spn, s_prime, s_prime_len);
-  goo_mpz_import(ctx->C1, C1, C1_len);
-  goo_mpz_import(nn, n, n_len);
-  goo_mpz_import(pn, p, p_len);
-  goo_mpz_import(qn, q, q_len);
-
+  mpz_t msg_n, s_prime_n, C1_n, n_n, p_n, q_n;
   goo_sig_t sig;
+
+  mpz_init(msg_n);
+  mpz_init(s_prime_n);
+  mpz_init(C1_n);
+  mpz_init(n_n);
+  mpz_init(p_n);
+  mpz_init(q_n);
+
   goo_sig_init(&sig);
 
-  if (!goo_group_sign(ctx, &sig, ctx->msg,
-                      spn, ctx->C1, nn, pn, qn)) {
+  goo_mpz_import(msg_n, msg, msg_len);
+  goo_mpz_import(s_prime_n, s_prime, s_prime_len);
+  goo_mpz_import(C1_n, C1, C1_len);
+  goo_mpz_import(n_n, n, n_len);
+  goo_mpz_import(p_n, p, p_len);
+  goo_mpz_import(q_n, q, q_len);
+
+  if (!goo_group_sign(ctx, &sig, msg_n,
+                      s_prime_n, C1_n, n_n, p_n, q_n)) {
     goto fail;
   }
 
@@ -2682,11 +2698,13 @@ goo_sign(
 
   r = 1;
 fail:
+  mpz_clear(msg_n);
+  mpz_clear(s_prime_n);
+  mpz_clear(C1_n);
+  mpz_clear(n_n);
+  mpz_clear(p_n);
+  mpz_clear(q_n);
   goo_sig_uninit(&sig);
-  mpz_clear(spn);
-  mpz_clear(nn);
-  mpz_clear(pn);
-  mpz_clear(qn);
   return r;
 }
 
@@ -3287,20 +3305,16 @@ run_ops_test(void) {
     "16a4d9d373d8721f24a3fc0f1b3131f55615172866bccc30f95054c824e7"
     "33a5eb6817f7bc16399d48c6361cc7e5";
 
-  unsigned char *mod;
   mpz_t n;
   goo_group_t *goo;
-
-  mod = goo_malloc(2048 / 8);
 
   printf("Testing group ops...\n");
 
   assert(mpz_init_set_str(n, mod_hex, 16) == 0);
-  goo_mpz_export(mod, NULL, n);
 
   goo = goo_malloc(sizeof(goo_group_t));
 
-  assert(goo_group_init(goo, mod, 2048 / 8, 2, 3, 2048));
+  assert(goo_group_init(goo, n, 2, 3, 2048));
 
   {
     printf("Testing comb calculation...\n");
@@ -3486,7 +3500,6 @@ run_ops_test(void) {
     }
   }
 
-  goo_free(mod);
   mpz_clear(n);
   goo_group_uninit(goo);
   goo_free(goo);
@@ -3522,18 +3535,14 @@ run_combspec_test(void) {
     "16a4d9d373d8721f24a3fc0f1b3131f55615172866bccc30f95054c824e7"
     "33a5eb6817f7bc16399d48c6361cc7e5";
 
-  unsigned char *mod;
   mpz_t n;
   goo_group_t *goo;
 
-  mod = goo_malloc(2048 / 8);
-
   assert(mpz_init_set_str(n, mod_hex, 16) == 0);
-  goo_mpz_export(mod, NULL, n);
 
   goo = goo_malloc(sizeof(goo_group_t));
 
-  assert(goo_group_init(goo, mod, 2048 / 8, 2, 3, 0));
+  assert(goo_group_init(goo, n, 2, 3, 0));
 
   assert(goo->combs[0].g.points_per_add == 8);
   assert(goo->combs[0].g.adds_per_shift == 2);
@@ -3551,7 +3560,6 @@ run_combspec_test(void) {
   assert(goo->combs[0].h.points_per_subcomb == 255);
   assert(goo->combs[0].h.size == 510);
 
-  goo_free(mod);
   mpz_clear(n);
   goo_group_uninit(goo);
   goo_free(goo);
@@ -3601,7 +3609,6 @@ run_goo_test(void) {
   mpz_t s_prime, C1;
   mpz_t msg;
   goo_sig_t sig;
-  unsigned char *mod;
   goo_group_t *goo;
 
   assert(mpz_init_set_str(p, p_hex, 16) == 0);
@@ -3610,14 +3617,11 @@ run_goo_test(void) {
   mpz_init(n);
   mpz_mul(n, p, q);
 
-  mod = goo_malloc(2048 / 8);
-
   assert(mpz_init_set_str(mod_n, mod_hex, 16) == 0);
-  goo_mpz_export(mod, NULL, mod_n);
 
   goo = goo_malloc(sizeof(goo_group_t));
 
-  assert(goo_group_init(goo, mod, 2048 / 8, 2, 3, 4096));
+  assert(goo_group_init(goo, mod_n, 2, 3, 4096));
 
   mpz_init(s_prime);
   mpz_init(C1);
@@ -3641,7 +3645,6 @@ run_goo_test(void) {
   mpz_clear(C1);
   mpz_clear(msg);
   goo_sig_uninit(&sig);
-  goo_free(mod);
   goo_group_uninit(goo);
   goo_free(goo);
 }
