@@ -5,7 +5,6 @@
 'use strict';
 
 const assert = require('./util/assert');
-const BN = require('bcrypto/lib/bn.js');
 const random = require('bcrypto/lib/random');
 const BigMath = require('../lib/js/bigmath');
 const primes = require('../lib/js/primes');
@@ -186,13 +185,6 @@ const composites = [
   '105919633'
 ];
 
-function decodeDecimal(str) {
-  assert(typeof str === 'string');
-  const num = new BN(str, 10);
-  const hex = num.toString(16, 2);
-  return BigMath.decodeHex(hex);
-}
-
 describe('Primes', function() {
   const key = random.randomBytes(32);
   const zero = Buffer.alloc(32, 0x00);
@@ -201,7 +193,7 @@ describe('Primes', function() {
     const str = primes_[i];
 
     it(`should test prime (${i})`, () => {
-      const p = decodeDecimal(str);
+      const p = BigMath.fromString(str, 10);
 
       assert(primes.isPrimeDiv(p));
       assert(primes.isPrimeMR(p, key, 16 + 1, true));
@@ -216,7 +208,7 @@ describe('Primes', function() {
     const str = composites[i];
 
     it(`should test composite (${i})`, () => {
-      const p = decodeDecimal(str);
+      const p = BigMath.fromString(str, 10);
 
       if (i === 6 || i === 7 || (i >= 43 && i <= 49) || i === 54) {
         assert(primes.isPrimeDiv(p));

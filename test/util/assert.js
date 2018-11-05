@@ -107,6 +107,36 @@ assert.notBufferEqual = function notBufferEqual(actual, expected, message) {
   }
 };
 
+assert.bigIntEqual = function bigIntEqual(actual, expected, message) {
+  _isBigInt(actual, '`actual` must be a bigint.', bigIntEqual);
+  _isBigInt(expected, '`expected` must be a bigint.', bigIntEqual);
+
+  if (actual !== expected) {
+    throw new assert.AssertionError({
+      message,
+      actual: actual.toString(10),
+      expected: expected.toString(10),
+      operator: '===',
+      stackStartFunction: bigIntEqual
+    });
+  }
+};
+
+assert.notBigIntEqual = function notBigIntEqual(actual, expected, message) {
+  _isBigInt(actual, '`actual` must be a bigint.', notBigIntEqual);
+  _isBigInt(expected, '`expected` must be a bigint.', notBigIntEqual);
+
+  if (actual === expected) {
+    throw new assert.AssertionError({
+      message,
+      actual: actual.toString(10),
+      expected: expected.toString(10),
+      operator: '!==',
+      stackStartFunction: notBigIntEqual
+    });
+  }
+};
+
 function _isString(value, message, stackStartFunction) {
   if (typeof value !== 'string') {
     throw new assert.AssertionError({
@@ -137,6 +167,18 @@ function _isBuffer(value, message, stackStartFunction) {
       message,
       actual: _typeOf(value),
       expected: 'buffer',
+      operator: 'typeof ==',
+      stackStartFunction
+    });
+  }
+}
+
+function _isBigInt(value, message, stackStartFunction) {
+  if (typeof value !== 'bigint') {
+    throw new assert.AssertionError({
+      message,
+      actual: _typeOf(value),
+      expected: 'bigint',
       operator: 'typeof ==',
       stackStartFunction
     });
