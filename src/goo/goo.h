@@ -144,7 +144,7 @@ typedef struct goo_group_s {
   /* goo_group_wnaf() */
   mpz_t val;
   mpz_t mask;
-  mpz_t r;
+  mpz_t e;
 
   /* goo_group_recon() */
   mpz_t gh;

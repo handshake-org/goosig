@@ -1426,7 +1426,7 @@ goo_group_init(
 
   mpz_init(group->val);
   mpz_init(group->mask);
-  mpz_init(group->r);
+  mpz_init(group->e);
 
   mpz_init(group->gh);
 
@@ -1487,7 +1487,7 @@ goo_group_uninit(goo_group_t *group) {
 
   mpz_clear(group->val);
   mpz_clear(group->mask);
-  mpz_clear(group->r);
+  mpz_clear(group->e);
 
   mpz_clear(group->gh);
 }
@@ -1732,14 +1732,14 @@ goo_group_precomp_wnaf(
 }
 
 static long *
-goo_group_wnaf(goo_group_t *group, const mpz_t e, long *out, long bitlen) {
-  mpz_t *r = &group->r;
+goo_group_wnaf_slow(goo_group_t *group, const mpz_t exp, long *out, long bitlen) {
+  mpz_t *e = &group->e;
   mpz_t *mask = &group->mask;
   mpz_t *val = &group->val;
   long w = GOO_WINDOW_SIZE;
 
-  // r = e
-  mpz_set(*r, e);
+  // e = exp
+  mpz_set(*e, exp);
 
   // mask = (1 << w) - 1
   mpz_set_ui(*mask, (1 << w) - 1);
@@ -1748,69 +1748,69 @@ goo_group_wnaf(goo_group_t *group, const mpz_t e, long *out, long bitlen) {
     // val = 0
     mpz_set_ui(*val, 0);
 
-    // if r & 1
-    if (mpz_odd_p(*r)) {
-      // val = r & mask
-      mpz_and(*val, *r, *mask);
+    // if e & 1
+    if (mpz_odd_p(*e)) {
+      // val = e & mask
+      mpz_and(*val, *e, *mask);
       // if val & (1 << (w - 1))
       if (mpz_tstbit(*val, w - 1)) {
         // val -= 1 << w
         mpz_sub_ui(*val, *val, 1 << w);
       }
-      // r = r - val
-      mpz_sub(*r, *r, *val);
+      // e = e - val
+      mpz_sub(*e, *e, *val);
     }
 
     // out[i] = val
     out[i] = mpz_get_si(*val);
 
-    // r = r >> 1
-    mpz_fdiv_q_2exp(*r, *r, 1);
+    // e = e >> 1
+    mpz_fdiv_q_2exp(*e, *e, 1);
   }
 
-  // r == 0
-  assert(mpz_sgn(*r) == 0);
+  // e == 0
+  assert(mpz_sgn(*e) == 0);
 
   return out;
 }
 
 static long *
-goo_group_wnaf2(goo_group_t *group, const mpz_t e, long *out, long bitlen) {
-  mpz_t *r = &group->r;
+goo_group_wnaf(goo_group_t *group, const mpz_t exp, long *out, long bitlen) {
+  mpz_t *e = &group->e;
   long w = GOO_WINDOW_SIZE;
   long mask = (1 << w) - 1;
   long val;
 
-  // r = e
-  mpz_set(*r, e);
+  // e = exp
+  mpz_set(*e, exp);
 
   for (long i = bitlen - 1; i >= 0; i--) {
     val = 0;
 
-    // if r & 1
-    if (mpz_tstbit(*r, 0)) {
-      // val = r & mask;
-      val = (long)mpz_fdiv_ui(*r, mask + 1);
+    // if e & 1
+    if (mpz_tstbit(*e, 0)) {
+      // val = e & mask;
+      val = (long)mpz_fdiv_ui(*e, mask + 1);
 
       if (val & (1 << (w - 1)))
         val -= 1 << w;
 
-      // r = r - val
+      // e = e - val
       if (val < 0)
-        mpz_add_ui(*r, *r, -val);
+        mpz_add_ui(*e, *e, -val);
       else
-        mpz_sub_ui(*r, *r, val);
+        mpz_sub_ui(*e, *e, val);
     }
 
     // out[i] = val
     out[i] = val;
 
-    // r = r >> 1
-    mpz_fdiv_q_2exp(*r, *r, 1);
+    // e = e >> 1
+    mpz_fdiv_q_2exp(*e, *e, 1);
   }
 
-  // r == 0
-  assert(mpz_sgn(*r) == 0);
+  // e == 0
+  assert(mpz_sgn(*e) == 0);
 
   return out;
 }
