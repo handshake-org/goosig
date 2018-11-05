@@ -1306,19 +1306,9 @@ goo_group_init(
 
   goo_prng_init(&group->prng);
 
-  mpz_init(group->b12);
-  mpz_init(group->b34);
-  mpz_init(group->b1234);
-  mpz_init(group->b12345);
-  mpz_init(group->b12_inv);
-  mpz_init(group->b34_inv);
-  mpz_init(group->b1234_inv);
-  mpz_init(group->b12345_inv);
-  mpz_init(group->bsq);
-  mpz_init(group->val);
-  mpz_init(group->mask);
-  mpz_init(group->r);
-  mpz_init(group->gh);
+  mpz_init(group->msg);
+  goo_sig_init(&group->sig);
+  mpz_init(group->C1);
   mpz_init(group->C1_inv);
   mpz_init(group->C2_inv);
   mpz_init(group->Aq_inv);
@@ -1333,9 +1323,21 @@ goo_group_init(
   mpz_init(group->chal_out);
   mpz_init(group->ell_r_out);
   mpz_init(group->elldiff);
-  mpz_init(group->msg);
-  goo_sig_init(&group->sig);
-  mpz_init(group->C1);
+
+  mpz_init(group->b12);
+  mpz_init(group->b34);
+  mpz_init(group->b1234);
+  mpz_init(group->b12345);
+  mpz_init(group->b12_inv);
+  mpz_init(group->b34_inv);
+  mpz_init(group->b1234_inv);
+  mpz_init(group->b12345_inv);
+
+  mpz_init(group->bsq);
+  mpz_init(group->val);
+  mpz_init(group->mask);
+  mpz_init(group->r);
+  mpz_init(group->gh);
 
   return 1;
 }
@@ -1363,19 +1365,9 @@ goo_group_uninit(goo_group_t *group) {
 
   goo_prng_uninit(&group->prng);
 
-  mpz_clear(group->b12);
-  mpz_clear(group->b34);
-  mpz_clear(group->b1234);
-  mpz_clear(group->b12345);
-  mpz_clear(group->b12_inv);
-  mpz_clear(group->b34_inv);
-  mpz_clear(group->b1234_inv);
-  mpz_clear(group->b12345_inv);
-  mpz_clear(group->bsq);
-  mpz_clear(group->val);
-  mpz_clear(group->mask);
-  mpz_clear(group->r);
-  mpz_clear(group->gh);
+  mpz_clear(group->msg);
+  goo_sig_uninit(&group->sig);
+  mpz_clear(group->C1);
   mpz_clear(group->C1_inv);
   mpz_clear(group->C2_inv);
   mpz_clear(group->Aq_inv);
@@ -1390,9 +1382,23 @@ goo_group_uninit(goo_group_t *group) {
   mpz_clear(group->chal_out);
   mpz_clear(group->ell_r_out);
   mpz_clear(group->elldiff);
-  mpz_clear(group->msg);
-  goo_sig_uninit(&group->sig);
-  mpz_clear(group->C1);
+
+  mpz_clear(group->b12);
+  mpz_clear(group->b34);
+  mpz_clear(group->b1234);
+  mpz_clear(group->b12345);
+  mpz_clear(group->b12_inv);
+  mpz_clear(group->b34_inv);
+  mpz_clear(group->b1234_inv);
+  mpz_clear(group->b12345_inv);
+
+  mpz_clear(group->bsq);
+
+  mpz_clear(group->val);
+  mpz_clear(group->mask);
+  mpz_clear(group->r);
+
+  mpz_clear(group->gh);
 }
 
 static void

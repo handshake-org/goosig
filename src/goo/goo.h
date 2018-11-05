@@ -87,18 +87,18 @@ typedef struct goo_sig_s {
 } goo_sig_t;
 
 typedef struct goo_group_s {
-  // parameters
+  /* Parameters */
   mpz_t n;
   mpz_t nh;
   mpz_t g;
   mpz_t h;
   size_t rand_bits;
 
-  // combs
+  /* Combs */
   long combs_len;
   goo_comb_item_t combs[2];
 
-  // wnaf
+  /* WNAF */
   mpz_t pctab_p1[GOO_TABLEN];
   mpz_t pctab_n1[GOO_TABLEN];
   mpz_t pctab_n2[GOO_TABLEN];
@@ -108,20 +108,11 @@ typedef struct goo_group_s {
 
   goo_prng_t prng;
 
-  // temporary variables
-  mpz_t b12;
-  mpz_t b34;
-  mpz_t b1234;
-  mpz_t b12345;
-  mpz_t b12_inv;
-  mpz_t b34_inv;
-  mpz_t b1234_inv;
-  mpz_t b12345_inv;
-  mpz_t bsq;
-  mpz_t val;
-  mpz_t mask;
-  mpz_t r;
-  mpz_t gh;
+  /* Temporary variables (for verification) */
+  /* goo_group_verify() */
+  mpz_t msg;
+  goo_sig_t sig;
+  mpz_t C1;
   mpz_t C1_inv;
   mpz_t C2_inv;
   mpz_t Aq_inv;
@@ -136,10 +127,29 @@ typedef struct goo_group_s {
   mpz_t chal_out;
   mpz_t ell_r_out;
   mpz_t elldiff;
-  mpz_t msg;
-  goo_sig_t sig;
-  mpz_t C1;
 
+  /* goo_group_inv2() / goo_group_inv5() */
+  mpz_t b12;
+  mpz_t b34;
+  mpz_t b1234;
+  mpz_t b12345;
+  mpz_t b12_inv;
+  mpz_t b34_inv;
+  mpz_t b1234_inv;
+  mpz_t b12345_inv;
+
+  /* goo_group_wnaf_pc_help() */
+  mpz_t bsq;
+
+  /* goo_group_wnaf() */
+  mpz_t val;
+  mpz_t mask;
+  mpz_t r;
+
+  /* goo_group_recon() */
+  mpz_t gh;
+
+  /* goo_hash_all() */
   unsigned char slab[2 + ((GOO_MAX_RSA_BITS + 7) / 8) * 2];
 } goo_group_t;
 
