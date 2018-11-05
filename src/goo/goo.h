@@ -68,6 +68,24 @@ typedef struct goo_prng_s {
   mpz_t tmp;
 } goo_prng_t;
 
+typedef struct goo_sig_s {
+  mpz_t C2;
+  mpz_t t;
+  mpz_t chal;
+  mpz_t ell;
+  mpz_t Aq;
+  mpz_t Bq;
+  mpz_t Cq;
+  mpz_t Dq;
+  mpz_t z_w;
+  mpz_t z_w2;
+  mpz_t z_s1;
+  mpz_t z_a;
+  mpz_t z_an;
+  mpz_t z_s1w;
+  mpz_t z_sa;
+} goo_sig_t;
+
 typedef struct goo_group_s {
   // parameters
   mpz_t n;
@@ -118,44 +136,12 @@ typedef struct goo_group_s {
   mpz_t chal_out;
   mpz_t ell_r_out;
   mpz_t elldiff;
-  mpz_t C1;
-  mpz_t C2;
-  mpz_t t;
   mpz_t msg;
-  mpz_t chal;
-  mpz_t ell;
-  mpz_t Aq;
-  mpz_t Bq;
-  mpz_t Cq;
-  mpz_t Dq;
-  mpz_t z_w;
-  mpz_t z_w2;
-  mpz_t z_s1;
-  mpz_t z_a;
-  mpz_t z_an;
-  mpz_t z_s1w;
-  mpz_t z_sa;
+  goo_sig_t sig;
+  mpz_t C1;
 
   unsigned char slab[2 + ((GOO_MAX_RSA_BITS + 7) / 8) * 2];
 } goo_group_t;
-
-typedef struct goo_sig_s {
-  mpz_t C2;
-  mpz_t t;
-  mpz_t chal;
-  mpz_t ell;
-  mpz_t Aq;
-  mpz_t Bq;
-  mpz_t Cq;
-  mpz_t Dq;
-  mpz_t z_w;
-  mpz_t z_w2;
-  mpz_t z_s1;
-  mpz_t z_a;
-  mpz_t z_an;
-  mpz_t z_s1w;
-  mpz_t z_sa;
-} goo_sig_t;
 
 typedef struct goo_group_s goo_ctx_t;
 

@@ -1329,23 +1329,9 @@ goo_group_init(
   mpz_init(group->chal_out);
   mpz_init(group->ell_r_out);
   mpz_init(group->elldiff);
-  mpz_init(group->C1);
-  mpz_init(group->C2);
-  mpz_init(group->t);
   mpz_init(group->msg);
-  mpz_init(group->chal);
-  mpz_init(group->ell);
-  mpz_init(group->Aq);
-  mpz_init(group->Bq);
-  mpz_init(group->Cq);
-  mpz_init(group->Dq);
-  mpz_init(group->z_w);
-  mpz_init(group->z_w2);
-  mpz_init(group->z_s1);
-  mpz_init(group->z_a);
-  mpz_init(group->z_an);
-  mpz_init(group->z_s1w);
-  mpz_init(group->z_sa);
+  goo_sig_init(&group->sig);
+  mpz_init(group->C1);
 
   return 1;
 }
@@ -1400,23 +1386,9 @@ goo_group_uninit(goo_group_t *group) {
   mpz_clear(group->chal_out);
   mpz_clear(group->ell_r_out);
   mpz_clear(group->elldiff);
-  mpz_clear(group->C1);
-  mpz_clear(group->C2);
-  mpz_clear(group->t);
   mpz_clear(group->msg);
-  mpz_clear(group->chal);
-  mpz_clear(group->ell);
-  mpz_clear(group->Aq);
-  mpz_clear(group->Bq);
-  mpz_clear(group->Cq);
-  mpz_clear(group->Dq);
-  mpz_clear(group->z_w);
-  mpz_clear(group->z_w2);
-  mpz_clear(group->z_s1);
-  mpz_clear(group->z_a);
-  mpz_clear(group->z_an);
-  mpz_clear(group->z_s1w);
-  mpz_clear(group->z_sa);
+  goo_sig_uninit(&group->sig);
+  mpz_clear(group->C1);
 }
 
 static void
@@ -2057,10 +2029,10 @@ goo_group_sign(
   mpz_t *z_s1w = &sig->z_s1w;
   mpz_t *z_sa = &sig->z_sa;
 
-  mpz_t *s = &group->Aq;
-  mpz_t *w = &group->Bq;
-  mpz_t *a = &group->Cq;
-  mpz_t *s1 = &group->Dq;
+  mpz_t *s = &group->sig.Aq;
+  mpz_t *w = &group->sig.Bq;
+  mpz_t *a = &group->sig.Cq;
+  mpz_t *s1 = &group->sig.Dq;
 
   mpz_t *x = &group->Aq_inv;
   mpz_t *y = &group->Bq_inv;
@@ -2071,13 +2043,13 @@ goo_group_sign(
   mpz_t *C1_inv = &group->C1_inv;
   mpz_t *C2_inv = &group->C2_inv;
 
-  mpz_t *r_w = &group->z_w;
-  mpz_t *r_w2 = &group->z_w2;
-  mpz_t *r_s1 = &group->z_s1;
-  mpz_t *r_a = &group->z_a;
-  mpz_t *r_an = &group->z_an;
-  mpz_t *r_s1w = &group->z_s1w;
-  mpz_t *r_sa = &group->z_sa;
+  mpz_t *r_w = &group->sig.z_w;
+  mpz_t *r_w2 = &group->sig.z_w2;
+  mpz_t *r_s1 = &group->sig.z_s1;
+  mpz_t *r_a = &group->sig.z_a;
+  mpz_t *r_an = &group->sig.z_an;
+  mpz_t *r_s1w = &group->sig.z_s1w;
+  mpz_t *r_sa = &group->sig.z_sa;
 
   mpz_t *A = &group->A;
   mpz_t *B = &group->B;
@@ -2325,32 +2297,26 @@ fail:
 static int
 goo_group_verify(
   goo_group_t *group,
-
-  // msg
   const mpz_t msg,
-
-  // pubkey
-  const mpz_t C1,
-  const mpz_t C2,
-  const mpz_t t,
-
-  // sigma
-  const mpz_t chal,
-  const mpz_t ell,
-  const mpz_t Aq,
-  const mpz_t Bq,
-  const mpz_t Cq,
-  const mpz_t Dq,
-
-  // z_prime
-  const mpz_t z_w,
-  const mpz_t z_w2,
-  const mpz_t z_s1,
-  const mpz_t z_a,
-  const mpz_t z_an,
-  const mpz_t z_s1w,
-  const mpz_t z_sa
+  const goo_sig_t *sig,
+  const mpz_t C1
 ) {
+  const mpz_t *C2 = &sig->C2;
+  const mpz_t *t = &sig->t;
+  const mpz_t *chal = &sig->chal;
+  const mpz_t *ell = &sig->ell;
+  const mpz_t *Aq = &sig->Aq;
+  const mpz_t *Bq = &sig->Bq;
+  const mpz_t *Cq = &sig->Cq;
+  const mpz_t *Dq = &sig->Dq;
+  const mpz_t *z_w = &sig->z_w;
+  const mpz_t *z_w2 = &sig->z_w2;
+  const mpz_t *z_s1 = &sig->z_s1;
+  const mpz_t *z_a = &sig->z_a;
+  const mpz_t *z_an = &sig->z_an;
+  const mpz_t *z_s1w = &sig->z_s1w;
+  const mpz_t *z_sa = &sig->z_sa;
+
   mpz_t *C1_inv = &group->C1_inv;
   mpz_t *C2_inv = &group->C2_inv;
   mpz_t *Aq_inv = &group->Aq_inv;
@@ -2368,25 +2334,25 @@ goo_group_verify(
 
   // Sanity check.
   if (mpz_sgn(C1) <= 0
-      || mpz_sgn(C2) <= 0
-      || mpz_sgn(t) <= 0
-      || mpz_sgn(chal) <= 0
-      || mpz_sgn(ell) <= 0
-      || mpz_sgn(Aq) <= 0
-      || mpz_sgn(Bq) <= 0
-      || mpz_sgn(Cq) <= 0
-      || mpz_sgn(Dq) <= 0
-      || mpz_sgn(z_w) <= 0
-      || mpz_sgn(z_w2) <= 0
-      || mpz_sgn(z_s1) <= 0
-      || mpz_sgn(z_a) <= 0
-      || mpz_sgn(z_an) <= 0
-      || mpz_sgn(z_s1w) <= 0
-      || mpz_sgn(z_sa) <= 0) {
+      || mpz_sgn(*C2) <= 0
+      || mpz_sgn(*t) <= 0
+      || mpz_sgn(*chal) <= 0
+      || mpz_sgn(*ell) <= 0
+      || mpz_sgn(*Aq) <= 0
+      || mpz_sgn(*Bq) <= 0
+      || mpz_sgn(*Cq) <= 0
+      || mpz_sgn(*Dq) <= 0
+      || mpz_sgn(*z_w) <= 0
+      || mpz_sgn(*z_w2) <= 0
+      || mpz_sgn(*z_s1) <= 0
+      || mpz_sgn(*z_a) <= 0
+      || mpz_sgn(*z_an) <= 0
+      || mpz_sgn(*z_s1w) <= 0
+      || mpz_sgn(*z_sa) <= 0) {
     return 0;
   }
 
-  if (goo_mpz_bitlen(ell) != 128)
+  if (goo_mpz_bitlen(*ell) != 128)
     return 0;
 
   unsigned char key[32];
@@ -2396,7 +2362,7 @@ goo_group_verify(
 
   for (long i = 0; i < GOO_PRIMES_LEN; i++) {
     // if t == primes[i]
-    if (mpz_cmp_ui(t, goo_primes[i]) == 0) {
+    if (mpz_cmp_ui(*t, goo_primes[i]) == 0) {
       found = 1;
       break;
     }
@@ -2408,53 +2374,53 @@ goo_group_verify(
   // All group elements must be the "canonical"
   // element of the quotient group (Z/n)/{1,-1}.
   if (!goo_group_is_reduced(group, C1)
-      || !goo_group_is_reduced(group, C2)
-      || !goo_group_is_reduced(group, Aq)
-      || !goo_group_is_reduced(group, Bq)
-      || !goo_group_is_reduced(group, Cq)) {
+      || !goo_group_is_reduced(group, *C2)
+      || !goo_group_is_reduced(group, *Aq)
+      || !goo_group_is_reduced(group, *Bq)
+      || !goo_group_is_reduced(group, *Cq)) {
     return 0;
   }
 
   // Compute inverses of C1, C2, Aq, Bq, Cq.
   // [C1_inv, C2_inv, Aq_inv, Bq_inv, Cq_inv] = inv5(C1, C2, Aq, Bq, Cq)
   if (!goo_group_inv5(group, *C1_inv, *C2_inv, *Aq_inv,
-                      *Bq_inv, *Cq_inv, C1, C2, Aq, Bq, Cq)) {
+                      *Bq_inv, *Cq_inv, C1, *C2, *Aq, *Bq, *Cq)) {
     return 0;
   }
 
   // Step 1: reconstruct A, B, C, and D from signature.
   // A = recon(Aq, Aq_inv, ell, C2_inv, C2, chal, z_w, z_s1)
-  if (!goo_group_recon(group, *A, Aq, *Aq_inv, ell,
-                       *C2_inv, C2, chal, z_w, z_s1)) {
+  if (!goo_group_recon(group, *A, *Aq, *Aq_inv, *ell,
+                       *C2_inv, *C2, *chal, *z_w, *z_s1)) {
     return 0;
   }
 
   // B = recon(Bq, Bq_inv, ell, C2_inv, C2, z_w, z_w2, z_s1w)
-  if (!goo_group_recon(group, *B, Bq, *Bq_inv, ell,
-                       *C2_inv, C2, z_w, z_w2, z_s1w)) {
+  if (!goo_group_recon(group, *B, *Bq, *Bq_inv, *ell,
+                       *C2_inv, *C2, *z_w, *z_w2, *z_s1w)) {
     return 0;
   }
 
   // C = recon(Cq, Cq_inv, ell, C1_inv, C1, z_a, z_an, z_sa)
-  if (!goo_group_recon(group, *C, Cq, *Cq_inv, ell,
-                       *C1_inv, C1, z_a, z_an, z_sa)) {
+  if (!goo_group_recon(group, *C, *Cq, *Cq_inv, *ell,
+                       *C1_inv, C1, *z_a, *z_an, *z_sa)) {
     return 0;
   }
 
   // Make sure sign of (z_w2 - z_an) is positive.
   // z_w2_m_an = z_w2 - z_an
-  mpz_sub(*z_w2_m_an, z_w2, z_an);
+  mpz_sub(*z_w2_m_an, *z_w2, *z_an);
 
   // D = Dq * ell + z_w2_m_an - t * chal
-  mpz_mul(*D, Dq, ell);
+  mpz_mul(*D, *Dq, *ell);
   mpz_add(*D, *D, *z_w2_m_an);
-  mpz_mul(*tmp, t, chal);
+  mpz_mul(*tmp, *t, *chal);
   mpz_sub(*D, *D, *tmp);
 
   // if z_w2_m_an < 0
   if (mpz_sgn(*z_w2_m_an) < 0) {
     // D += ell
-    mpz_add(*D, *D, ell);
+    mpz_add(*D, *D, *ell);
   }
 
   if (mpz_sgn(*D) < 0)
@@ -2463,23 +2429,23 @@ goo_group_verify(
   // Step 2: recompute implicitly claimed V message, viz., chal and ell.
   // [chal_out, ell_r_out, key] = fs_chal(C1, C2, t, A, B, C, D, msg)
   goo_group_fs_chal(group, *chal_out, *ell_r_out, &key[0],
-                    C1, C2, t, *A, *B, *C, *D, msg, 1);
+                    C1, *C2, *t, *A, *B, *C, *D, msg, 1);
 
   // Final checks.
   // chal has to match
   // AND 0 <= (ell_r_out - ell) <= elldiff_max
   // AND ell is prime
   // elldiff = ell - ell_r_out
-  mpz_sub(*elldiff, ell, *ell_r_out);
+  mpz_sub(*elldiff, *ell, *ell_r_out);
 
   // if chal != chal_out
   //   or elldiff < 0
   //   or elldiff > ELLDIFF_MAX
   //   or !is_prime(ell)
-  if (mpz_cmp(chal, *chal_out) != 0
+  if (mpz_cmp(*chal, *chal_out) != 0
       || mpz_cmp_ui(*elldiff, 0) < 0
       || mpz_cmp_ui(*elldiff, GOO_ELLDIFF_MAX) > 0
-      || !goo_is_prime(ell, &key[0])) {
+      || !goo_is_prime(*ell, &key[0])) {
     return 0;
   }
 
@@ -2743,54 +2709,29 @@ goo_verify(
   size_t modbytes = (goo_mpz_bitlen(ctx->n) + 7) / 8;
   size_t chalbytes = (GOO_CHAL_BITS + 7) / 8;
 
-  goo_read_item(ctx->C2, modbytes);
-  goo_read_item(ctx->t, 2);
+  goo_sig_t *s = &ctx->sig;
 
-  goo_read_item(ctx->chal, chalbytes);
-  goo_read_item(ctx->ell, chalbytes);
-  goo_read_item(ctx->Aq, modbytes);
-  goo_read_item(ctx->Bq, modbytes);
-  goo_read_item(ctx->Cq, modbytes);
-  goo_read_item(ctx->Dq, 2048 / 8);
+  goo_read_item(s->C2, modbytes);
+  goo_read_item(s->t, 2);
 
-  goo_read_item(ctx->z_w, chalbytes);
-  goo_read_item(ctx->z_w2, chalbytes);
-  goo_read_item(ctx->z_s1, chalbytes);
-  goo_read_item(ctx->z_a, chalbytes);
-  goo_read_item(ctx->z_an, chalbytes);
-  goo_read_item(ctx->z_s1w, chalbytes);
-  goo_read_item(ctx->z_sa, chalbytes);
+  goo_read_item(s->chal, chalbytes);
+  goo_read_item(s->ell, chalbytes);
+  goo_read_item(s->Aq, modbytes);
+  goo_read_item(s->Bq, modbytes);
+  goo_read_item(s->Cq, modbytes);
+  goo_read_item(s->Dq, 2048 / 8);
+
+  goo_read_item(s->z_w, chalbytes);
+  goo_read_item(s->z_w2, chalbytes);
+  goo_read_item(s->z_s1, chalbytes);
+  goo_read_item(s->z_a, chalbytes);
+  goo_read_item(s->z_an, chalbytes);
+  goo_read_item(s->z_s1w, chalbytes);
+  goo_read_item(s->z_sa, chalbytes);
 
   goo_read_final();
 
-  return goo_group_verify(
-    ctx,
-
-    // msg
-    ctx->msg,
-
-    // pubkey
-    ctx->C1,
-    ctx->C2,
-    ctx->t,
-
-    // sigma
-    ctx->chal,
-    ctx->ell,
-    ctx->Aq,
-    ctx->Bq,
-    ctx->Cq,
-    ctx->Dq,
-
-    // z_prime
-    ctx->z_w,
-    ctx->z_w2,
-    ctx->z_s1,
-    ctx->z_a,
-    ctx->z_an,
-    ctx->z_s1w,
-    ctx->z_sa
-  );
+  return goo_group_verify(ctx, ctx->msg, s, ctx->C1);
 }
 
 #ifdef GOO_TEST
@@ -3666,12 +3607,7 @@ run_goo_test(void) {
 
   assert(goo_group_sign(goo, &sig, msg, s_prime, C1, n, p, q));
 
-  assert(goo_group_verify(goo, msg, C1, sig.C2, sig.t,
-                          sig.chal, sig.ell, sig.Aq,
-                          sig.Bq, sig.Cq, sig.Dq,
-                          sig.z_w, sig.z_w2, sig.z_s1,
-                          sig.z_a, sig.z_an, sig.z_s1w,
-                          sig.z_sa));
+  assert(goo_group_verify(goo, msg, &sig, C1));
 
   mpz_clear(p);
   mpz_clear(q);
