@@ -241,6 +241,22 @@ goo_mpz_jacobi(const mpz_t x, const mpz_t y) {
 #define mpz_jacobi goo_mpz_jacobi
 #endif
 
+static inline void
+goo_mpz_add_si(mpz_t r, const mpz_t n, long val) {
+  if (val < 0)
+    mpz_sub_ui(r, n, -val);
+  else
+    mpz_add_ui(r, n, val);
+}
+
+static inline void
+goo_mpz_sub_si(mpz_t r, const mpz_t n, long val) {
+  if (val < 0)
+    mpz_add_ui(r, n, -val);
+  else
+    mpz_sub_ui(r, n, val);
+}
+
 /*
  * Allocator
  */
