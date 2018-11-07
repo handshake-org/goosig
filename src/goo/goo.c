@@ -2090,6 +2090,7 @@ goo_hash_all(
   goo_sha256_t ctx;
 
   // Copy the state of SHA256(prefix || n || g || h).
+  // This gives us a very minor speedup.
   memcpy(&ctx, &group->sha, sizeof(goo_sha256_t));
 
   if (!goo_hash_item(&ctx, C1, mod_bytes, buf)
