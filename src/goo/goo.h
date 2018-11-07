@@ -94,9 +94,6 @@ typedef struct goo_group_s {
   mpz_t nh;
   mpz_t g;
   mpz_t h;
-  unsigned char *n_raw;
-  unsigned char *g_raw;
-  unsigned char *h_raw;
   size_t rand_bits;
 
   /* Combs */

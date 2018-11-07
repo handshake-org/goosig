@@ -1481,14 +1481,6 @@ goo_group_init(
   // h = h
   mpz_set_ui(group->h, h);
 
-  group->n_raw = goo_mpz_pad(NULL, group->size, group->n);
-  group->g_raw = goo_mpz_pad(NULL, 4, group->g);
-  group->h_raw = goo_mpz_pad(NULL, 4, group->h);
-
-  assert(group->n_raw);
-  assert(group->g_raw);
-  assert(group->h_raw);
-
   group->rand_bits = goo_clog2(group->n) - 1;
 
   if (modbits != 0) {
@@ -1566,10 +1558,6 @@ goo_group_uninit(goo_group_t *group) {
   mpz_clear(group->nh);
   mpz_clear(group->g);
   mpz_clear(group->h);
-
-  goo_free(group->n_raw);
-  goo_free(group->g_raw);
-  goo_free(group->h_raw);
 
   for (long i = 0; i < group->combs_len; i++) {
     goo_comb_uninit(&group->combs[i].g);
@@ -2099,18 +2087,9 @@ goo_hash_all(
   size_t mod_bytes = (group->bits + 7) / 8;
   size_t exp_bytes = (GOO_EXPONENT_SIZE + 7) / 8;
 
-#if 0
-  goo_sha256_t ctx;
-  goo_sha256_init(&ctx);
-
-  goo_sha256_update(&ctx, (void *)goo_prefix, sizeof(goo_prefix) - 1);
-  goo_sha256_update(ctx, group->n_raw, group->size);
-  goo_sha256_update(ctx, group->g_raw, 4);
-  goo_sha256_update(ctx, group->h_raw, 4);
-#endif
-
   goo_sha256_t ctx;
 
+  // Copy the state of SHA256(prefix || n || g || h).
   memcpy(&ctx, &group->sha, sizeof(goo_sha256_t));
 
   if (!goo_hash_item(&ctx, C1, mod_bytes, buf)
