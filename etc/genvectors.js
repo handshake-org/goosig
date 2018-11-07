@@ -76,6 +76,11 @@ for (const Goo of [JS, Native]) {
 }
 
 {
-  const path = Path.resolve(__dirname, '..', 'test', 'data', 'vectors2.json');
-  fs.writeFileSync(path, JSON.stringify(vectors, null, 2) + '\n');
+  const path = Path.resolve(__dirname, '..',
+                            'test', 'data',
+                            'vectors.json');
+
+  const json = JSON.stringify(vectors, null, 2);
+
+  fs.writeFileSync(path, json + '\n');
 }
