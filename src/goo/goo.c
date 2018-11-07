@@ -1082,19 +1082,20 @@ goo_sig_uninit(goo_sig_t *sig) {
 
 static inline size_t
 goo_sig_size(const goo_sig_t *sig, size_t bits) {
-  size_t modbytes = (bits + 7) / 8;
-  size_t chalbytes = (GOO_CHAL_BITS + 7) / 8;
+  size_t mod_bytes = (bits + 7) / 8;
+  size_t exp_bytes = (GOO_EXPONENT_SIZE + 7) / 8;
+  size_t chal_bytes = (GOO_CHAL_BITS + 7) / 8;
   size_t len = 0;
 
-  len += modbytes; // C2
+  len += mod_bytes; // C2
   len += 2; // t
-  len += chalbytes; // chal
-  len += chalbytes; // ell
-  len += modbytes; // Aq
-  len += modbytes; // Bq
-  len += modbytes; // Cq
-  len += 2048 / 8; // Dq
-  len += chalbytes * 7; // z_prime
+  len += chal_bytes; // chal
+  len += chal_bytes; // ell
+  len += mod_bytes; // Aq
+  len += mod_bytes; // Bq
+  len += mod_bytes; // Cq
+  len += exp_bytes; // Dq
+  len += chal_bytes * 7; // z_prime
 
   return len;
 }
@@ -1115,27 +1116,28 @@ goo_sig_size(const goo_sig_t *sig, size_t bits) {
 
 static inline int
 goo_sig_export(unsigned char *out, const goo_sig_t *sig, size_t bits) {
-  size_t modbytes = (bits + 7) / 8;
-  size_t chalbytes = (GOO_CHAL_BITS + 7) / 8;
+  size_t mod_bytes = (bits + 7) / 8;
+  size_t exp_bytes = (GOO_EXPONENT_SIZE + 7) / 8;
+  size_t chal_bytes = (GOO_CHAL_BITS + 7) / 8;
   size_t pos = 0;
 
-  goo_write_int(sig->C2, modbytes);
+  goo_write_int(sig->C2, mod_bytes);
   goo_write_int(sig->t, 2);
 
-  goo_write_int(sig->chal, chalbytes);
-  goo_write_int(sig->ell, chalbytes);
-  goo_write_int(sig->Aq, modbytes);
-  goo_write_int(sig->Bq, modbytes);
-  goo_write_int(sig->Cq, modbytes);
-  goo_write_int(sig->Dq, 2048 / 8);
+  goo_write_int(sig->chal, chal_bytes);
+  goo_write_int(sig->ell, chal_bytes);
+  goo_write_int(sig->Aq, mod_bytes);
+  goo_write_int(sig->Bq, mod_bytes);
+  goo_write_int(sig->Cq, mod_bytes);
+  goo_write_int(sig->Dq, exp_bytes);
 
-  goo_write_int(sig->z_w, chalbytes);
-  goo_write_int(sig->z_w2, chalbytes);
-  goo_write_int(sig->z_s1, chalbytes);
-  goo_write_int(sig->z_a, chalbytes);
-  goo_write_int(sig->z_an, chalbytes);
-  goo_write_int(sig->z_s1w, chalbytes);
-  goo_write_int(sig->z_sa, chalbytes);
+  goo_write_int(sig->z_w, chal_bytes);
+  goo_write_int(sig->z_w2, chal_bytes);
+  goo_write_int(sig->z_s1, chal_bytes);
+  goo_write_int(sig->z_a, chal_bytes);
+  goo_write_int(sig->z_an, chal_bytes);
+  goo_write_int(sig->z_s1w, chal_bytes);
+  goo_write_int(sig->z_sa, chal_bytes);
 
   assert(goo_sig_size(sig, bits) == pos);
 
@@ -1159,27 +1161,28 @@ goo_sig_import(
   size_t data_len,
   size_t bits
 ) {
-  size_t modbytes = (bits + 7) / 8;
-  size_t chalbytes = (GOO_CHAL_BITS + 7) / 8;
+  size_t mod_bytes = (bits + 7) / 8;
+  size_t exp_bytes = (GOO_EXPONENT_SIZE + 7) / 8;
+  size_t chal_bytes = (GOO_CHAL_BITS + 7) / 8;
   size_t pos = 0;
 
-  goo_read_int(sig->C2, modbytes);
+  goo_read_int(sig->C2, mod_bytes);
   goo_read_int(sig->t, 2);
 
-  goo_read_int(sig->chal, chalbytes);
-  goo_read_int(sig->ell, chalbytes);
-  goo_read_int(sig->Aq, modbytes);
-  goo_read_int(sig->Bq, modbytes);
-  goo_read_int(sig->Cq, modbytes);
-  goo_read_int(sig->Dq, 2048 / 8);
+  goo_read_int(sig->chal, chal_bytes);
+  goo_read_int(sig->ell, chal_bytes);
+  goo_read_int(sig->Aq, mod_bytes);
+  goo_read_int(sig->Bq, mod_bytes);
+  goo_read_int(sig->Cq, mod_bytes);
+  goo_read_int(sig->Dq, exp_bytes);
 
-  goo_read_int(sig->z_w, chalbytes);
-  goo_read_int(sig->z_w2, chalbytes);
-  goo_read_int(sig->z_s1, chalbytes);
-  goo_read_int(sig->z_a, chalbytes);
-  goo_read_int(sig->z_an, chalbytes);
-  goo_read_int(sig->z_s1w, chalbytes);
-  goo_read_int(sig->z_sa, chalbytes);
+  goo_read_int(sig->z_w, chal_bytes);
+  goo_read_int(sig->z_w2, chal_bytes);
+  goo_read_int(sig->z_s1, chal_bytes);
+  goo_read_int(sig->z_a, chal_bytes);
+  goo_read_int(sig->z_an, chal_bytes);
+  goo_read_int(sig->z_s1w, chal_bytes);
+  goo_read_int(sig->z_sa, chal_bytes);
 
   assert(pos <= data_len);
 
@@ -1436,6 +1439,14 @@ goo_to_comb_exp(goo_comb_t *comb, const mpz_t e) {
  * Group
  */
 
+static inline int
+goo_hash_item(
+  goo_sha256_t *ctx,
+  const mpz_t n,
+  size_t size,
+  unsigned char *buf
+);
+
 static int
 goo_group_init(
   goo_group_t *group,
@@ -1460,6 +1471,7 @@ goo_group_init(
   mpz_set(group->n, n);
 
   group->bits = goo_mpz_bitlen(group->n);
+  group->size = (group->bits + 7) / 8;
 
   // nh = n >> 1
   mpz_fdiv_q_2exp(group->nh, group->n, 1);
@@ -1468,6 +1480,14 @@ goo_group_init(
   mpz_set_ui(group->g, g);
   // h = h
   mpz_set_ui(group->h, h);
+
+  group->n_raw = goo_mpz_pad(NULL, group->size, group->n);
+  group->g_raw = goo_mpz_pad(NULL, 4, group->g);
+  group->h_raw = goo_mpz_pad(NULL, 4, group->h);
+
+  assert(group->n_raw);
+  assert(group->g_raw);
+  assert(group->h_raw);
 
   group->rand_bits = goo_clog2(group->n) - 1;
 
@@ -1509,6 +1529,12 @@ goo_group_init(
 
   goo_prng_init(&group->prng);
 
+  goo_sha256_init(&group->sha);
+  goo_sha256_update(&group->sha, (void *)goo_prefix, sizeof(goo_prefix) - 1);
+  assert(goo_hash_item(&group->sha, group->n, group->size, group->slab));
+  assert(goo_hash_item(&group->sha, group->g, 4, group->slab));
+  assert(goo_hash_item(&group->sha, group->h, 4, group->slab));
+
   mpz_init(group->msg);
   goo_sig_init(&group->sig);
   mpz_init(group->C1);
@@ -1540,6 +1566,10 @@ goo_group_uninit(goo_group_t *group) {
   mpz_clear(group->nh);
   mpz_clear(group->g);
   mpz_clear(group->h);
+
+  goo_free(group->n_raw);
+  goo_free(group->g_raw);
+  goo_free(group->h_raw);
 
   for (long i = 0; i < group->combs_len; i++) {
     goo_comb_uninit(&group->combs[i].g);
@@ -2022,35 +2052,37 @@ fail:
   return r;
 }
 
-static void
+static inline int
 goo_hash_item(
   goo_sha256_t *ctx,
   const mpz_t n,
-  unsigned char *size,
+  size_t size,
   unsigned char *buf
 ) {
-  size_t len = 0;
-
-  goo_mpz_export(&buf[0], &len, n);
-
-  // Sanity check.
-  assert(len <= (GOO_MAX_RSA_BITS + 7) / 8);
-
-  // Commit to sign.
-  // if n < 0
   if (mpz_sgn(n) < 0)
-    len |= 0x8000;
+    return 0;
 
-  size[0] = len;
-  size[1] = len >> 8;
+  size_t len = goo_mpz_bytelen(n);
 
-  len &= ~0x8000;
+  if (len > size)
+    return 0;
 
-  goo_sha256_update(ctx, size, 2);
-  goo_sha256_update(ctx, buf, len);
+  if (len > (GOO_MAX_RSA_BITS + 7) / 8)
+    return 0;
+
+  size_t pos = size - len;
+
+  memset(buf, 0x00, pos);
+
+  if (len != 0)
+    goo_mpz_export(buf + pos, NULL, n);
+
+  goo_sha256_update(ctx, buf, size);
+
+  return 1;
 }
 
-static void
+static int
 goo_hash_all(
   unsigned char *out,
   goo_group_t *group,
@@ -2063,26 +2095,38 @@ goo_hash_all(
   const mpz_t D,
   const mpz_t msg
 ) {
-  unsigned char *size = &group->slab[0];
-  unsigned char *buf = &group->slab[2];
+  unsigned char *buf = &group->slab[0];
+  size_t mod_bytes = (group->bits + 7) / 8;
+  size_t exp_bytes = (GOO_EXPONENT_SIZE + 7) / 8;
 
+#if 0
   goo_sha256_t ctx;
   goo_sha256_init(&ctx);
-  goo_sha256_update(&ctx, (void *)goo_prefix, sizeof(goo_prefix) - 1);
 
-  goo_hash_item(&ctx, group->n, size, buf);
-  goo_hash_item(&ctx, group->g, size, buf);
-  goo_hash_item(&ctx, group->h, size, buf);
-  goo_hash_item(&ctx, C1, size, buf);
-  goo_hash_item(&ctx, C2, size, buf);
-  goo_hash_item(&ctx, t, size, buf);
-  goo_hash_item(&ctx, A, size, buf);
-  goo_hash_item(&ctx, B, size, buf);
-  goo_hash_item(&ctx, C, size, buf);
-  goo_hash_item(&ctx, D, size, buf);
-  goo_hash_item(&ctx, msg, size, buf);
+  goo_sha256_update(&ctx, (void *)goo_prefix, sizeof(goo_prefix) - 1);
+  goo_sha256_update(ctx, group->n_raw, group->size);
+  goo_sha256_update(ctx, group->g_raw, 4);
+  goo_sha256_update(ctx, group->h_raw, 4);
+#endif
+
+  goo_sha256_t ctx;
+
+  memcpy(&ctx, &group->sha, sizeof(goo_sha256_t));
+
+  if (!goo_hash_item(&ctx, C1, mod_bytes, buf)
+      || !goo_hash_item(&ctx, C2, mod_bytes, buf)
+      || !goo_hash_item(&ctx, t, 4, buf)
+      || !goo_hash_item(&ctx, A, mod_bytes, buf)
+      || !goo_hash_item(&ctx, B, mod_bytes, buf)
+      || !goo_hash_item(&ctx, C, mod_bytes, buf)
+      || !goo_hash_item(&ctx, D, exp_bytes, buf)
+      || !goo_hash_item(&ctx, msg, 64, buf)) {
+    return 0;
+  }
 
   goo_sha256_final(&ctx, out);
+
+  return 1;
 }
 
 static int
@@ -2103,7 +2147,8 @@ goo_group_fs_chal(
 ) {
   unsigned char key[32];
 
-  goo_hash_all(&key[0], group, C1, C2, t, A, B, C, D, msg);
+  if (!goo_hash_all(&key[0], group, C1, C2, t, A, B, C, D, msg))
+    return 0;
 
   goo_prng_seed(&group->prng, &key[0]);
   goo_prng_random_bits(&group->prng, chal, GOO_CHAL_BITS);
@@ -2117,7 +2162,7 @@ goo_group_fs_chal(
     if (!goo_next_prime(ell, ell, key, GOO_ELLDIFF_MAX)) {
       mpz_set_ui(chal, 0);
       mpz_set_ui(ell, 0);
-      return 0;
+      return 1;
     }
   }
 
@@ -2426,10 +2471,12 @@ goo_group_sign(
   // assert D >= 0
   assert(mpz_sgn(D) >= 0);
 
-  int valid = 0;
+  // ell = 0
+  mpz_set_ui(*ell, 0);
 
   // V's message: random challenge and random prime.
-  while (valid == 0 || goo_mpz_bitlen(*ell) != 128) {
+  // while bitlen(ell) != 128
+  while (goo_mpz_bitlen(*ell) != 128) {
     // Randomize the signature until Fiat-Shamir
     // returns an admissable ell. Note that it's
     // not necessary to re-start the whole
@@ -2445,9 +2492,11 @@ goo_group_sign(
     goo_group_reduce(group, A, A);
 
     // [chal, ell] = fs_chal(C1, C2, t, A, B, C, D, msg)
-    valid = goo_group_fs_chal(group,
-                              *chal, *ell, NULL, C1, *C2,
-                              *t, A, B, C, D, msg, 0);
+    if (!goo_group_fs_chal(group,
+                           *chal, *ell, NULL, C1, *C2,
+                           *t, A, B, C, D, msg, 0)) {
+      goto fail;
+    }
   }
 
   // P's second message: compute quotient message.
@@ -2598,6 +2647,8 @@ goo_group_verify(
   mpz_t *ell_r_out = &group->ell_r_out;
   mpz_t *elldiff = &group->elldiff;
 
+  unsigned char key[32];
+
   // Sanity check.
   if (mpz_sgn(C1) <= 0
       || mpz_sgn(*C2) <= 0
@@ -2618,10 +2669,9 @@ goo_group_verify(
     return 0;
   }
 
+  // if bitlen(ell) != 128
   if (goo_mpz_bitlen(*ell) != 128)
     return 0;
-
-  unsigned char key[32];
 
   // `t` must be one of the small primes in our list.
   int found = 0;
@@ -2689,13 +2739,16 @@ goo_group_verify(
     mpz_add(*D, *D, *ell);
   }
 
+  // if D < 0
   if (mpz_sgn(*D) < 0)
     return 0;
 
   // Step 2: recompute implicitly claimed V message, viz., chal and ell.
   // [chal_out, ell_r_out, key] = fs_chal(C1, C2, t, A, B, C, D, msg)
-  goo_group_fs_chal(group, *chal_out, *ell_r_out, &key[0],
-                    C1, *C2, *t, *A, *B, *C, *D, msg, 1);
+  if (!goo_group_fs_chal(group, *chal_out, *ell_r_out, &key[0],
+                         C1, *C2, *t, *A, *B, *C, *D, msg, 1)) {
+    return 0;
+  }
 
   // Final checks.
   // chal has to match
@@ -2868,7 +2921,7 @@ goo_sign(
     return 0;
   }
 
-  if (msg_len < 20 || msg_len > 128)
+  if (msg_len < 20 || msg_len > 64)
     return 0;
 
   if (s_prime_len != 32)
@@ -2944,7 +2997,7 @@ goo_verify(
   if (ctx == NULL || msg == NULL || sig == NULL || C1 == NULL)
     return 0;
 
-  if (msg_len < 20 || msg_len > 128)
+  if (msg_len < 20 || msg_len > 64)
     return 0;
 
   if (C1_len != (ctx->bits + 7) / 8)

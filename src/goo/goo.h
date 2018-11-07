@@ -90,9 +90,13 @@ typedef struct goo_group_s {
   /* Parameters */
   mpz_t n;
   size_t bits;
+  size_t size;
   mpz_t nh;
   mpz_t g;
   mpz_t h;
+  unsigned char *n_raw;
+  unsigned char *g_raw;
+  unsigned char *h_raw;
   size_t rand_bits;
 
   /* Combs */
@@ -108,6 +112,7 @@ typedef struct goo_group_s {
   long e2bits[GOO_CHAL_BITS + 1];
 
   goo_prng_t prng;
+  goo_sha256_t sha;
 
   /* Temporary variables (for verification) */
   /* goo_group_verify() */
@@ -136,7 +141,7 @@ typedef struct goo_group_s {
   mpz_t gh;
 
   /* goo_hash_all() */
-  unsigned char slab[2 + ((GOO_MAX_RSA_BITS + 7) / 8) * 2];
+  unsigned char slab[(GOO_MAX_RSA_BITS + 7) / 8];
 } goo_group_t;
 
 typedef struct goo_group_s goo_ctx_t;

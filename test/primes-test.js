@@ -238,6 +238,6 @@ describe('Primes', function() {
   }
 
   it('should get next prime', () => {
-    assert(primes.nextPrime(4n, zero, 512n) === 5n);
+    assert(primes.nextPrime(4n, zero, 512) === 5n);
   });
 });
