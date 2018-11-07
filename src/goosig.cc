@@ -32,6 +32,7 @@ Goo::Init(v8::Local<v8::Object> &target) {
   tpl->SetClassName(Nan::New("Goo").ToLocalChecked());
   tpl->InstanceTemplate()->SetInternalFieldCount(1);
 
+  Nan::SetPrototypeMethod(tpl, "generate", Goo::Generate);
   Nan::SetPrototypeMethod(tpl, "challenge", Goo::Challenge);
   Nan::SetPrototypeMethod(tpl, "sign", Goo::Sign);
   Nan::SetPrototypeMethod(tpl, "verify", Goo::Verify);
@@ -87,37 +88,52 @@ NAN_METHOD(Goo::New) {
   info.GetReturnValue().Set(info.This());
 }
 
-NAN_METHOD(Goo::Challenge) {
+NAN_METHOD(Goo::Generate) {
   Goo *goo = ObjectWrap::Unwrap<Goo>(info.Holder());
-
-  if (info.Length() < 1)
-    return Nan::ThrowError("goo.challenge() requires arguments.");
-
-  v8::Local<v8::Object> n_buf = info[0].As<v8::Object>();
-
-  if (!node::Buffer::HasInstance(n_buf))
-    return Nan::ThrowTypeError("First argument must be a buffer.");
-
-  const uint8_t *n = (const uint8_t *)node::Buffer::Data(n_buf);
-  size_t n_len = node::Buffer::Length(n_buf);
 
   unsigned char *s_prime;
   size_t s_prime_len;
 
+  if (!goo_generate(&goo->ctx, &s_prime, &s_prime_len))
+    return Nan::ThrowError("Could create challenge.");
+
+  info.GetReturnValue().Set(
+    Nan::NewBuffer((char *)s_prime, s_prime_len).ToLocalChecked());
+}
+
+NAN_METHOD(Goo::Challenge) {
+  Goo *goo = ObjectWrap::Unwrap<Goo>(info.Holder());
+
+  if (info.Length() < 2)
+    return Nan::ThrowError("goo.challenge() requires arguments.");
+
+  v8::Local<v8::Object> s_prime_buf = info[0].As<v8::Object>();
+
+  if (!node::Buffer::HasInstance(s_prime_buf))
+    return Nan::ThrowTypeError("First argument must be a buffer.");
+
+  v8::Local<v8::Object> n_buf = info[1].As<v8::Object>();
+
+  if (!node::Buffer::HasInstance(n_buf))
+    return Nan::ThrowTypeError("Second argument must be a buffer.");
+
+  const uint8_t *s_prime = (const uint8_t *)node::Buffer::Data(s_prime_buf);
+  size_t s_prime_len = node::Buffer::Length(s_prime_buf);
+
+  const uint8_t *n = (const uint8_t *)node::Buffer::Data(n_buf);
+  size_t n_len = node::Buffer::Length(n_buf);
+
   unsigned char *C1;
   size_t C1_len;
 
-  if (!goo_challenge(&goo->ctx,
-                     &s_prime, &s_prime_len,
-                     &C1, &C1_len, n, n_len)) {
+  if (!goo_challenge(&goo->ctx, &C1, &C1_len,
+                     s_prime, s_prime_len,
+                     n, n_len)) {
     return Nan::ThrowError("Could create challenge.");
   }
 
-  v8::Local<v8::Array> ret = Nan::New<v8::Array>();
-  ret->Set(0, Nan::NewBuffer((char *)s_prime, s_prime_len).ToLocalChecked());
-  ret->Set(1, Nan::NewBuffer((char *)C1, C1_len).ToLocalChecked());
-
-  return info.GetReturnValue().Set(ret);
+  info.GetReturnValue().Set(
+    Nan::NewBuffer((char *)C1, C1_len).ToLocalChecked());
 }
 
 NAN_METHOD(Goo::Sign) {

@@ -15,7 +15,8 @@ const [p, q] = testUtil.sample(testUtil.primes1024, 2);
 const key = testUtil.rsaKey(p, q);
 
 // Generate the challenge token.
-const [s_prime, C1] = prover.challenge(key);
+const s_prime = prover.generate();
+const C1 = prover.challenge(s_prime, key);
 
 // Generate the proof.
 const sig = prover.sign(msg, s_prime, C1, key);

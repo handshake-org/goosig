@@ -95,7 +95,8 @@ for (let i = 0; i < Infinity; i++) {
     console.log('  Iterations: %d', i * 100);
 
   // Generate the challenge token.
-  const [s_prime, C1] = goo.challenge(pub);
+  const s_prime = goo.generate();
+  const C1 = goo.challenge(s_prime, pub);
 
   // Encrypt to the recipient.
   const ct = goo.encrypt(s_prime, C1, pub);

@@ -2169,10 +2169,19 @@ goo_is_valid_rsa(const mpz_t n) {
 }
 
 static int
+goo_group_generate(goo_group_t *group, mpz_t s_prime) {
+  // s_prime = randbits(256)
+  if (!goo_random_bits(s_prime, 256))
+    return 0;
+
+  return 1;
+}
+
+static int
 goo_group_challenge(
   goo_group_t *group,
-  mpz_t s_prime,
   mpz_t C1,
+  const mpz_t s_prime,
   const mpz_t n
 ) {
   int r = 0;
@@ -2180,15 +2189,16 @@ goo_group_challenge(
   mpz_t s;
   mpz_init(s);
 
+  if (mpz_sgn(s_prime) <= 0) {
+    // Invalid seed length.
+    goto fail;
+  }
+
   // if n < 2 ** 1023 or n > 2 ** 4096 - 1
   if (!goo_is_valid_rsa(n)) {
     // Invalid RSA public key.
     goto fail;
   }
-
-  // s_prime = randbits(256)
-  if (!goo_random_bits(s_prime, 256))
-    goto fail;
 
   // s = expand_sprime(s_prime)
   if (!goo_group_expand_sprime(group, s, s_prime))
@@ -2747,34 +2757,23 @@ goo_uninit(goo_ctx_t *ctx) {
 }
 
 int
-goo_challenge(
+goo_generate(
   goo_ctx_t *ctx,
   unsigned char **s_prime,
-  size_t *s_prime_len,
-  unsigned char **C1,
-  size_t *C1_len,
-  const unsigned char *n,
-  size_t n_len
+  size_t *s_prime_len
 ) {
   int r = 0;
 
   if (ctx == NULL
       || s_prime == NULL
-      || s_prime_len == NULL
-      || C1 == NULL
-      || C1_len == NULL
-      || n == NULL) {
+      || s_prime_len == NULL) {
     return 0;
   }
 
-  mpz_t s_prime_n, C1_n, n_n;
+  mpz_t s_prime_n;
   mpz_init(s_prime_n);
-  mpz_init(C1_n);
-  mpz_init(n_n);
 
-  goo_mpz_import(n_n, n, n_len);
-
-  if (!goo_group_challenge(ctx, s_prime_n, C1_n, n_n))
+  if (!goo_group_generate(ctx, s_prime_n))
     goto fail;
 
   *s_prime_len = 32;
@@ -2783,18 +2782,56 @@ goo_challenge(
   if (*s_prime == NULL)
     goto fail;
 
-  *C1_len = goo_mpz_bytelen(ctx->n);
-  *C1 = goo_mpz_pad(NULL, *C1_len, C1_n);
-
-  if (*C1 == NULL) {
-    free(*s_prime);
-    goto fail;
-  }
-
   r = 1;
 fail:
   mpz_clear(s_prime_n);
+  return r;
+}
+
+int
+goo_challenge(
+  goo_ctx_t *ctx,
+  unsigned char **C1,
+  size_t *C1_len,
+  const unsigned char *s_prime,
+  size_t s_prime_len,
+  const unsigned char *n,
+  size_t n_len
+) {
+  int r = 0;
+
+  if (ctx == NULL
+      || s_prime == NULL
+      || C1 == NULL
+      || C1_len == NULL
+      || n == NULL) {
+    return 0;
+  }
+
+  if (s_prime_len != 32)
+    return 0;
+
+  mpz_t C1_n, s_prime_n, n_n;
+  mpz_init(C1_n);
+  mpz_init(s_prime_n);
+  mpz_init(n_n);
+
+  goo_mpz_import(s_prime_n, s_prime, s_prime_len);
+  goo_mpz_import(n_n, n, n_len);
+
+  if (!goo_group_challenge(ctx, C1_n, s_prime_n, n_n))
+    goto fail;
+
+  *C1_len = goo_mpz_bytelen(ctx->n);
+  *C1 = goo_mpz_pad(NULL, *C1_len, C1_n);
+
+  if (*C1 == NULL)
+    goto fail;
+
+  r = 1;
+fail:
   mpz_clear(C1_n);
+  mpz_clear(s_prime_n);
   mpz_clear(n_n);
   return r;
 }
@@ -3898,7 +3935,8 @@ run_goo_test(void) {
 
   assert(goo_group_init(goo, mod_n, 2, 3, 4096));
 
-  assert(goo_group_challenge(goo, s_prime, C1, n));
+  assert(goo_group_generate(goo, s_prime));
+  assert(goo_group_challenge(goo, C1, s_prime, n));
 
   mpz_set_ui(msg, 0xdeadbeef);
 

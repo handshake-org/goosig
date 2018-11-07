@@ -30,7 +30,8 @@ const goo = new Goo(Goo.RSA2048, 2, 3, 2048);
 // Generate s_prime and C1 based on user's pubkey.
 // Handshake contributors do this part.
 // `s_prime` is the seed for the `s` scalar.
-let [s_prime, C1] = goo.challenge(pub);
+let s_prime = goo.generate();
+let C1 = goo.challenge(s_prime, pub);
 
 // At this point, C1 is inserted into a public
 // merkle tree and added to the HNS consensus rules.

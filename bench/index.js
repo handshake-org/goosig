@@ -63,7 +63,8 @@ function main(Goo, nreps) {
 
       // Generate the challenge token.
       start = performance.now();
-      const [s_prime, C1] = prover.challenge(key);
+      const s_prime = prover.generate();
+      const C1 = prover.challenge(s_prime, key);
       stop = performance.now();
       times[i][0].push(stop - start);
 

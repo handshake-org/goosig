@@ -46,7 +46,8 @@ for (const Goo of [JS, Native]) {
         for (let i = 0; i < 5; i++) {
           const msg = SHA256.digest(random.randomBytes(32));
           const key = rsa.privateKeyGenerate(bits);
-          const [s_prime, C1] = goo.challenge(key);
+          const s_prime = goo.generate();
+          const C1 = goo.challenge(s_prime, key);
           const ct = goo.encrypt(s_prime, C1, key);
           const sig = goo.sign(msg, s_prime, C1, key);
           const result = ver.verify(msg, sig, C1);
