@@ -25,29 +25,31 @@ const priv = rsa.privateKeyGenerate(2048);
 const pub = rsa.publicKeyCreate(priv);
 
 // GooSig context (using the RSA-2048 challenge modulus).
-const goo = new Goo(Goo.RSA2048, 2, 3, 2048);
+const goo = new Goo(Goo.RSA2048, 2, 3);
 
 // Generate s_prime and C1 based on user's pubkey.
 // Handshake contributors do this part.
 // `s_prime` is the seed for the `s` scalar.
-let s_prime = goo.generate();
-let C1 = goo.challenge(s_prime, pub);
+const s_prime = goo.generate();
+const C1 = goo.challenge(s_prime, pub);
 
 // At this point, C1 is inserted into a public
 // merkle tree and added to the HNS consensus rules.
 
-// Encrypt s_prime and C1 to user's pubkey.
-const ct = goo.encrypt(s_prime, C1, pub);
+// Encrypt s_prime to user's pubkey.
+const ct = goo.encrypt(s_prime, pub);
 
 // User decrypts the encrypted payload.
-[s_prime, C1] = goo.decrypt(ct, priv);
+const pt = goo.decrypt(ct, priv);
+
+pt.equals(s_prime) === true;
 
 // Sign the hash of the serialized airdrop proof.
 // This proof includes an address.
 // Handshake users do this part after retrieving
 // s_prime and C1 from the encrypted public files.
 const msg = Buffer.alloc(32, 0xff); // A sighash in reality.
-const sig = goo.sign(msg, s_prime, C1, priv);
+const sig = goo.sign(msg, s_prime, priv);
 
 // Verify the proof.
 // The Handshake blockchain does this part.

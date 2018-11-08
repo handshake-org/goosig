@@ -175,6 +175,19 @@ goo_challenge(
 );
 
 int
+goo_validate(
+  goo_ctx_t *ctx,
+  const unsigned char *s_prime,
+  size_t s_prime_len,
+  const unsigned char *C1,
+  size_t C1_len,
+  const unsigned char *p,
+  size_t p_len,
+  const unsigned char *q,
+  size_t q_len
+);
+
+int
 goo_sign(
   goo_ctx_t *ctx,
   unsigned char **out,
@@ -183,10 +196,6 @@ goo_sign(
   size_t msg_len,
   const unsigned char *s_prime,
   size_t s_prime_len,
-  const unsigned char *C1,
-  size_t C1_len,
-  const unsigned char *n,
-  size_t n_len,
   const unsigned char *p,
   size_t p_len,
   const unsigned char *q,

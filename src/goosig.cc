@@ -34,6 +34,7 @@ Goo::Init(v8::Local<v8::Object> &target) {
 
   Nan::SetPrototypeMethod(tpl, "generate", Goo::Generate);
   Nan::SetPrototypeMethod(tpl, "challenge", Goo::Challenge);
+  Nan::SetPrototypeMethod(tpl, "validate", Goo::Validate);
   Nan::SetPrototypeMethod(tpl, "sign", Goo::Sign);
   Nan::SetPrototypeMethod(tpl, "verify", Goo::Verify);
 #ifdef GOO_TEST
@@ -136,10 +137,54 @@ NAN_METHOD(Goo::Challenge) {
     Nan::NewBuffer((char *)C1, C1_len).ToLocalChecked());
 }
 
+NAN_METHOD(Goo::Validate) {
+  Goo *goo = ObjectWrap::Unwrap<Goo>(info.Holder());
+
+  if (info.Length() < 4)
+    return Nan::ThrowError("goo.validate() requires arguments.");
+
+  v8::Local<v8::Object> s_prime_buf = info[0].As<v8::Object>();
+
+  if (!node::Buffer::HasInstance(s_prime_buf))
+    return Nan::ThrowTypeError("First argument must be a buffer.");
+
+  v8::Local<v8::Value> C1_buf = info[1].As<v8::Object>();
+
+  if (!node::Buffer::HasInstance(C1_buf))
+    return Nan::ThrowTypeError("Second argument must be a buffer.");
+
+  v8::Local<v8::Value> p_buf = info[2].As<v8::Object>();
+
+  if (!node::Buffer::HasInstance(p_buf))
+    return Nan::ThrowTypeError("Third argument must be a buffer.");
+
+  v8::Local<v8::Value> q_buf = info[3].As<v8::Object>();
+
+  if (!node::Buffer::HasInstance(q_buf))
+    return Nan::ThrowTypeError("Fourth argument must be a buffer.");
+
+  const uint8_t *s_prime = (const uint8_t *)node::Buffer::Data(s_prime_buf);
+  size_t s_prime_len = node::Buffer::Length(s_prime_buf);
+
+  const uint8_t *C1 = (const uint8_t *)node::Buffer::Data(C1_buf);
+  size_t C1_len = node::Buffer::Length(C1_buf);
+
+  const uint8_t *p = (const uint8_t *)node::Buffer::Data(p_buf);
+  size_t p_len = node::Buffer::Length(p_buf);
+
+  const uint8_t *q = (const uint8_t *)node::Buffer::Data(q_buf);
+  size_t q_len = node::Buffer::Length(q_buf);
+
+  int result = goo_validate(&goo->ctx, s_prime, s_prime_len,
+                            C1, C1_len, p, p_len, q, q_len);
+
+  return info.GetReturnValue().Set(Nan::New<v8::Boolean>(result == 1));
+}
+
 NAN_METHOD(Goo::Sign) {
   Goo *goo = ObjectWrap::Unwrap<Goo>(info.Holder());
 
-  if (info.Length() < 6)
+  if (info.Length() < 4)
     return Nan::ThrowError("goo.sign() requires arguments.");
 
   v8::Local<v8::Object> msg_buf = info[0].As<v8::Object>();
@@ -152,37 +197,21 @@ NAN_METHOD(Goo::Sign) {
   if (!node::Buffer::HasInstance(s_prime_buf))
     return Nan::ThrowTypeError("Second argument must be a buffer.");
 
-  v8::Local<v8::Value> C1_buf = info[2].As<v8::Object>();
-
-  if (!node::Buffer::HasInstance(C1_buf))
-    return Nan::ThrowTypeError("Third argument must be a buffer.");
-
-  v8::Local<v8::Value> n_buf = info[3].As<v8::Object>();
-
-  if (!node::Buffer::HasInstance(n_buf))
-    return Nan::ThrowTypeError("Fourth argument must be a buffer.");
-
-  v8::Local<v8::Value> p_buf = info[4].As<v8::Object>();
+  v8::Local<v8::Value> p_buf = info[2].As<v8::Object>();
 
   if (!node::Buffer::HasInstance(p_buf))
-    return Nan::ThrowTypeError("Fifth argument must be a buffer.");
+    return Nan::ThrowTypeError("Third argument must be a buffer.");
 
-  v8::Local<v8::Value> q_buf = info[5].As<v8::Object>();
+  v8::Local<v8::Value> q_buf = info[3].As<v8::Object>();
 
   if (!node::Buffer::HasInstance(q_buf))
-    return Nan::ThrowTypeError("Sixth argument must be a buffer.");
+    return Nan::ThrowTypeError("Fourth argument must be a buffer.");
 
   const uint8_t *msg = (const uint8_t *)node::Buffer::Data(msg_buf);
   size_t msg_len = node::Buffer::Length(msg_buf);
 
   const uint8_t *s_prime = (const uint8_t *)node::Buffer::Data(s_prime_buf);
   size_t s_prime_len = node::Buffer::Length(s_prime_buf);
-
-  const uint8_t *C1 = (const uint8_t *)node::Buffer::Data(C1_buf);
-  size_t C1_len = node::Buffer::Length(C1_buf);
-
-  const uint8_t *n = (const uint8_t *)node::Buffer::Data(n_buf);
-  size_t n_len = node::Buffer::Length(n_buf);
 
   const uint8_t *p = (const uint8_t *)node::Buffer::Data(p_buf);
   size_t p_len = node::Buffer::Length(p_buf);
@@ -197,8 +226,6 @@ NAN_METHOD(Goo::Sign) {
                 &sig, &sig_len,
                 msg, msg_len,
                 s_prime, s_prime_len,
-                C1, C1_len,
-                n, n_len,
                 p, p_len,
                 q, q_len)) {
     return Nan::ThrowError("Could create signature.");

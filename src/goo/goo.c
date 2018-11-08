@@ -2084,7 +2084,7 @@ goo_hash_all(
   const mpz_t msg
 ) {
   unsigned char *buf = &group->slab[0];
-  size_t mod_bytes = (group->bits + 7) / 8;
+  size_t mod_bytes = group->size;
   size_t exp_bytes = (GOO_EXPONENT_SIZE + 7) / 8;
 
   goo_sha256_t ctx;
@@ -2179,6 +2179,21 @@ goo_group_random_scalar(goo_group_t *group, mpz_t ret) {
 }
 
 static inline int
+goo_is_valid_prime(const mpz_t n) {
+  // if n <= 0
+  if (mpz_sgn(n) <= 0)
+    return 0;
+
+  size_t bits = goo_mpz_bitlen(n);
+
+  // if bitlen(n) > 4096
+  if (bits > GOO_MAX_RSA_BITS)
+    return 0;
+
+  return 1;
+}
+
+static inline int
 goo_is_valid_rsa(const mpz_t n) {
   // if n <= 0
   if (mpz_sgn(n) <= 0)
@@ -2197,6 +2212,10 @@ static int
 goo_group_generate(goo_group_t *group, mpz_t s_prime) {
   // s_prime = randbits(256)
   if (!goo_random_bits(s_prime, 256))
+    return 0;
+
+  // if s_prime <= 0
+  if (mpz_sgn(s_prime) <= 0)
     return 0;
 
   return 1;
@@ -2238,16 +2257,85 @@ goo_group_challenge(
   if (!goo_group_powgh(group, C1, n, s))
     goto fail;
 
+  // C1 = reduce(C1)
+  goo_group_reduce(group, C1, C1);
+
   // if C1 <= 0
   if (mpz_sgn(C1) <= 0)
     goto fail;
 
-  // C1 = reduce(C1)
-  goo_group_reduce(group, C1, C1);
-
   r = 1;
 fail:
   mpz_clear(s);
+  return r;
+}
+
+static int
+goo_group_validate(
+  goo_group_t *group,
+  const mpz_t s_prime,
+  const mpz_t C1,
+  const mpz_t p,
+  const mpz_t q
+) {
+  int r = 0;
+
+  mpz_t n, s, x;
+  mpz_init(n);
+  mpz_init(s);
+  mpz_init(x);
+
+  // if s_prime <= 0 or C1 <= 0 or p <= 0 or q <= 0
+  if (mpz_sgn(s_prime) <= 0
+      || mpz_sgn(C1) <= 0
+      || mpz_sgn(p) <= 0
+      || mpz_sgn(q) <= 0) {
+    // Invalid parameters.
+    goto fail;
+  }
+
+  // if p > 2 ** 4096 - 1 or q > 2 ** 4096 - 1
+  if (!goo_is_valid_prime(p) || !goo_is_valid_prime(q))
+    goto fail;
+
+  // n = p * q
+  mpz_mul(n, p, q);
+
+  // if n < 2 ** 1023 or n > 2 ** 4096 - 1
+  if (!goo_is_valid_rsa(n)) {
+    // Invalid RSA private key.
+    goto fail;
+  }
+
+  // s = expand_sprime(s_prime)
+  if (!goo_group_expand_sprime(group, s, s_prime))
+    goto fail;
+
+  // if s <= 0
+  if (mpz_sgn(s) <= 0)
+    goto fail;
+
+  // The challenge: a commitment to the RSA modulus.
+  // x = powgh(n, s)
+  if (!goo_group_powgh(group, x, n, s))
+    goto fail;
+
+  // x = reduce(x)
+  goo_group_reduce(group, x, x);
+
+  // if x <= 0
+  if (mpz_sgn(x) <= 0)
+    goto fail;
+
+  // if C1 != x
+  if (mpz_cmp(C1, x) != 0)
+    goto fail;
+
+  r = 1;
+fail:
+  mpz_clear(n);
+  mpz_clear(s);
+  mpz_clear(x);
   return r;
 }
 
@@ -2257,8 +2345,6 @@ goo_group_sign(
   goo_sig_t *sig,
   const mpz_t msg,
   const mpz_t s_prime,
-  const mpz_t C1,
-  const mpz_t n,
   const mpz_t p,
   const mpz_t q
 ) {
@@ -2280,13 +2366,15 @@ goo_group_sign(
   mpz_t *z_s1w = &sig->z_s1w;
   mpz_t *z_sa = &sig->z_sa;
 
-  mpz_t s, w, a, s1;
+  mpz_t n, s, C1, w, a, s1;
   mpz_t x, y, z, xx, yy;
   mpz_t C1_inv, C2_inv;
   mpz_t r_w, r_w2, r_s1, r_a, r_an, r_s1w, r_sa;
   mpz_t A, B, C, D;
 
+  mpz_init(n);
   mpz_init(s);
+  mpz_init(C1);
   mpz_init(w);
   mpz_init(a);
   mpz_init(s1);
@@ -2309,14 +2397,19 @@ goo_group_sign(
   mpz_init(C);
   mpz_init(D);
 
-  // if s_prime <= 0 or C1 <= 0 or n <= 0 or p <= 0 or q <= 0
+  // if s_prime <= 0 or p <= 0 or q <= 0
   if (mpz_sgn(s_prime) <= 0
-      || mpz_sgn(C1) <= 0
-      || mpz_sgn(n) <= 0
       || mpz_sgn(p) <= 0
       || mpz_sgn(q) <= 0) {
     goto fail;
   }
+
+  // if p > 2 ** 4096 - 1 or q > 2 ** 4096 - 1
+  if (!goo_is_valid_prime(p) || !goo_is_valid_prime(q))
+    goto fail;
+
+  // n = p * q
+  mpz_mul(n, p, q);
 
   // if n < 2 ** 1023 or n > 2 ** 4096 - 1
   if (!goo_is_valid_rsa(n)) {
@@ -2324,30 +2417,24 @@ goo_group_sign(
     goto fail;
   }
 
-  // x = p * q
-  mpz_mul(x, p, q);
-
-  // if x != n
-  if (mpz_cmp(x, n) != 0) {
-    // Invalid RSA private key.
-    goto fail;
-  }
-
   // s = expand_sprime(s_prime)
   if (!goo_group_expand_sprime(group, s, s_prime))
     goto fail;
 
-  // x = powgh(n, s)
-  if (!goo_group_powgh(group, x, n, s))
+  // if s <= 0
+  if (mpz_sgn(s) <= 0)
     goto fail;
 
-  goo_group_reduce(group, x, x);
-
-  // if C1 != x
-  if (mpz_cmp(C1, x) != 0) {
-    // C1 does not commit to our RSA modulus with opening s.
+  // C1 = powgh(n, s)
+  if (!goo_group_powgh(group, C1, n, s))
     goto fail;
-  }
+
+  // C1 = reduce(C1)
+  goo_group_reduce(group, C1, C1);
+
+  // if C1 <= 0
+  if (mpz_sgn(C1) <= 0)
+    goto fail;
 
   // Preliminaries: compute values P needs to run the ZKPOK.
   // Find `t`.
@@ -2564,7 +2651,9 @@ goo_group_sign(
 
   r = 1;
 fail:
+  mpz_clear(n);
   mpz_clear(s);
+  mpz_clear(C1);
   mpz_clear(w);
   mpz_clear(a);
   mpz_clear(s1);
@@ -2870,6 +2959,59 @@ fail:
 }
 
 int
+goo_validate(
+  goo_ctx_t *ctx,
+  const unsigned char *s_prime,
+  size_t s_prime_len,
+  const unsigned char *C1,
+  size_t C1_len,
+  const unsigned char *p,
+  size_t p_len,
+  const unsigned char *q,
+  size_t q_len
+) {
+  int r = 0;
+
+  if (ctx == NULL
+      || s_prime == NULL
+      || C1 == NULL
+      || p == NULL
+      || q == NULL) {
+    return 0;
+  }
+
+  if (s_prime_len != 32)
+    return 0;
+
+  if (C1_len != ctx->size)
+    return 0;
+
+  mpz_t s_prime_n, C1_n, p_n, q_n;
+
+  mpz_init(s_prime_n);
+  mpz_init(C1_n);
+  mpz_init(p_n);
+  mpz_init(q_n);
+
+  goo_mpz_import(s_prime_n, s_prime, s_prime_len);
+  goo_mpz_import(C1_n, C1, C1_len);
+  goo_mpz_import(p_n, p, p_len);
+  goo_mpz_import(q_n, q, q_len);
+
+  if (!goo_group_validate(ctx, s_prime_n, C1_n, p_n, q_n))
+    goto fail;
+
+  r = 1;
+fail:
+  mpz_clear(s_prime_n);
+  mpz_clear(C1_n);
+  mpz_clear(p_n);
+  mpz_clear(q_n);
+
+  return r;
+}
+
+int
 goo_sign(
   goo_ctx_t *ctx,
   unsigned char **out,
@@ -2878,10 +3020,6 @@ goo_sign(
   size_t msg_len,
   const unsigned char *s_prime,
   size_t s_prime_len,
-  const unsigned char *C1,
-  size_t C1_len,
-  const unsigned char *n,
-  size_t n_len,
   const unsigned char *p,
   size_t p_len,
   const unsigned char *q,
@@ -2894,8 +3032,6 @@ goo_sign(
       || out_len == NULL
       || msg == NULL
       || s_prime == NULL
-      || C1 == NULL
-      || n == NULL
       || p == NULL
       || q == NULL) {
     return 0;
@@ -2907,18 +3043,13 @@ goo_sign(
   if (s_prime_len != 32)
     return 0;
 
-  if (C1_len != (ctx->bits + 7) / 8)
-    return 0;
-
-  mpz_t msg_n, s_prime_n, C1_n, n_n, p_n, q_n;
+  mpz_t msg_n, s_prime_n, p_n, q_n;
   goo_sig_t sig;
   size_t size;
   unsigned char *data = NULL;
 
   mpz_init(msg_n);
   mpz_init(s_prime_n);
-  mpz_init(C1_n);
-  mpz_init(n_n);
   mpz_init(p_n);
   mpz_init(q_n);
 
@@ -2926,15 +3057,11 @@ goo_sign(
 
   goo_mpz_import(msg_n, msg, msg_len);
   goo_mpz_import(s_prime_n, s_prime, s_prime_len);
-  goo_mpz_import(C1_n, C1, C1_len);
-  goo_mpz_import(n_n, n, n_len);
   goo_mpz_import(p_n, p, p_len);
   goo_mpz_import(q_n, q, q_len);
 
-  if (!goo_group_sign(ctx, &sig, msg_n,
-                      s_prime_n, C1_n, n_n, p_n, q_n)) {
+  if (!goo_group_sign(ctx, &sig, msg_n, s_prime_n, p_n, q_n))
     goto fail;
-  }
 
   size = goo_sig_size(&sig, ctx->bits);
   data = malloc(size);
@@ -2952,8 +3079,6 @@ goo_sign(
 fail:
   mpz_clear(msg_n);
   mpz_clear(s_prime_n);
-  mpz_clear(C1_n);
-  mpz_clear(n_n);
   mpz_clear(p_n);
   mpz_clear(q_n);
   goo_sig_uninit(&sig);
@@ -2980,7 +3105,7 @@ goo_verify(
   if (msg_len < 20 || msg_len > 64)
     return 0;
 
-  if (C1_len != (ctx->bits + 7) / 8)
+  if (C1_len != ctx->size)
     return 0;
 
   goo_mpz_import(ctx->msg, msg, msg_len);
@@ -3973,8 +4098,8 @@ run_goo_test(void) {
 
   mpz_set_ui(msg, 0xdeadbeef);
 
-  assert(goo_group_sign(goo, &sig, msg, s_prime, C1, n, p, q));
-
+  assert(goo_group_validate(goo, s_prime, C1, p, q));
+  assert(goo_group_sign(goo, &sig, msg, s_prime, p, q));
   assert(goo_group_verify(goo, msg, &sig, C1));
 
   mpz_clear(p);

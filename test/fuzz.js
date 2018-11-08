@@ -99,17 +99,17 @@ for (let i = 0; i < Infinity; i++) {
   const C1 = goo.challenge(s_prime, pub);
 
   // Encrypt to the recipient.
-  const ct = goo.encrypt(s_prime, C1, pub);
+  const ct = goo.encrypt(s_prime, pub);
 
   // Recipient decrypts.
-  const [x, y] = goo.decrypt(ct, key);
+  const pt = goo.decrypt(ct, key);
 
-  assert.bufferEqual(x, s_prime);
-  assert.bufferEqual(y, C1);
+  assert.bufferEqual(pt, s_prime);
 
   // Generate the proof.
+  assert(goo.validate(s_prime, C1, key));
   const msg = random.randomBytes(32);
-  const sig = goo.sign(msg, s_prime, C1, key);
+  const sig = goo.sign(msg, s_prime, key);
 
   // Verify the proof.
   assert(ver.verify(msg, sig, C1));

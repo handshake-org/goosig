@@ -19,7 +19,7 @@ const s_prime = prover.generate();
 const C1 = prover.challenge(s_prime, key);
 
 // Generate the proof.
-const sig = prover.sign(msg, s_prime, C1, key);
+const sig = prover.sign(msg, s_prime, key);
 
 // Verify the proof.
 const result = verifier.verify(msg, sig, C1);

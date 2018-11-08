@@ -70,7 +70,7 @@ function main(Goo, nreps) {
 
       // Generate the signature.
       start = performance.now();
-      const sig = prover.sign(msg, s_prime, C1, key);
+      const sig = prover.sign(msg, s_prime, key);
       stop = performance.now();
       times[i][1].push(stop - start);
 

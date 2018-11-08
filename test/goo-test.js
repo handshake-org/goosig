@@ -42,16 +42,18 @@ function runTests(name, Goo, Other) {
 
         // Generate the challenge token.
         let s_prime = prover.generate();
-        let C1 = prover.challenge(s_prime, key);
+        const C1 = prover.challenge(s_prime, key);
 
         // Encrypt to the recipient.
-        const ct = prover.encrypt(s_prime, C1, key);
+        const ct = prover.encrypt(s_prime, key);
 
         // Recipient decrypts.
-        [s_prime, C1] = prover.decrypt(ct, key);
+        s_prime = prover.decrypt(ct, key);
+
+        assert(prover.validate(s_prime, C1, key));
 
         // Generate the proof.
-        const sig = prover.sign(msg, s_prime, C1, key);
+        const sig = prover.sign(msg, s_prime, key);
 
         sigs.push([n, g, h, msg, sig, C1]);
 
@@ -91,10 +93,9 @@ function runTests(name, Goo, Other) {
 
         assert.strictEqual(result, true);
 
-        const [s_prime2, C12] = goo.decrypt(ct, key);
+        const pt = goo.decrypt(ct, key);
 
-        assert.bufferEqual(s_prime2, s_prime);
-        assert.bufferEqual(C12, C1);
+        assert.bufferEqual(pt, s_prime);
       });
 
       it(`should not accept invalid proof: ${str}`, () => {
