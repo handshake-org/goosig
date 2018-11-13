@@ -8,7 +8,7 @@ allows the creation of signatures originating from RSA private keys _without
 revealing the RSA public key_.
 
 GooSig implements a [cryptographic protocol][protocol] devised by Dan Boneh and
-Riad Wahby which makes use of Groups of unknOwn Order. It was originally ported
+Riad Wahby at the Stanford Center for Blockchain Research which makes use of Groups of unknOwn Order. It was originally ported
 from the python [reference implementation][libgoopy] to javascript, but has
 since been [implemented in C][c] as well.
 
