@@ -1,14 +1,15 @@
 # GooSig
 
-GooSig was created specifically for the [Handshake Project][handshake] to
-address a very specific problem: an [airdrop] to Github users' RSA keys allows
-Github users to be _identified on-chain_. In order to anonymize who is
-receiving coins from the airdrop, cryptographic trickery is required: GooSig
-allows the creation of signatures originating from RSA private keys _without
-revealing the RSA public key_.
+GooSig was created for the [Handshake Project][handshake] to address a very
+specific problem: an [airdrop] to Github users' RSA keys allows Github users to
+be _identified on-chain_. In order to anonymize who is receiving coins from the
+airdrop, cryptographic trickery is required: GooSig allows the creation of
+signatures originating from RSA private keys _without revealing the RSA public
+key_.
 
-GooSig implements a [cryptographic protocol][protocol] devised by Dan Boneh and
-Riad Wahby which makes use of Groups of unknOwn Order. It was originally ported
+GooSig makes use of (G)roups of Unkn(o)wn (O)rder, and implements a
+[cryptographic protocol][protocol] devised by Dan Boneh and Riad S. Wahby at
+the [Stanford Center for Blockchain Research][cbr]. It was originally ported
 from the python [reference implementation][libgoopy] to javascript, but has
 since been [implemented in C][c] as well.
 
@@ -184,3 +185,4 @@ See LICENSE for more info.
 [list]: http://www.ontko.com/pub/rayo/primes/rsa_fact.html
 [etc]: https://github.com/handshake-org/goosig/tree/master/etc
 [constants]: https://github.com/handshake-org/goosig/blob/master/lib/internal/constants.js
+[cbr]: https://cbr.stanford.edu/
