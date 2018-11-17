@@ -22,8 +22,8 @@ describe('PRNG', function() {
     assert(BigMath.bitLength(y) <= 256);
     assert(y < x);
 
-    assert(rng.randomBits(30) === 540405817n);
-    assert(rng.randomBits(31) === 1312024779n);
-    assert(rng.randomInt(rng.randomBits(31)) === 1679635921n);
+    assert.bigIntEqual(rng.randomBits(30), 540405817n);
+    assert.bigIntEqual(rng.randomBits(31), 1312024779n);
+    assert.bigIntEqual(rng.randomInt(rng.randomBits(31)), 1679635921n);
   });
 });

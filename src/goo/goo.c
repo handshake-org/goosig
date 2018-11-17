@@ -3189,7 +3189,7 @@ run_drbg_test(void) {
   assert(goo_hex_cmp(&out[0], 16, expect3) == 0);
 }
 
-void
+static void
 run_rng_test(void) {
   mpz_t x, y;
 
@@ -3211,7 +3211,7 @@ run_rng_test(void) {
   mpz_clear(y);
 }
 
-void
+static void
 run_prng_test(void) {
   goo_prng_t prng;
   unsigned char key[32];
@@ -3248,7 +3248,7 @@ run_prng_test(void) {
   goo_prng_uninit(&prng);
 }
 
-void
+static void
 run_util_test(void) {
   // test bitlen and zerobits
   {
@@ -3440,8 +3440,11 @@ run_util_test(void) {
       const int *v = symbols[i];
       mpz_t x, y;
 
-      mpz_init_set_si(x, v[0]);
-      mpz_init_set_si(y, v[1]);
+      mpz_init(x);
+      mpz_init(y);
+
+      mpz_set_si(x, v[0]);
+      mpz_set_si(y, v[1]);
 
       assert(mpz_jacobi(x, y) == v[2]);
       assert(goo_mpz_jacobi(x, y) == v[2]);
@@ -3628,7 +3631,6 @@ run_primes_test(void) {
 
   for (int i = 0; i < (int)GOO_ARRAY_SIZE(primes); i++) {
     mpz_t p;
-
     mpz_init(p);
 
     assert(mpz_set_str(p, primes[i], 10) == 0);
@@ -3646,7 +3648,6 @@ run_primes_test(void) {
 
   for (int i = 0; i < (int)GOO_ARRAY_SIZE(composites); i++) {
     mpz_t p;
-
     mpz_init(p);
 
     assert(mpz_set_str(p, composites[i], 10) == 0);
@@ -3910,7 +3911,7 @@ run_ops_test(void) {
   goo_free(goo);
 }
 
-void
+static void
 run_combspec_test(void) {
   goo_combspec_t spec;
 
@@ -3970,7 +3971,7 @@ run_combspec_test(void) {
   goo_free(goo);
 }
 
-void
+static void
 run_sig_test(void) {
   goo_sig_t sig1;
   goo_sig_t sig2;
@@ -4026,7 +4027,7 @@ run_sig_test(void) {
   goo_free(data);
 }
 
-void
+static void
 run_goo_test(void) {
   printf("Testing signing/verifying...\n");
 

@@ -26,7 +26,10 @@ function digitSum(data) {
   for (let i = 0; i < base10.length; i++)
     sum += Number(base10[i]);
 
-  assert.bufferEqual(BigMath.toBuffer(BigMath.fromString(base10, 10)), data);
+  const num2 = BigMath.fromString(base10, 10);
+  const data2 = BigMath.toBuffer(num2);
+
+  assert.bufferEqual(data2, data);
 
   return sum;
 }

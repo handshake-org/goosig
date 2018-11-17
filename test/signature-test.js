@@ -29,21 +29,21 @@ describe('Signature', function() {
 
     const sig2 = Signature.decode(sig1.encode(2048), 2048);
 
-    assert(sig2.C2 === 0x01n);
-    assert(sig2.t === 0x02n);
-    assert(sig2.chal === 0x03n);
-    assert(sig2.ell === 0x04n);
-    assert(sig2.Aq === 0x05n);
-    assert(sig2.Bq === 0x06n);
-    assert(sig2.Cq === 0x07n);
-    assert(sig2.Dq === 0x08n);
-    assert(sig2.z_w === 0x09n);
-    assert(sig2.z_w2 === 0x0an);
-    assert(sig2.z_s1 === 0x0bn);
-    assert(sig2.z_a === 0x0cn);
-    assert(sig2.z_an === 0x0dn);
-    assert(sig2.z_s1w === 0x0en);
-    assert(sig2.z_sa === 0x0fn);
+    assert.bigIntEqual(sig2.C2, 0x01n);
+    assert.bigIntEqual(sig2.t, 0x02n);
+    assert.bigIntEqual(sig2.chal, 0x03n);
+    assert.bigIntEqual(sig2.ell, 0x04n);
+    assert.bigIntEqual(sig2.Aq, 0x05n);
+    assert.bigIntEqual(sig2.Bq, 0x06n);
+    assert.bigIntEqual(sig2.Cq, 0x07n);
+    assert.bigIntEqual(sig2.Dq, 0x08n);
+    assert.bigIntEqual(sig2.z_w, 0x09n);
+    assert.bigIntEqual(sig2.z_w2, 0x0an);
+    assert.bigIntEqual(sig2.z_s1, 0x0bn);
+    assert.bigIntEqual(sig2.z_a, 0x0cn);
+    assert.bigIntEqual(sig2.z_an, 0x0dn);
+    assert.bigIntEqual(sig2.z_s1w, 0x0en);
+    assert.bigIntEqual(sig2.z_sa, 0x0fn);
   });
 
   it('should deserialize and reserialize (with options)', () => {
@@ -69,21 +69,21 @@ describe('Signature', function() {
 
     const sig2 = Signature.decode(sig1.encode(2048), 2048);
 
-    assert(sig2.C2 === 0x01n);
-    assert(sig2.t === 0x02n);
-    assert(sig2.chal === 0x03n);
-    assert(sig2.ell === 0x04n);
-    assert(sig2.Aq === 0x05n);
-    assert(sig2.Bq === 0x06n);
-    assert(sig2.Cq === 0x07n);
-    assert(sig2.Dq === 0x08n);
-    assert(sig2.z_w === 0x09n);
-    assert(sig2.z_w2 === 0x0an);
-    assert(sig2.z_s1 === 0x0bn);
-    assert(sig2.z_a === 0x0cn);
-    assert(sig2.z_an === 0x0dn);
-    assert(sig2.z_s1w === 0x0en);
-    assert(sig2.z_sa === 0x0fn);
+    assert.bigIntEqual(sig2.C2, 0x01n);
+    assert.bigIntEqual(sig2.t, 0x02n);
+    assert.bigIntEqual(sig2.chal, 0x03n);
+    assert.bigIntEqual(sig2.ell, 0x04n);
+    assert.bigIntEqual(sig2.Aq, 0x05n);
+    assert.bigIntEqual(sig2.Bq, 0x06n);
+    assert.bigIntEqual(sig2.Cq, 0x07n);
+    assert.bigIntEqual(sig2.Dq, 0x08n);
+    assert.bigIntEqual(sig2.z_w, 0x09n);
+    assert.bigIntEqual(sig2.z_w2, 0x0an);
+    assert.bigIntEqual(sig2.z_s1, 0x0bn);
+    assert.bigIntEqual(sig2.z_a, 0x0cn);
+    assert.bigIntEqual(sig2.z_an, 0x0dn);
+    assert.bigIntEqual(sig2.z_s1w, 0x0en);
+    assert.bigIntEqual(sig2.z_sa, 0x0fn);
   });
 
   it('should deserialize and reserialize JSON', () => {
@@ -109,20 +109,20 @@ describe('Signature', function() {
 
     const sig2 = Signature.fromJSON(sig1.toJSON());
 
-    assert(sig2.C2 === 0x01n);
-    assert(sig2.t === 0x02n);
-    assert(sig2.chal === 0x03n);
-    assert(sig2.ell === 0x04n);
-    assert(sig2.Aq === 0x05n);
-    assert(sig2.Bq === 0x06n);
-    assert(sig2.Cq === 0x07n);
-    assert(sig2.Dq === 0x08n);
-    assert(sig2.z_w === 0x09n);
-    assert(sig2.z_w2 === 0x0an);
-    assert(sig2.z_s1 === 0x0bn);
-    assert(sig2.z_a === 0x0cn);
-    assert(sig2.z_an === 0x0dn);
-    assert(sig2.z_s1w === 0x0en);
-    assert(sig2.z_sa === 0x0fn);
+    assert.bigIntEqual(sig2.C2, 0x01n);
+    assert.bigIntEqual(sig2.t, 0x02n);
+    assert.bigIntEqual(sig2.chal, 0x03n);
+    assert.bigIntEqual(sig2.ell, 0x04n);
+    assert.bigIntEqual(sig2.Aq, 0x05n);
+    assert.bigIntEqual(sig2.Bq, 0x06n);
+    assert.bigIntEqual(sig2.Cq, 0x07n);
+    assert.bigIntEqual(sig2.Dq, 0x08n);
+    assert.bigIntEqual(sig2.z_w, 0x09n);
+    assert.bigIntEqual(sig2.z_w2, 0x0an);
+    assert.bigIntEqual(sig2.z_s1, 0x0bn);
+    assert.bigIntEqual(sig2.z_a, 0x0cn);
+    assert.bigIntEqual(sig2.z_an, 0x0dn);
+    assert.bigIntEqual(sig2.z_s1w, 0x0en);
+    assert.bigIntEqual(sig2.z_sa, 0x0fn);
   });
 });
