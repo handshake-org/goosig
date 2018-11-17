@@ -5,7 +5,6 @@
 'use strict';
 
 const assert = require('./util/assert');
-const rsa = require('bcrypto/lib/rsa');
 const SHA256 = require('bcrypto/lib/sha256');
 const testUtil = require('./util');
 const Goo = require('../');
@@ -34,14 +33,16 @@ describe('API', function() {
       const key = testUtil.genKey(bits);
 
       // Generate the challenge token.
-      let s_prime = goo.generate();
+      const s_prime = goo.generate();
       const C1 = goo.challenge(s_prime, key);
 
       // Encrypt to the recipient.
       const ct = goo.encrypt(s_prime, key);
 
       // Recipient decrypts.
-      s_prime = goo.decrypt(ct, key);
+      const pt = goo.decrypt(ct, key);
+
+      assert.bufferEqual(pt, s_prime);
 
       assert(goo.validate(s_prime, C1, key));
 

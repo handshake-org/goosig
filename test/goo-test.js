@@ -41,14 +41,16 @@ function runTests(name, Goo, Other) {
         const key = testUtil.genKey(bits);
 
         // Generate the challenge token.
-        let s_prime = prover.generate();
+        const s_prime = prover.generate();
         const C1 = prover.challenge(s_prime, key);
 
         // Encrypt to the recipient.
         const ct = prover.encrypt(s_prime, key);
 
         // Recipient decrypts.
-        s_prime = prover.decrypt(ct, key);
+        const pt = prover.decrypt(ct, key);
+
+        assert.bufferEqual(pt, s_prime);
 
         assert(prover.validate(s_prime, C1, key));
 
