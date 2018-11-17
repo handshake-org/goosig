@@ -2738,8 +2738,8 @@ goo_group_verify(
     return 0;
   }
 
-  // if bitlen(ell) != 128
-  if (goo_mpz_bitlen(*ell) != 128)
+  // if bitlen(ell) > 128
+  if (goo_mpz_bitlen(*ell) > 128)
     return 0;
 
   // `t` must be one of the small primes in our list.
