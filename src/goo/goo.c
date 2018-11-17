@@ -2636,7 +2636,7 @@ goo_group_sign(
 
   // assert Dq >= 0
   assert(mpz_sgn(*Dq) >= 0);
-  assert(goo_mpz_bitlen(*Dq) <= 2048);
+  assert(goo_mpz_bitlen(*Dq) <= GOO_EXPONENT_SIZE);
 
   mpz_mod(*z_w, *z_w, *ell);
   mpz_mod(*z_w2, *z_w2, *ell);
@@ -2719,22 +2719,22 @@ goo_group_verify(
   unsigned char key[32];
 
   // Sanity check.
-  if (mpz_sgn(C1) <= 0
-      || mpz_sgn(*C2) <= 0
-      || mpz_sgn(*t) <= 0
-      || mpz_sgn(*chal) <= 0
-      || mpz_sgn(*ell) <= 0
-      || mpz_sgn(*Aq) <= 0
-      || mpz_sgn(*Bq) <= 0
-      || mpz_sgn(*Cq) <= 0
-      || mpz_sgn(*Dq) <= 0
-      || mpz_sgn(*z_w) <= 0
-      || mpz_sgn(*z_w2) <= 0
-      || mpz_sgn(*z_s1) <= 0
-      || mpz_sgn(*z_a) <= 0
-      || mpz_sgn(*z_an) <= 0
-      || mpz_sgn(*z_s1w) <= 0
-      || mpz_sgn(*z_sa) <= 0) {
+  if (mpz_sgn(C1) < 0
+      || mpz_sgn(*C2) < 0
+      || mpz_sgn(*t) < 0
+      || mpz_sgn(*chal) < 0
+      || mpz_sgn(*ell) < 0
+      || mpz_sgn(*Aq) < 0
+      || mpz_sgn(*Bq) < 0
+      || mpz_sgn(*Cq) < 0
+      || mpz_sgn(*Dq) < 0
+      || mpz_sgn(*z_w) < 0
+      || mpz_sgn(*z_w2) < 0
+      || mpz_sgn(*z_s1) < 0
+      || mpz_sgn(*z_a) < 0
+      || mpz_sgn(*z_an) < 0
+      || mpz_sgn(*z_s1w) < 0
+      || mpz_sgn(*z_sa) < 0) {
     return 0;
   }
 
@@ -3319,6 +3319,69 @@ run_util_test(void) {
 
     assert(goo_dsqrt(1024) == 32);
     assert(goo_dsqrt(1025) == 32);
+  }
+
+  // test division
+  {
+    printf("Testing division...\n");
+    mpz_t x, y;
+    mpz_init(x);
+    mpz_init(y);
+
+    mpz_set_si(x, 3);
+    mpz_set_si(y, -2);
+    mpz_fdiv_q(x, x, y);
+    assert(mpz_get_si(x) == -2);
+
+    mpz_set_si(x, -3);
+    mpz_set_si(y, 2);
+    mpz_fdiv_q(x, x, y);
+    assert(mpz_get_si(x) == -2);
+
+    mpz_set_si(x, 4);
+    mpz_set_si(y, -2);
+    mpz_fdiv_q(x, x, y);
+    assert(mpz_get_si(x) == -2);
+
+    mpz_set_si(x, -4);
+    mpz_set_si(y, 2);
+    mpz_fdiv_q(x, x, y);
+    assert(mpz_get_si(x) == -2);
+
+    mpz_clear(x);
+    mpz_clear(y);
+  }
+
+  // test modulo
+  {
+    printf("Testing modulo...\n");
+    mpz_t x, y;
+    mpz_init(x);
+    mpz_init(y);
+
+    // equals 1 with mpz_mod
+    mpz_set_si(x, 3);
+    mpz_set_si(y, -2);
+    mpz_fdiv_r(x, x, y);
+    assert(mpz_get_si(x) == -1);
+
+    mpz_set_si(x, -3);
+    mpz_set_si(y, 2);
+    mpz_mod(x, x, y);
+    assert(mpz_get_si(x) == 1);
+
+    mpz_set_si(x, 4);
+    mpz_set_si(y, -2);
+    mpz_mod(x, x, y);
+    assert(mpz_get_si(x) == 0);
+
+    mpz_set_si(x, -4);
+    mpz_set_si(y, 2);
+    mpz_mod(x, x, y);
+    assert(mpz_get_si(x) == 0);
+
+    mpz_clear(x);
+    mpz_clear(y);
   }
 
   // test sqrts

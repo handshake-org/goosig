@@ -162,6 +162,24 @@ describe('Util', function() {
     assert.strictEqual(util.dsqrt(1025), 32);
   });
 
+  it('should compute division', () => {
+    assert.bigIntEqual(3n / -2n, -1n);
+    assert.bigIntEqual(-3n / 2n, -1n);
+    assert.bigIntEqual(BigMath.div(3n, -2n), -2n);
+    assert.bigIntEqual(BigMath.div(-3n, 2n), -2n);
+    assert.bigIntEqual(BigMath.div(4n, -2n), -2n);
+    assert.bigIntEqual(BigMath.div(-4n, 2n), -2n);
+  });
+
+  it('should compute modulo', () => {
+    assert.bigIntEqual(3n % -2n, 1n);
+    assert.bigIntEqual(-3n % 2n, -1n);
+    assert.bigIntEqual(BigMath.mod(3n, -2n), -1n);
+    assert.bigIntEqual(BigMath.mod(-3n, 2n), 1n);
+    assert.bigIntEqual(BigMath.mod(4n, -2n), 0n);
+    assert.bigIntEqual(BigMath.mod(-4n, 2n), 0n);
+  });
+
   it('should compute mod_pow', () => {
     for (let i = 0; i < 50; i++) {
       const x = util.randomBits(768);
