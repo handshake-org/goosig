@@ -23,10 +23,10 @@
     "test-file": "GOOSIG_TEST=1 mocha --reporter spec"
   },
   "dependencies": {
-    "bindings": "~1.3.0",
-    "bcrypto": "bcoin-org/bcrypto#master",
+    "bcrypto": "~3.0.0",
+    "bindings": "~1.3.1",
     "bsert": "~0.0.4",
-    "nan": "~2.11.0"
+    "nan": "~2.11.1"
   },
   "devDependencies": {
     "mocha": "^5.2.0"
