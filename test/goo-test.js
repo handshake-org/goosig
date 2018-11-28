@@ -4,12 +4,14 @@
 
 'use strict';
 
+const NODE_BACKEND = process.env.NODE_BACKEND || 'native';
+
 const assert = require('./util/assert');
 const rsa = require('bcrypto/lib/rsa');
 const SHA256 = require('bcrypto/lib/sha256');
 const testUtil = require('./util');
 const JS = require('../lib/js/goo');
-const Native = require('../lib/native/goo');
+const Native = NODE_BACKEND === 'native' ? require('../lib/native/goo') : null;
 const Signature = require('../lib/js/signature');
 const vectors = require('./data/vectors.json');
 
@@ -66,13 +68,15 @@ function runTests(name, Goo, Other) {
       });
     }
 
-    it('should verify with opposite implementation', () => {
-      for (const [n, g, h, msg, sig, C1] of sigs) {
-        const goo = new Other(n, g, h, null);
-        const result = goo.verify(msg, sig, C1);
-        assert.strictEqual(result, true);
-      }
-    });
+    if (Other) {
+      it('should verify with opposite implementation', () => {
+        for (const [n, g, h, msg, sig, C1] of sigs) {
+          const goo = new Other(n, g, h, null);
+          const result = goo.verify(msg, sig, C1);
+          assert.strictEqual(result, true);
+        }
+      });
+    }
 
     for (const vector of vectors) {
       const name = vector.group;
@@ -124,4 +128,5 @@ function runTests(name, Goo, Other) {
 }
 
 runTests('Goo', JS, Native);
-runTests('Goo (Native)', Native, JS);
+if (Native)
+  runTests('Goo (Native)', Native, JS);
