@@ -2,7 +2,7 @@
 
 'use strict';
 
-const assert = require('./util/assert');
+const assert = require('../test/util/assert');
 const rsa = require('bcrypto/lib/rsa');
 const random = require('bcrypto/lib/random');
 const Goo = require('../lib/goo');

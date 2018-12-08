@@ -4,6 +4,7 @@ build/
 combs/
 docs/
 etc/
+scripts/
 node_modules/
 test/
 npm-debug.log
