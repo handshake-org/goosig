@@ -4,7 +4,7 @@
 
 'use strict';
 
-const assert = require('./util/assert');
+const assert = require('bsert');
 const SHA256 = require('bcrypto/lib/sha256');
 const testUtil = require('./util');
 const Goo = require('../');

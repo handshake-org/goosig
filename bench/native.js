@@ -2,7 +2,7 @@
 
 'use strict';
 
-const assert = require('../test/util/assert');
+const assert = require('bsert');
 const {performance} = require('perf_hooks');
 const testUtil = require('../test/util');
 const Goo = require('../lib/js/goo');

@@ -4,7 +4,7 @@
 
 'use strict';
 
-const assert = require('./util/assert');
+const assert = require('bsert');
 const Signature = require('../lib/js/signature');
 
 describe('Signature', function() {
@@ -29,21 +29,21 @@ describe('Signature', function() {
 
     const sig2 = Signature.decode(sig1.encode(2048), 2048);
 
-    assert.bigIntEqual(sig2.C2, 0x01n);
-    assert.bigIntEqual(sig2.t, 0x02n);
-    assert.bigIntEqual(sig2.chal, 0x03n);
-    assert.bigIntEqual(sig2.ell, 0x04n);
-    assert.bigIntEqual(sig2.Aq, 0x05n);
-    assert.bigIntEqual(sig2.Bq, 0x06n);
-    assert.bigIntEqual(sig2.Cq, 0x07n);
-    assert.bigIntEqual(sig2.Dq, 0x08n);
-    assert.bigIntEqual(sig2.z_w, 0x09n);
-    assert.bigIntEqual(sig2.z_w2, 0x0an);
-    assert.bigIntEqual(sig2.z_s1, 0x0bn);
-    assert.bigIntEqual(sig2.z_a, 0x0cn);
-    assert.bigIntEqual(sig2.z_an, 0x0dn);
-    assert.bigIntEqual(sig2.z_s1w, 0x0en);
-    assert.bigIntEqual(sig2.z_sa, 0x0fn);
+    assert.strictEqual(sig2.C2, 0x01n);
+    assert.strictEqual(sig2.t, 0x02n);
+    assert.strictEqual(sig2.chal, 0x03n);
+    assert.strictEqual(sig2.ell, 0x04n);
+    assert.strictEqual(sig2.Aq, 0x05n);
+    assert.strictEqual(sig2.Bq, 0x06n);
+    assert.strictEqual(sig2.Cq, 0x07n);
+    assert.strictEqual(sig2.Dq, 0x08n);
+    assert.strictEqual(sig2.z_w, 0x09n);
+    assert.strictEqual(sig2.z_w2, 0x0an);
+    assert.strictEqual(sig2.z_s1, 0x0bn);
+    assert.strictEqual(sig2.z_a, 0x0cn);
+    assert.strictEqual(sig2.z_an, 0x0dn);
+    assert.strictEqual(sig2.z_s1w, 0x0en);
+    assert.strictEqual(sig2.z_sa, 0x0fn);
   });
 
   it('should deserialize and reserialize (with options)', () => {
@@ -69,21 +69,21 @@ describe('Signature', function() {
 
     const sig2 = Signature.decode(sig1.encode(2048), 2048);
 
-    assert.bigIntEqual(sig2.C2, 0x01n);
-    assert.bigIntEqual(sig2.t, 0x02n);
-    assert.bigIntEqual(sig2.chal, 0x03n);
-    assert.bigIntEqual(sig2.ell, 0x04n);
-    assert.bigIntEqual(sig2.Aq, 0x05n);
-    assert.bigIntEqual(sig2.Bq, 0x06n);
-    assert.bigIntEqual(sig2.Cq, 0x07n);
-    assert.bigIntEqual(sig2.Dq, 0x08n);
-    assert.bigIntEqual(sig2.z_w, 0x09n);
-    assert.bigIntEqual(sig2.z_w2, 0x0an);
-    assert.bigIntEqual(sig2.z_s1, 0x0bn);
-    assert.bigIntEqual(sig2.z_a, 0x0cn);
-    assert.bigIntEqual(sig2.z_an, 0x0dn);
-    assert.bigIntEqual(sig2.z_s1w, 0x0en);
-    assert.bigIntEqual(sig2.z_sa, 0x0fn);
+    assert.strictEqual(sig2.C2, 0x01n);
+    assert.strictEqual(sig2.t, 0x02n);
+    assert.strictEqual(sig2.chal, 0x03n);
+    assert.strictEqual(sig2.ell, 0x04n);
+    assert.strictEqual(sig2.Aq, 0x05n);
+    assert.strictEqual(sig2.Bq, 0x06n);
+    assert.strictEqual(sig2.Cq, 0x07n);
+    assert.strictEqual(sig2.Dq, 0x08n);
+    assert.strictEqual(sig2.z_w, 0x09n);
+    assert.strictEqual(sig2.z_w2, 0x0an);
+    assert.strictEqual(sig2.z_s1, 0x0bn);
+    assert.strictEqual(sig2.z_a, 0x0cn);
+    assert.strictEqual(sig2.z_an, 0x0dn);
+    assert.strictEqual(sig2.z_s1w, 0x0en);
+    assert.strictEqual(sig2.z_sa, 0x0fn);
   });
 
   it('should deserialize and reserialize JSON', () => {
@@ -109,20 +109,20 @@ describe('Signature', function() {
 
     const sig2 = Signature.fromJSON(sig1.toJSON());
 
-    assert.bigIntEqual(sig2.C2, 0x01n);
-    assert.bigIntEqual(sig2.t, 0x02n);
-    assert.bigIntEqual(sig2.chal, 0x03n);
-    assert.bigIntEqual(sig2.ell, 0x04n);
-    assert.bigIntEqual(sig2.Aq, 0x05n);
-    assert.bigIntEqual(sig2.Bq, 0x06n);
-    assert.bigIntEqual(sig2.Cq, 0x07n);
-    assert.bigIntEqual(sig2.Dq, 0x08n);
-    assert.bigIntEqual(sig2.z_w, 0x09n);
-    assert.bigIntEqual(sig2.z_w2, 0x0an);
-    assert.bigIntEqual(sig2.z_s1, 0x0bn);
-    assert.bigIntEqual(sig2.z_a, 0x0cn);
-    assert.bigIntEqual(sig2.z_an, 0x0dn);
-    assert.bigIntEqual(sig2.z_s1w, 0x0en);
-    assert.bigIntEqual(sig2.z_sa, 0x0fn);
+    assert.strictEqual(sig2.C2, 0x01n);
+    assert.strictEqual(sig2.t, 0x02n);
+    assert.strictEqual(sig2.chal, 0x03n);
+    assert.strictEqual(sig2.ell, 0x04n);
+    assert.strictEqual(sig2.Aq, 0x05n);
+    assert.strictEqual(sig2.Bq, 0x06n);
+    assert.strictEqual(sig2.Cq, 0x07n);
+    assert.strictEqual(sig2.Dq, 0x08n);
+    assert.strictEqual(sig2.z_w, 0x09n);
+    assert.strictEqual(sig2.z_w2, 0x0an);
+    assert.strictEqual(sig2.z_s1, 0x0bn);
+    assert.strictEqual(sig2.z_a, 0x0cn);
+    assert.strictEqual(sig2.z_an, 0x0dn);
+    assert.strictEqual(sig2.z_s1w, 0x0en);
+    assert.strictEqual(sig2.z_sa, 0x0fn);
   });
 });

@@ -3,7 +3,7 @@
 
 'use strict';
 
-const assert = require('./util/assert');
+const assert = require('bsert');
 const BigMath = require('../lib/js/bigmath');
 const SHA256 = require('bcrypto/lib/sha256');
 const Goo = require('../lib/goo');

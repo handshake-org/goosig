@@ -3,7 +3,7 @@
 
 'use strict';
 
-const assert = require('./util/assert');
+const assert = require('bsert');
 const DRBG = require('bcrypto/lib/drbg');
 const SHA256 = require('bcrypto/lib/sha256');
 

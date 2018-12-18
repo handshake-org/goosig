@@ -4,7 +4,7 @@
 
 'use strict';
 
-const assert = require('./util/assert');
+const assert = require('bsert');
 const BN = require('bcrypto/lib/bn.js');
 const testUtil = require('./util');
 const BigMath = require('../lib/js/bigmath');
@@ -56,11 +56,11 @@ describe('Util', function() {
 
   it('should do assert.bigInt', () => {
     assert.throws(() => {
-      assert.bigIntEqual(1n, 0n);
+      assert.strictEqual(1n, 0n);
     });
 
     assert.throws(() => {
-      assert.notBigIntEqual(0n, 0n);
+      assert.notStrictEqual(0n, 0n);
     });
   });
 
@@ -129,13 +129,13 @@ describe('Util', function() {
   it('should toBuffer and fromBuffer', () => {
     assert.bufferEqual(BigMath.toBuffer(0x1234567890n),
                        new BN(0x1234567890).toBuffer());
-    assert.bigIntEqual(BigMath.fromBuffer(new BN(0x1234567890).toBuffer()),
+    assert.strictEqual(BigMath.fromBuffer(new BN(0x1234567890).toBuffer()),
                        0x1234567890n);
   });
 
   it('should toBN and fromBN', () => {
-    assert.bigIntEqual(BigMath.fromBN(new BN(0x1234567890)), 0x1234567890n);
-    assert.bigIntEqual(BigMath.fromBN(new BN(-0x1234567890)), -0x1234567890n);
+    assert.strictEqual(BigMath.fromBN(new BN(0x1234567890)), 0x1234567890n);
+    assert.strictEqual(BigMath.fromBN(new BN(-0x1234567890)), -0x1234567890n);
     assert(BigMath.toBN(BN, 0x1234567890n).eq(new BN(0x1234567890)));
     assert(BigMath.toBN(BN, -0x1234567890n).eq(new BN(-0x1234567890)));
   });
@@ -156,28 +156,28 @@ describe('Util', function() {
   });
 
   it('should compute sqrt', () => {
-    assert.bigIntEqual(util.isqrt(1024n), 32n);
-    assert.bigIntEqual(util.isqrt(1025n), 32n);
+    assert.strictEqual(util.isqrt(1024n), 32n);
+    assert.strictEqual(util.isqrt(1025n), 32n);
     assert.strictEqual(util.dsqrt(1024), 32);
     assert.strictEqual(util.dsqrt(1025), 32);
   });
 
   it('should compute division', () => {
-    assert.bigIntEqual(3n / -2n, -1n);
-    assert.bigIntEqual(-3n / 2n, -1n);
-    assert.bigIntEqual(BigMath.div(3n, -2n), -2n);
-    assert.bigIntEqual(BigMath.div(-3n, 2n), -2n);
-    assert.bigIntEqual(BigMath.div(4n, -2n), -2n);
-    assert.bigIntEqual(BigMath.div(-4n, 2n), -2n);
+    assert.strictEqual(3n / -2n, -1n);
+    assert.strictEqual(-3n / 2n, -1n);
+    assert.strictEqual(BigMath.div(3n, -2n), -2n);
+    assert.strictEqual(BigMath.div(-3n, 2n), -2n);
+    assert.strictEqual(BigMath.div(4n, -2n), -2n);
+    assert.strictEqual(BigMath.div(-4n, 2n), -2n);
   });
 
   it('should compute modulo', () => {
-    assert.bigIntEqual(3n % -2n, 1n);
-    assert.bigIntEqual(-3n % 2n, -1n);
-    assert.bigIntEqual(BigMath.mod(3n, -2n), -1n);
-    assert.bigIntEqual(BigMath.mod(-3n, 2n), 1n);
-    assert.bigIntEqual(BigMath.mod(4n, -2n), 0n);
-    assert.bigIntEqual(BigMath.mod(-4n, 2n), 0n);
+    assert.strictEqual(3n % -2n, 1n);
+    assert.strictEqual(-3n % 2n, -1n);
+    assert.strictEqual(BigMath.mod(3n, -2n), -1n);
+    assert.strictEqual(BigMath.mod(-3n, 2n), 1n);
+    assert.strictEqual(BigMath.mod(4n, -2n), 0n);
+    assert.strictEqual(BigMath.mod(-4n, 2n), 0n);
   });
 
   it('should compute mod_pow', () => {
@@ -186,7 +186,7 @@ describe('Util', function() {
       const y = util.randomBits(33);
       const m = util.randomBits(1024);
 
-      assert.bigIntEqual(BigMath.modPow(x, y, m), modPowBN(x, y, m));
+      assert.strictEqual(BigMath.modPow(x, y, m), modPowBN(x, y, m));
     }
   });
 
@@ -194,16 +194,16 @@ describe('Util', function() {
     const r = util.randomInt(p);
     const rInv = util.modInverseP(r, p);
 
-    assert.bigIntEqual(BigMath.mod(r * rInv - 1n, p), 0n);
-    assert.bigIntEqual(rInv, modInverse(r, p));
+    assert.strictEqual(BigMath.mod(r * rInv - 1n, p), 0n);
+    assert.strictEqual(rInv, modInverse(r, p));
   });
 
   it('should compute invert_modp (n)', () => {
     const r2 = util.randomInt(n);
     const r2Inv = util.modInverseP(r2, n);
 
-    assert.bigIntEqual(BigMath.mod(r2 * r2Inv - 1n, n), 0n);
-    assert.bigIntEqual(r2Inv, modInverse(r2, n));
+    assert.strictEqual(BigMath.mod(r2 * r2Inv - 1n, n), 0n);
+    assert.strictEqual(r2Inv, modInverse(r2, n));
   });
 
   it('should compute gcd and ext_euclid', () => {
@@ -212,7 +212,7 @@ describe('Util', function() {
     const d_ = util.gcd(r1, r2);
     const [, , d] = util.euclidLR(r1, r2);
 
-    assert.bigIntEqual(d_, d);
+    assert.strictEqual(d_, d);
   });
 
   it('should compute ext_euclid', () => {
@@ -225,10 +225,10 @@ describe('Util', function() {
     const r2d = r2 / d;
     const [r1d_e, r2d_e, d2] = util.euclidLR(r1d, r2d);
 
-    assert.bigIntEqual(d_, d);
-    assert.bigIntEqual(d, r1 * r1_e + r2 * r2_e);
-    assert.bigIntEqual(d2, 1n);
-    assert.bigIntEqual(r1d * r1d_e + r2d * r2d_e - 1n, 0n);
+    assert.strictEqual(d_, d);
+    assert.strictEqual(d, r1 * r1_e + r2 * r2_e);
+    assert.strictEqual(d2, 1n);
+    assert.strictEqual(r1d * r1d_e + r2d * r2d_e - 1n, 0n);
   });
 
   it('should compute isqrt', () => {
@@ -243,14 +243,14 @@ describe('Util', function() {
     const r1 = BigMath.mod(util.randomInt(p) ** 2n, p);
     const sqrtR1 = util.modSqrtP(r1, p);
 
-    assert.bigIntEqual(BigMath.mod(sqrtR1 ** 2n, p), r1);
+    assert.strictEqual(BigMath.mod(sqrtR1 ** 2n, p), r1);
   });
 
   it('should compute sqrt_modn', () => {
     const r2 = BigMath.mod(util.randomInt(n) ** 2n, n);
     const sqrtR2 = util.modSqrtN(r2, p, q);
 
-    assert.bigIntEqual(BigMath.mod(sqrtR2 ** 2n, n), r2);
+    assert.strictEqual(BigMath.mod(sqrtR2 ** 2n, n), r2);
   });
 
   for (const [x, y, z] of symbols) {

@@ -4,7 +4,7 @@
 
 'use strict';
 
-const assert = require('./util/assert');
+const assert = require('bsert');
 const random = require('bcrypto/lib/random');
 const BigMath = require('../lib/js/bigmath');
 const primes = require('../lib/js/primes');
@@ -238,6 +238,6 @@ describe('Primes', function() {
   }
 
   it('should get next prime', () => {
-    assert.bigIntEqual(primes.nextPrime(4n, zero, 512), 5n);
+    assert.strictEqual(primes.nextPrime(4n, zero, 512), 5n);
   });
 });

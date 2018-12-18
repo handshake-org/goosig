@@ -6,7 +6,7 @@
 
 const NODE_BACKEND = process.env.NODE_BACKEND || 'native';
 
-const assert = require('./util/assert');
+const assert = require('bsert');
 const rsa = require('bcrypto/lib/rsa');
 const SHA256 = require('bcrypto/lib/sha256');
 const testUtil = require('./util');
