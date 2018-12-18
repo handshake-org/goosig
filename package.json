@@ -18,8 +18,7 @@
   "scripts": {
     "install": "node-gyp rebuild || echo 'Build failed.'",
     "lint": "./utils/eslint-bigint || exit 0",
-    "test": "node test/test-native.js && GOOSIG_TEST=1 bmocha --reporter spec test/*-test.js",
-    "test-file": "GOOSIG_TEST=1 bmocha --reporter spec"
+    "test": "node test/native && bmocha --reporter spec test/*-test.js"
   },
   "dependencies": {
     "bcrypto": "~3.0.1",
