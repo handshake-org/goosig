@@ -101,8 +101,10 @@ describe('Group Ops', function() {
     assert.strictEqual(t2.reduce(BigMath.mod(e2_s * e2_sInv, t2.n)), 1n);
   });
 
-  it('should compute inv5 (t1)', () => {
+  it('should compute inv7 (t1)', () => {
     const eVals = [
+      util.randomBits(2048),
+      util.randomBits(2048),
       util.randomBits(2048),
       util.randomBits(2048),
       util.randomBits(2048),
@@ -110,14 +112,16 @@ describe('Group Ops', function() {
       util.randomBits(2048)
     ];
 
-    const eInvs = t1.inv5(...eVals);
+    const eInvs = t1.inv7(...eVals);
 
     for (const [e, eInv] of testUtil.zip(eVals, eInvs))
       assert.strictEqual(t1.reduce(BigMath.mod(e * eInv, t1.n)), 1n);
   });
 
-  it('should compute inv5 (t2)', () => {
+  it('should compute inv7 (t2)', () => {
     const eVals = [
+      util.randomBits(2048),
+      util.randomBits(2048),
       util.randomBits(2048),
       util.randomBits(2048),
       util.randomBits(2048),
@@ -125,7 +129,7 @@ describe('Group Ops', function() {
       util.randomBits(2048)
     ];
 
-    const eInvs = t2.inv5(...eVals);
+    const eInvs = t2.inv7(...eVals);
 
     for (const [e, eInv] of testUtil.zip(eVals, eInvs))
       assert.strictEqual(t2.reduce(BigMath.mod(e * eInv, t2.n)), 1n);

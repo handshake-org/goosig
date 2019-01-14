@@ -70,6 +70,7 @@ typedef struct goo_prng_s {
 
 typedef struct goo_sig_s {
   mpz_t C2;
+  mpz_t C3;
   mpz_t t;
   mpz_t chal;
   mpz_t ell;
@@ -77,6 +78,7 @@ typedef struct goo_sig_s {
   mpz_t Bq;
   mpz_t Cq;
   mpz_t Dq;
+  mpz_t Eq;
   mpz_t z_w;
   mpz_t z_w2;
   mpz_t z_s1;
@@ -84,6 +86,7 @@ typedef struct goo_sig_s {
   mpz_t z_an;
   mpz_t z_s1w;
   mpz_t z_sa;
+  mpz_t z_s2;
 } goo_sig_t;
 
 typedef struct goo_group_s {
@@ -118,13 +121,16 @@ typedef struct goo_group_s {
   mpz_t C1;
   mpz_t C1_inv;
   mpz_t C2_inv;
+  mpz_t C3_inv;
   mpz_t Aq_inv;
   mpz_t Bq_inv;
   mpz_t Cq_inv;
+  mpz_t Dq_inv;
   mpz_t A;
   mpz_t B;
   mpz_t C;
   mpz_t D;
+  mpz_t E;
   mpz_t z_w2_m_an;
   mpz_t tmp;
   mpz_t chal_out;
