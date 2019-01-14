@@ -282,4 +282,4 @@ NAN_MODULE_INIT(init) {
   Goo::Init(target);
 }
 
-NODE_MODULE(goo, init)
+NAN_MODULE_WORKER_ENABLED(goo, init)
