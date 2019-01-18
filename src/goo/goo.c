@@ -842,6 +842,15 @@ goo_is_prime_lucas(const mpz_t n) {
       goto fail;
     }
 
+    if (p > 50) {
+      // It's thought to be impossible for `p`
+      // to be larger than 10,000, but fail
+      // on anything higher than 50 to prevent
+      // DoS attacks. `p` never seems to be
+      // higher than 30 in practice.
+      goto fail;
+    }
+
     // d = p * p - 4
     mpz_set_ui(d, p * p - 4);
 
