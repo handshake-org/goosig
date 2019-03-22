@@ -363,6 +363,19 @@ goo_random_int(mpz_t ret, const mpz_t max) {
   return 1;
 }
 
+static unsigned long
+goo_random_num(unsigned long max) {
+  if (max == 0)
+    return 0;
+
+  unsigned long rand;
+
+  if (!goo_random((void *)&rand, sizeof(unsigned long)))
+    assert(0 && "RNG failed.");
+
+  return rand % max;
+}
+
 /*
  * PRNG
  */
@@ -2501,9 +2514,22 @@ goo_group_sign(
   // Find `t`.
   int found = 0;
 
+  unsigned long primes[GOO_PRIMES_LEN];
+
+  memcpy(&primes[0], &goo_primes[0], sizeof(goo_primes));
+
   for (long i = 0; i < GOO_PRIMES_LEN; i++) {
+    // Partial in-place Fisher-Yates shuffle to choose random t.
+    // Note: goo_random_num() is _exclusive_ of endpoints!
+    unsigned long j = goo_random_num(GOO_PRIMES_LEN - i);
+    unsigned long x = primes[i];
+    unsigned long y = primes[i + j];
+
+    primes[i] = y;
+    primes[i + j] = x;
+
     // t = small_primes[i]
-    mpz_set_ui(*t, goo_primes[i]);
+    mpz_set_ui(*t, primes[i]);
 
     // w = mod_sqrtn(t, p, q)
     if (goo_mod_sqrtn(w, *t, p, q)) {
