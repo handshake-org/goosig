@@ -282,4 +282,8 @@ NAN_MODULE_INIT(init) {
   Goo::Init(target);
 }
 
+#if NODE_MAJOR_VERSION >= 10
 NAN_MODULE_WORKER_ENABLED(goo, init)
+#else
+NODE_MODULE(goo, init)
+#endif
