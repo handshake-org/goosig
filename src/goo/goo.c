@@ -449,14 +449,13 @@ goo_prng_random_int(goo_prng_t *prng, mpz_t ret, const mpz_t max) {
     return;
   }
 
-  // ret = max - 1
-  mpz_sub_ui(ret, max, 1);
+  // ret = max
+  mpz_set(ret, max);
 
   // bits = bitlen(ret)
   size_t bits = goo_mpz_bitlen(ret);
 
-  // ret += 1
-  mpz_add_ui(ret, ret, 1);
+  assert(bits > 0);
 
   // while ret >= max
   while (mpz_cmp(ret, max) >= 0)
@@ -466,14 +465,6 @@ goo_prng_random_int(goo_prng_t *prng, mpz_t ret, const mpz_t max) {
 /*
  * Utils
  */
-
-static size_t
-goo_clog2(const mpz_t val) {
-  mpz_sub_ui((mpz_ptr)val, val, 1);
-  size_t bits = goo_mpz_bitlen(val);
-  mpz_add_ui((mpz_ptr)val, val, 1);
-  return bits;
-}
 
 static unsigned long
 goo_dsqrt(unsigned long x) {
@@ -1517,7 +1508,7 @@ goo_group_init(
   // h = h
   mpz_set_ui(group->h, h);
 
-  group->rand_bits = goo_clog2(group->n) - 1;
+  group->rand_bits = goo_mpz_bitlen(group->n) - 1;
 
   if (modbits != 0) {
     long big1 = 2 * modbits;
@@ -3436,20 +3427,6 @@ run_util_test(void) {
 
     mpz_clear(n);
     mpz_clear(t);
-  }
-
-  // test clog2
-  {
-    printf("Testing clog2...\n");
-
-    mpz_t n;
-    mpz_init(n);
-
-    mpz_set_ui(n, 0x10000);
-
-    assert(goo_clog2(n) == 16);
-
-    mpz_clear(n);
   }
 
   // test sqrt

@@ -151,10 +151,6 @@ describe('Util', function() {
     assert.strictEqual(BigMath.bitLength(-0x20000n), 18);
   });
 
-  it('should calculate clog2', () => {
-    assert(util.clog2(0x10000n) === 16);
-  });
-
   it('should compute sqrt', () => {
     assert.strictEqual(util.isqrt(1024n), 32n);
     assert.strictEqual(util.isqrt(1025n), 32n);
