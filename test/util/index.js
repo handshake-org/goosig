@@ -276,29 +276,32 @@ const testUtil = {
     }
   },
 
-  rsaExponent(pbuf, qbuf) {
+  rsaExponent(pRaw, qRaw) {
     // Find a decryption exponent.
-    const [p, q] = [BN.decode(pbuf), BN.decode(qbuf)];
+    const p = BN.decode(pRaw);
+    const q = BN.decode(qRaw);
     const n = p.mul(q);
-    const lam = p.subn(1).mul(q.subn(1)).div(p.subn(1).gcd(q.subn(1)));
+    const p1 = p.subn(1);
+    const q1 = q.subn(1);
+    const lam = p1.mul(q1).div(p1.gcd(q1));
 
-    for (const e of primes.primesSkip(1)) {
-      if (e > 1000)
+    for (const p of primes.primesSkip(1)) {
+      if (p > 1000)
         throw new Error('Could find a suitable exponent!');
 
-      const E = new BN(e);
+      const e = BN.from(p);
 
-      let d;
+      let d = null;
 
       try {
-        d = E.invm(lam);
+        d = e.invm(lam);
       } catch (e) {
         continue;
       }
 
       return [
         n.encode(),
-        E.encode(),
+        e.encode(),
         d.encode()
       ];
     }
