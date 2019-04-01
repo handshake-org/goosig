@@ -18,7 +18,7 @@
   "scripts": {
     "install": "node-gyp rebuild || echo 'Build failed.'",
     "lint": "eslint ./{bench,etc,lib{,/js,/native,/internal},test{,/util}}/*.js || exit 0",
-    "test": "node test/native && bmocha --reporter spec test/*-test.js"
+    "test": "bmocha -S --file test/native 'test/*-test.js'"
   },
   "dependencies": {
     "bcrypto": "~3.0.3",
