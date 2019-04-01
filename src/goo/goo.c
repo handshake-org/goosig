@@ -2297,7 +2297,7 @@ goo_group_challenge(
     goto fail;
   }
 
-  // if n < 2 ** 1023 or n > 2 ** 4096 - 1
+  // if n < 2^1023 or n > 2^4096 - 1
   if (!goo_is_valid_rsa(n)) {
     // Invalid RSA public key.
     goto fail;
@@ -2353,14 +2353,14 @@ goo_group_validate(
     goto fail;
   }
 
-  // if p > 2 ** 4096 - 1 or q > 2 ** 4096 - 1
+  // if p > 2^4096 - 1 or q > 2^4096 - 1
   if (!goo_is_valid_prime(p) || !goo_is_valid_prime(q))
     goto fail;
 
   // n = p * q
   mpz_mul(n, p, q);
 
-  // if n < 2 ** 1023 or n > 2 ** 4096 - 1
+  // if n < 2^1023 or n > 2^4096 - 1
   if (!goo_is_valid_rsa(n)) {
     // Invalid RSA private key.
     goto fail;
@@ -2469,14 +2469,14 @@ goo_group_sign(
     goto fail;
   }
 
-  // if p > 2 ** 4096 - 1 or q > 2 ** 4096 - 1
+  // if p > 2^4096 - 1 or q > 2^4096 - 1
   if (!goo_is_valid_prime(p) || !goo_is_valid_prime(q))
     goto fail;
 
   // n = p * q
   mpz_mul(n, p, q);
 
-  // if n < 2 ** 1023 or n > 2 ** 4096 - 1
+  // if n < 2^1023 or n > 2^4096 - 1
   if (!goo_is_valid_rsa(n)) {
     // Invalid RSA public key.
     goto fail;
@@ -2537,7 +2537,7 @@ goo_group_sign(
   // assert w > 0
   assert(mpz_sgn(w) > 0);
 
-  // a = (w ** 2 - t) / n
+  // a = (w^2 - t) / n
   mpz_pow_ui(a, w, 2);
   mpz_sub(a, a, *t);
   mpz_tdiv_q(a, a, n);
@@ -2548,7 +2548,7 @@ goo_group_sign(
   // x = a * n
   mpz_mul(x, a, n);
 
-  // y = w ** 2 - t
+  // y = w^2 - t
   mpz_pow_ui(y, w, 2);
   mpz_sub(y, y, *t);
 
@@ -3449,6 +3449,7 @@ run_util_test(void) {
     mpz_set_si(y, -2);
     mpz_fdiv_q(z, x, y);
     assert(mpz_get_si(z) == -2);
+    assert(mpz_cmp_ui(z, 0) < 0);
 
     mpz_tdiv_q(z, x, y);
     assert(mpz_get_si(z) == -1);
