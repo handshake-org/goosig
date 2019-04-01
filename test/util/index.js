@@ -15,9 +15,8 @@
 
 const assert = require('bsert');
 const rsa = require('bcrypto/lib/rsa');
-const BigMath = require('../../lib/js/bigmath');
+const BN = require('bcrypto/lib/bn.js');
 const primes = require('../../lib/js/primes');
-const util = require('../../lib/js/util');
 
 const testUtil = {
   log(...args) {
@@ -279,23 +278,29 @@ const testUtil = {
 
   rsaExponent(pbuf, qbuf) {
     // Find a decryption exponent.
-    const [p, q] = [BigMath.decode(pbuf), BigMath.decode(qbuf)];
-    const n = p * q;
-    const lam = (p - 1n) * (q - 1n) / util.gcd(p - 1n, q - 1n);
+    const [p, q] = [BN.decode(pbuf), BN.decode(qbuf)];
+    const n = p.mul(q);
+    const lam = p.subn(1).mul(q.subn(1)).div(p.subn(1).gcd(q.subn(1)));
 
     for (const e of primes.primesSkip(1)) {
-      if (e > 1000n)
+      if (e > 1000)
         throw new Error('Could find a suitable exponent!');
 
-      const d = util.modInverseP(e, lam);
+      const E = new BN(e);
 
-      if (d != null) {
-        return [
-          BigMath.encode(n),
-          BigMath.encode(e),
-          BigMath.encode(d)
-        ];
+      let d;
+
+      try {
+        d = E.invm(lam);
+      } catch (e) {
+        continue;
       }
+
+      return [
+        n.encode(),
+        E.encode(),
+        d.encode()
+      ];
     }
 
     throw new Error('Unreachable.');

@@ -5,8 +5,8 @@
 'use strict';
 
 const assert = require('bsert');
+const BN = require('bcrypto/lib/bn.js');
 const random = require('bcrypto/lib/random');
-const BigMath = require('../lib/js/bigmath');
 const primes = require('../lib/js/primes');
 
 // https://github.com/golang/go/blob/aadaec5/src/math/big/prime_test.go
@@ -193,7 +193,7 @@ describe('Primes', function() {
     const str = primes_[i];
 
     it(`should test prime (${i})`, () => {
-      const p = BigMath.fromString(str, 10);
+      const p = BN.fromString(str, 10);
 
       assert(primes.isPrimeDiv(p));
       assert(primes.isPrimeMR(p, key, 16 + 1, true));
@@ -208,7 +208,7 @@ describe('Primes', function() {
     const str = composites[i];
 
     it(`should test composite (${i})`, () => {
-      const p = BigMath.fromString(str, 10);
+      const p = BN.fromString(str, 10);
 
       if (i === 6 || i === 7 || (i >= 43 && i <= 49) || i === 54) {
         assert(primes.isPrimeDiv(p));
@@ -238,6 +238,6 @@ describe('Primes', function() {
   }
 
   it('should get next prime', () => {
-    assert.strictEqual(primes.nextPrime(4n, zero, 512), 5n);
+    assert.strictEqual(primes.nextPrime(new BN(4), zero, 512).toString(), '5');
   });
 });

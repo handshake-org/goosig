@@ -4,7 +4,7 @@
 'use strict';
 
 const assert = require('bsert');
-const BigMath = require('../lib/js/bigmath');
+const BN = require('bcrypto/lib/bn.js');
 const SHA256 = require('bcrypto/lib/sha256');
 const Goo = require('../lib/goo');
 
@@ -19,15 +19,15 @@ function digitSum(data) {
   assert(Buffer.isBuffer(data));
 
   // Digit Sum, used by RSA2048
-  const num = BigMath.fromBuffer(data);
+  const num = BN.decode(data);
   const base10 = num.toString(10);
 
   let sum = 0;
   for (let i = 0; i < base10.length; i++)
     sum += Number(base10[i]);
 
-  const num2 = BigMath.fromString(base10, 10);
-  const data2 = BigMath.toBuffer(num2);
+  const num2 = BN.fromString(base10, 10);
+  const data2 = num2.encode();
 
   assert.bufferEqual(data2, data);
 
@@ -37,8 +37,8 @@ function digitSum(data) {
 function primeMod(data) {
   assert(Buffer.isBuffer(data));
   // Prime Checksum, used by RSA617
-  const num = BigMath.fromBuffer(data);
-  return Number(num % 991889n);
+  const num = BN.decode(data);
+  return num.modrn(991889);
 }
 
 describe('Moduli', function() {
