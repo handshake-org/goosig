@@ -79,7 +79,7 @@ There are 4 built-in moduli exposed on the `Goo` object.
 - [RSA617] - Also from the factoring challenge (2048 bit). Generated later, in
   1997.
 
-Original Links (archive.org);
+Original Links (archive.org):
 
 - [Main Page][challenge]
 - [RSA Numbers][numbers]
