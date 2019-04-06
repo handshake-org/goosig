@@ -345,14 +345,13 @@ goo_random_int(mpz_t ret, const mpz_t max) {
     return 1;
   }
 
-  // ret = max - 1
-  mpz_sub_ui(ret, max, 1);
+  // ret = max
+  mpz_set(ret, max);
 
   // bits = bitlen(ret)
   size_t bits = goo_mpz_bitlen(ret);
 
-  // ret += 1
-  mpz_add_ui(ret, ret, 1);
+  assert(bits > 0);
 
   // while ret >= max
   while (mpz_cmp(ret, max) >= 0) {
