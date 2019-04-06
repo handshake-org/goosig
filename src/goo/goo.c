@@ -494,7 +494,7 @@ goo_dsqrt(unsigned long x) {
 }
 
 static int
-goo_mod_sqrtp(mpz_t ret, const mpz_t n, const mpz_t p) {
+goo_mpz_sqrtp(mpz_t ret, const mpz_t n, const mpz_t p) {
   // if p <= 0
   if (mpz_sgn(p) <= 0)
     return 0;
@@ -634,7 +634,7 @@ fail:
 }
 
 static int
-goo_mod_sqrtn(mpz_t ret, const mpz_t x, const mpz_t p, const mpz_t q) {
+goo_mpz_sqrtpq(mpz_t ret, const mpz_t x, const mpz_t p, const mpz_t q) {
   int r = 0;
   mpz_t sp, sq, mp, mq, xx, yy;
 
@@ -647,8 +647,8 @@ goo_mod_sqrtn(mpz_t ret, const mpz_t x, const mpz_t p, const mpz_t q) {
 
   // sp = mod_sqrtp(x, p)
   // sq = mod_sqrtp(x, q)
-  if (!goo_mod_sqrtp(sp, x, p)
-      || !goo_mod_sqrtp(sq, x, q)) {
+  if (!goo_mpz_sqrtp(sp, x, p)
+      || !goo_mpz_sqrtp(sq, x, q)) {
     goto fail;
   }
 
@@ -2522,7 +2522,7 @@ goo_group_sign(
     mpz_set_ui(*t, primes[i]);
 
     // w = mod_sqrtn(t, p, q)
-    if (goo_mod_sqrtn(w, *t, p, q)) {
+    if (goo_mpz_sqrtpq(w, *t, p, q)) {
       found = 1;
       break;
     }
@@ -3578,7 +3578,7 @@ run_util_test(void) {
       assert(goo_random_int(r1, p));
       mpz_powm_ui(r1, r1, 2, p);
 
-      assert(goo_mod_sqrtp(sr1, r1, p));
+      assert(goo_mpz_sqrtp(sr1, r1, p));
 
       mpz_powm_ui(sr1, sr1, 2, p);
 
@@ -3601,7 +3601,7 @@ run_util_test(void) {
       assert(goo_random_int(r2, n));
       mpz_powm_ui(r2, r2, 2, n);
 
-      assert(goo_mod_sqrtn(sr2, r2, p, q));
+      assert(goo_mpz_sqrtpq(sr2, r2, p, q));
 
       mpz_powm_ui(sr2, sr2, 2, n);
 
