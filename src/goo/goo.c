@@ -493,143 +493,167 @@ goo_dsqrt(unsigned long x) {
   }
 }
 
+// https://github.com/golang/go/blob/c86d464/src/math/big/int.go#L906
 static int
-goo_mpz_sqrtp(mpz_t ret, const mpz_t n, const mpz_t p) {
-  // if p <= 0
-  if (mpz_sgn(p) <= 0)
-    return 0;
-
+goo_mpz_sqrtp(mpz_t ret, const mpz_t num, const mpz_t p) {
   int r = 0;
-  unsigned long s;
+  mpz_t x, e, t, a, s, n, y, b, g;
 
-  mpz_t nn, t, Q, w, y, q, ys;
-  mpz_init(nn);
+  mpz_init(x);
+  mpz_init(e);
   mpz_init(t);
-  mpz_init(Q);
-  mpz_init(w);
+  mpz_init(a);
+  mpz_init(s);
+  mpz_init(n);
   mpz_init(y);
-  mpz_init(q);
-  mpz_init(ys);
+  mpz_init(b);
+  mpz_init(g);
 
-  // n = n mod p
-  mpz_mod(nn, n, p);
+  // x = num
+  mpz_set(x, num);
 
-  // if n == 0
-  if (mpz_sgn(nn) == 0) {
-    mpz_set_ui(ret, 0);
-    goto succeed;
-  }
-
-  if (mpz_jacobi(nn, p) == -1)
+  if (mpz_sgn(p) <= 0 || mpz_even_p(p))
     goto fail;
 
-  // if p & 3 == 3
+  switch (mpz_jacobi(x, p)) {
+    case -1:
+      goto fail;
+    case 0:
+      mpz_set_ui(ret, 0);
+      goto success;
+    case 1:
+      break;
+  }
+
+  // if x < 0 || x >= p
+  if (mpz_sgn(x) < 0 || mpz_cmp(x, p) >= 0) {
+    // x = x mod p
+    mpz_mod(x, x, p);
+  }
+
+  // if p mod 4 == 3
   if (mpz_tdiv_ui(p, 4) == 3) {
-    // t = (p + 1) >> 2
-    // ret = n^t mod p
-    mpz_add_ui(t, p, 1);
-    mpz_fdiv_q_2exp(t, t, 2);
-    mpz_powm(ret, nn, t, p);
-    goto succeed;
+    // e = (p + 1) >> 2
+    mpz_add_ui(e, p, 1);
+    mpz_fdiv_q_2exp(e, e, 2);
+    // ret = x^e mod p
+    mpz_powm(ret, x, e, p);
+    goto success;
   }
 
-  // Factor out 2^s from p - 1.
-  // t = p - 1
-  mpz_sub_ui(t, p, 1);
-
-  // s = zerobits(t)
-  s = goo_mpz_zerobits(t);
-  // Q = t >> s
-  mpz_fdiv_q_2exp(Q, t, s);
-
-  // Find a non-residue mod p.
-  // w = 2
-  mpz_set_ui(w, 2);
-
-  while (mpz_jacobi(w, p) != -1) {
-    // w += 1
-    mpz_add_ui(w, w, 1);
+  // if p mod 8 == 5
+  if (mpz_tdiv_ui(p, 8) == 5) {
+    // e = p >> 3
+    mpz_fdiv_q_2exp(e, p, 3);
+    // t = x << 1
+    mpz_mul_2exp(t, x, 1);
+    // a = t^e mod p
+    mpz_powm(a, t, e, p);
+    // b = a^2 mod p
+    mpz_powm_ui(b, a, 2, p);
+    // b = (b * t) mod p
+    mpz_mul(b, b, t);
+    mpz_mod(b, b, p);
+    // b = (b - 1) mod p
+    mpz_sub_ui(b, b, 1);
+    mpz_mod(b, b, p);
+    // b = (b * x) mod p
+    mpz_mul(b, b, x);
+    mpz_mod(b, b, p);
+    // b = (b * a) mod p
+    mpz_mul(b, b, a);
+    mpz_mod(b, b, p);
+    // ret = b
+    mpz_set(ret, b);
+    goto success;
   }
 
-  // w = w^Q mod p
-  mpz_powm(w, w, Q, p);
-  // y = n^Q mod p)
-  mpz_powm(y, nn, Q, p);
+  // s = p - 1
+  mpz_sub_ui(s, p, 1);
 
-  // t = (Q + 1) >> 1
-  // q = n^t mod p
-  mpz_add_ui(t, Q, 1);
-  mpz_fdiv_q_2exp(t, t, 1);
-  mpz_powm(q, nn, t, p);
+  // z = zerobits(s)
+  unsigned long z = goo_mpz_zerobits(s);
+
+  // s = s >> z
+  mpz_fdiv_q_2exp(s, s, z);
+
+  // n = 2
+  mpz_set_ui(n, 2);
+
+  // while jacobi(n, p) != -1
+  while (mpz_jacobi(n, p) != -1) {
+    // n = n + 1
+    mpz_add_ui(n, n, 1);
+  }
+
+  // y = s + 1
+  mpz_add_ui(y, s, 1);
+  // y = y >> 1
+  mpz_fdiv_q_2exp(y, y, 1);
+  // y = x^y mod p
+  mpz_powm(y, x, y, p);
+  // b = x^s mod p
+  mpz_powm(b, x, s, p);
+  // g = n^s mod p
+  mpz_powm(g, n, s, p);
+
+  // k = z
+  unsigned long k = z;
 
   for (;;) {
-    unsigned long i = 0;
+    unsigned long m = 0;
 
-    // ys = s
-    mpz_set(ys, y);
+    // t = b
+    mpz_set(t, b);
 
-    // while i < s and y != 1
-    while (i < s && mpz_cmp_ui(y, 1) != 0) {
-      // y = y^2 mod p
-      mpz_powm_ui(y, y, 2, p);
-      i += 1;
+    // while t != 1
+    while (mpz_cmp_ui(t, 1) != 0) {
+      // t = t^2 mod p
+      mpz_powm_ui(t, t, 2, p);
+      m += 1;
     }
 
-    if (i == 0)
+    // if m == 0
+    if (m == 0)
       break;
 
-    if (i == s)
+    // if m == k
+    if (m == k)
       goto fail;
 
-    // t = 1 << (s - i - 1)
-    // w = w^t mod p
+    // t = 1 << (k - m - 1)
     mpz_set_ui(t, 1);
-    mpz_mul_2exp(t, t, s - i - 1);
-    mpz_powm(w, w, t, p);
-
-    s = i;
-
-    // q = (q * w) mod p
-    mpz_mul(q, q, w);
-    mpz_mod(q, q, p);
-
-    // w = w^2 mod p
-    mpz_powm_ui(w, w, 2, p);
-
-    // y = (ys * w) mod p
-    mpz_mul(y, ys, w);
+    mpz_mul_2exp(t, t, k - m - 1);
+    // t = g^t mod p
+    mpz_powm(t, g, t, p);
+    // g = t^2 mod p
+    mpz_powm_ui(g, t, 2, p);
+    // y = (y * t) mod p
+    mpz_mul(y, y, t);
     mpz_mod(y, y, p);
+    // b = (b * g) mod p
+    mpz_mul(b, b, g);
+    mpz_mod(b, b, p);
+    // k = m
+    k = m;
   }
 
-  // t = p >> 1
-  mpz_fdiv_q_2exp(t, p, 1);
+  // ret = y
+  mpz_set(ret, y);
+  goto success;
 
-  // if q > t
-  if (mpz_cmp(q, t) > 0) {
-    // q = p - q
-    mpz_sub(q, p, q);
-  }
-
-  // t = (q * q) mod p
-  mpz_mul(t, q, q);
-  mpz_mod(t, t, p);
-
-  // n == t
-  assert(mpz_cmp(nn, t) == 0);
-
-  // ret = q
-  mpz_set(ret, q);
-
-succeed:
+success:
   r = 1;
 fail:
-  mpz_clear(nn);
+  mpz_clear(x);
+  mpz_clear(e);
   mpz_clear(t);
-  mpz_clear(Q);
-  mpz_clear(w);
+  mpz_clear(a);
+  mpz_clear(s);
+  mpz_clear(n);
   mpz_clear(y);
-  mpz_clear(q);
-  mpz_clear(ys);
+  mpz_clear(b);
+  mpz_clear(g);
   return r;
 }
 
