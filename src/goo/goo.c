@@ -304,7 +304,7 @@ goo_free(void *ptr) {
 static int
 goo_random_bits(mpz_t ret, unsigned long bits) {
   int r = 0;
-  unsigned long b = 0;
+  unsigned long total = 0;
   unsigned char out[32];
 
   mpz_t tmp;
@@ -313,7 +313,7 @@ goo_random_bits(mpz_t ret, unsigned long bits) {
   // ret = 0
   mpz_set_ui(ret, 0);
 
-  while (b < bits) {
+  while (total < bits) {
     // ret = ret << 256
     mpz_mul_2exp(ret, ret, 256);
     // tmp = nextrand()
@@ -322,10 +322,10 @@ goo_random_bits(mpz_t ret, unsigned long bits) {
     goo_mpz_import(tmp, &out[0], 32);
     // ret = ret | tmp
     mpz_ior(ret, ret, tmp);
-    b += 256;
+    total += 256;
   }
 
-  unsigned long left = b - bits;
+  unsigned long left = total - bits;
 
   // ret >>= left;
   mpz_fdiv_q_2exp(ret, ret, left);
@@ -384,6 +384,7 @@ goo_prng_init(goo_prng_t *prng) {
   memset((void *)prng, 0x00, sizeof(goo_prng_t));
 
   mpz_init(prng->save);
+  prng->total = 0;
   mpz_init(prng->tmp);
 }
 
@@ -404,6 +405,7 @@ goo_prng_seed(goo_prng_t *prng, const unsigned char *key) {
   goo_drbg_init(&prng->ctx, entropy, sizeof(entropy));
 
   mpz_set_ui(prng->save, 0);
+  prng->total = 0;
 }
 
 static void
@@ -416,10 +418,10 @@ goo_prng_random_bits(goo_prng_t *prng, mpz_t ret, unsigned long bits) {
   // ret = save
   mpz_set(ret, prng->save);
 
-  unsigned long b = goo_mpz_bitlen(ret);
+  unsigned long total = prng->total;
   unsigned char out[32];
 
-  while (b < bits) {
+  while (total < bits) {
     // ret = ret << 256
     mpz_mul_2exp(ret, ret, 256);
     // tmp = nextrand()
@@ -427,13 +429,14 @@ goo_prng_random_bits(goo_prng_t *prng, mpz_t ret, unsigned long bits) {
     goo_mpz_import(prng->tmp, &out[0], 32);
     // ret = ret | tmp
     mpz_ior(ret, ret, prng->tmp);
-    b += 256;
+    total += 256;
   }
 
-  unsigned long left = b - bits;
+  unsigned long left = total - bits;
 
   // save = ret & ((1 << left) - 1)
   goo_mpz_mask(prng->save, ret, left, prng->tmp);
+  prng->total = left;
 
   // ret >>= left;
   mpz_fdiv_q_2exp(ret, ret, left);
@@ -3394,7 +3397,7 @@ run_prng_test(void) {
   assert(mpz_cmp_ui(x, 1312024779) == 0);
   goo_prng_random_bits(&prng, x, 31);
   goo_prng_random_int(&prng, y, x);
-  assert(mpz_cmp_ui(y, 1679635921) == 0);
+  assert(mpz_cmp_ui(y, 665860407) == 0);
 
   mpz_clear(x);
   mpz_clear(y);

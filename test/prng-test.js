@@ -23,6 +23,6 @@ describe('PRNG', function() {
 
     assert.strictEqual(rng.randomBits(30).toString(), '540405817');
     assert.strictEqual(rng.randomBits(31).toString(), '1312024779');
-    assert.strictEqual(rng.randomInt(rng.randomBits(31)).toString(), '1679635921');
+    assert.strictEqual(rng.randomInt(rng.randomBits(31)).toString(), '665860407');
   });
 });
