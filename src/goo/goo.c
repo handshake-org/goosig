@@ -337,6 +337,18 @@ fail:
 }
 
 static int
+goo_random_bits_nz(mpz_t ret, unsigned long bits) {
+  assert(bits != 0);
+
+  do {
+    if (!goo_random_bits(ret, bits))
+      return 0;
+  } while (mpz_sgn(ret) == 0);
+
+  return 1;
+}
+
+static int
 goo_random_int(mpz_t ret, const mpz_t max) {
   // if max <= 0
   if (mpz_sgn(max) <= 0) {
@@ -440,6 +452,15 @@ goo_prng_random_bits(goo_prng_t *prng, mpz_t ret, unsigned long bits) {
 
   // ret >>= left;
   mpz_fdiv_q_2exp(ret, ret, left);
+}
+
+static void
+goo_prng_random_bits_nz(goo_prng_t *prng, mpz_t ret, unsigned long bits) {
+  assert(bits != 0);
+
+  do {
+    goo_prng_random_bits(prng, ret, bits);
+  } while (mpz_sgn(ret) == 0);
 }
 
 static void
@@ -2216,8 +2237,8 @@ goo_group_fs_chal(
     return 0;
 
   goo_prng_seed(&group->prng, &key[0]);
-  goo_prng_random_bits(&group->prng, chal, GOO_CHAL_BITS);
-  goo_prng_random_bits(&group->prng, ell, GOO_CHAL_BITS);
+  goo_prng_random_bits_nz(&group->prng, chal, GOO_CHAL_BITS);
+  goo_prng_random_bits_nz(&group->prng, ell, GOO_CHAL_BITS);
 
   if (k != NULL)
     memcpy(k, key, 32);
@@ -2248,19 +2269,19 @@ goo_group_expand_sprime(goo_group_t *group, mpz_t s, const mpz_t s_prime) {
   goo_mpz_export(&key[pos], NULL, s_prime);
 
   goo_prng_seed(&group->prng, &key[0]);
-  goo_prng_random_bits(&group->prng, s, GOO_EXPONENT_SIZE);
+  goo_prng_random_bits_nz(&group->prng, s, GOO_EXPONENT_SIZE);
 
   return 1;
 }
 
 static int
 goo_group_random_scalar(goo_group_t *group, mpz_t ret) {
-  size_t size = group->rand_bits;
+  size_t bits = group->rand_bits;
 
-  if (size > GOO_EXPONENT_SIZE)
-    size = GOO_EXPONENT_SIZE;
+  if (bits > GOO_EXPONENT_SIZE)
+    bits = GOO_EXPONENT_SIZE;
 
-  return goo_random_bits(ret, size);
+  return goo_random_bits_nz(ret, bits);
 }
 
 static inline int
@@ -2296,11 +2317,7 @@ goo_is_valid_rsa(const mpz_t n) {
 static int
 goo_group_generate(goo_group_t *group, mpz_t s_prime) {
   // s_prime = randbits(256)
-  if (!goo_random_bits(s_prime, 256))
-    return 0;
-
-  // if s_prime <= 0
-  if (mpz_sgn(s_prime) <= 0)
+  if (!goo_random_bits_nz(s_prime, 256))
     return 0;
 
   return 1;
@@ -2331,10 +2348,6 @@ goo_group_challenge(
 
   // s = expand_sprime(s_prime)
   if (!goo_group_expand_sprime(group, s, s_prime))
-    goto fail;
-
-  // if s <= 0
-  if (mpz_sgn(s) <= 0)
     goto fail;
 
   // The challenge: a commitment to the RSA modulus.
@@ -2394,10 +2407,6 @@ goo_group_validate(
 
   // s = expand_sprime(s_prime)
   if (!goo_group_expand_sprime(group, s, s_prime))
-    goto fail;
-
-  // if s <= 0
-  if (mpz_sgn(s) <= 0)
     goto fail;
 
   // The challenge: a commitment to the RSA modulus.
@@ -2508,25 +2517,6 @@ goo_group_sign(
     goto fail;
   }
 
-  // s = expand_sprime(s_prime)
-  if (!goo_group_expand_sprime(group, s, s_prime))
-    goto fail;
-
-  // if s <= 0
-  if (mpz_sgn(s) <= 0)
-    goto fail;
-
-  // C1 = powgh(n, s)
-  if (!goo_group_powgh(group, C1, n, s))
-    goto fail;
-
-  // C1 = reduce(C1)
-  goo_group_reduce(group, C1, C1);
-
-  // if C1 <= 0
-  if (mpz_sgn(C1) <= 0)
-    goto fail;
-
   // Preliminaries: compute values P needs to run the ZKPOK.
   // Find `t`.
   int found = 0;
@@ -2584,6 +2574,18 @@ goo_group_sign(
     goto fail;
   }
 
+  // Commitment to `n`.
+  // s = expand_sprime(s_prime)
+  if (!goo_group_expand_sprime(group, s, s_prime))
+    goto fail;
+
+  // C1 = powgh(n, s)
+  if (!goo_group_powgh(group, C1, n, s))
+    goto fail;
+
+  // C1 = reduce(C1)
+  goo_group_reduce(group, C1, C1);
+
   // Commitment to `w`.
   // s1 = rand_scalar()
   // C2 = powgh(w, s1)
@@ -2603,6 +2605,14 @@ goo_group_sign(
   }
 
   goo_group_reduce(group, *C3, *C3);
+
+  // if C1 <= 0 or C2 <= 0 or C3 <= 0
+  if (mpz_sgn(C1) <= 0
+      || mpz_sgn(*C2) <= 0
+      || mpz_sgn(*C3) <= 0) {
+    // Invalid C1, C2, or C3 value.
+    goto fail;
+  }
 
   // Inverses of `C1` and `C2`.
   // [C1_inv, C2_inv] = inv2(C1, C2)
@@ -2685,6 +2695,16 @@ goo_group_sign(
                            *t, A, B, C, D, E, msg, 0)) {
       goto fail;
     }
+  }
+
+  // if A <= 0 or B <= 0 or C <= 0 or D <= 0 or E <= 0
+  if (mpz_sgn(A) <= 0
+      || mpz_sgn(B) <= 0
+      || mpz_sgn(C) <= 0
+      || mpz_sgn(D) <= 0
+      || mpz_sgn(E) <= 0) {
+    // Invalid A, B, C, D, or E value.
+    goto fail;
   }
 
   // P's second message: compute quotient message.
@@ -2771,6 +2791,16 @@ goo_group_sign(
   assert(mpz_sgn(*Eq) >= 0);
   assert(goo_mpz_bitlen(*Eq) <= GOO_EXPONENT_SIZE);
 
+  // if Aq <= 0 or Bq <= 0 or Cq <= 0 or Dq <= 0 or Eq <= 0
+  if (mpz_sgn(*Aq) <= 0
+      || mpz_sgn(*Bq) <= 0
+      || mpz_sgn(*Cq) <= 0
+      || mpz_sgn(*Dq) <= 0
+      || mpz_sgn(*Eq) <= 0) {
+    // Invalid Aq, Bq, Cq, Dq, or Eq value.
+    goto fail;
+  }
+
   mpz_mod(*z_w, *z_w, *ell);
   mpz_mod(*z_w2, *z_w2, *ell);
   mpz_mod(*z_s1, *z_s1, *ell);
@@ -2779,6 +2809,20 @@ goo_group_sign(
   mpz_mod(*z_s1w, *z_s1w, *ell);
   mpz_mod(*z_sa, *z_sa, *ell);
   mpz_mod(*z_s2, *z_s2, *ell);
+
+  // if z_w <= 0 or z_w2 <= 0 or z_s1 <= 0 or z_a <= 0
+  // or z_an <= 0 or z_s1w <= 0 or z_sa <= 0 or z_s2 <= 0
+  if (mpz_sgn(*z_w) <= 0
+      || mpz_sgn(*z_w2) <= 0
+      || mpz_sgn(*z_s1) <= 0
+      || mpz_sgn(*z_a) <= 0
+      || mpz_sgn(*z_an) <= 0
+      || mpz_sgn(*z_s1w) <= 0
+      || mpz_sgn(*z_sa) <= 0
+      || mpz_sgn(*z_s2) <= 0) {
+    // Invalid z_prime value.
+    goto fail;
+  }
 
   // z_prime: (z_w, z_w2, z_s1, z_a, z_an, z_s1w, z_sa, z_s2).
   // Signature: (chal, ell, Aq, Bq, Cq, Dq, Eq, z_prime).
@@ -2862,25 +2906,25 @@ goo_group_verify(
   unsigned char key[32];
 
   // Sanity check.
-  if (mpz_sgn(C1) < 0
-      || mpz_sgn(*C2) < 0
-      || mpz_sgn(*C3) < 0
-      || mpz_sgn(*t) < 0
-      || mpz_sgn(*chal) < 0
-      || mpz_sgn(*ell) < 0
-      || mpz_sgn(*Aq) < 0
-      || mpz_sgn(*Bq) < 0
-      || mpz_sgn(*Cq) < 0
-      || mpz_sgn(*Dq) < 0
-      || mpz_sgn(*Eq) < 0
-      || mpz_sgn(*z_w) < 0
-      || mpz_sgn(*z_w2) < 0
-      || mpz_sgn(*z_s1) < 0
-      || mpz_sgn(*z_a) < 0
-      || mpz_sgn(*z_an) < 0
-      || mpz_sgn(*z_s1w) < 0
-      || mpz_sgn(*z_sa) < 0
-      || mpz_sgn(*z_s2) < 0) {
+  if (mpz_sgn(C1) <= 0
+      || mpz_sgn(*C2) <= 0
+      || mpz_sgn(*C3) <= 0
+      || mpz_sgn(*t) <= 0
+      || mpz_sgn(*chal) <= 0
+      || mpz_sgn(*ell) <= 0
+      || mpz_sgn(*Aq) <= 0
+      || mpz_sgn(*Bq) <= 0
+      || mpz_sgn(*Cq) <= 0
+      || mpz_sgn(*Dq) <= 0
+      || mpz_sgn(*Eq) <= 0
+      || mpz_sgn(*z_w) <= 0
+      || mpz_sgn(*z_w2) <= 0
+      || mpz_sgn(*z_s1) <= 0
+      || mpz_sgn(*z_a) <= 0
+      || mpz_sgn(*z_an) <= 0
+      || mpz_sgn(*z_s1w) <= 0
+      || mpz_sgn(*z_sa) <= 0
+      || mpz_sgn(*z_s2) <= 0) {
     return 0;
   }
 
