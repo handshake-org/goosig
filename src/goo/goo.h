@@ -65,6 +65,7 @@ typedef struct goo_comb_item_s {
 typedef struct goo_prng_s {
   goo_drbg_t ctx;
   mpz_t save;
+  unsigned long total;
   mpz_t tmp;
 } goo_prng_t;
 
