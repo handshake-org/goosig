@@ -1601,7 +1601,6 @@ goo_group_init(
   assert(goo_hash_item(&group->sha, group->g, 4, group->slab));
   assert(goo_hash_item(&group->sha, group->h, 4, group->slab));
 
-  mpz_init(group->msg);
   goo_sig_init(&group->sig);
   mpz_init(group->C1);
   mpz_init(group->C1_inv);
@@ -1652,7 +1651,6 @@ goo_group_uninit(goo_group_t *group) {
 
   goo_prng_uninit(&group->prng);
 
-  mpz_clear(group->msg);
   goo_sig_uninit(&group->sig);
   mpz_clear(group->C1);
   mpz_clear(group->C1_inv);
@@ -2183,7 +2181,8 @@ goo_hash_all(
   const mpz_t C,
   const mpz_t D,
   const mpz_t E,
-  const mpz_t msg
+  const unsigned char *msg,
+  size_t msg_len
 ) {
   unsigned char *buf = &group->slab[0];
   size_t mod_bytes = group->size;
@@ -2203,11 +2202,11 @@ goo_hash_all(
       || !goo_hash_item(&ctx, B, mod_bytes, buf)
       || !goo_hash_item(&ctx, C, mod_bytes, buf)
       || !goo_hash_item(&ctx, D, mod_bytes, buf)
-      || !goo_hash_item(&ctx, E, exp_bytes, buf)
-      || !goo_hash_item(&ctx, msg, 64, buf)) {
+      || !goo_hash_item(&ctx, E, exp_bytes, buf)) {
     return 0;
   }
 
+  goo_sha256_update(&ctx, msg, msg_len);
   goo_sha256_final(&ctx, out);
 
   return 1;
@@ -2228,12 +2227,13 @@ goo_group_fs_chal(
   const mpz_t C,
   const mpz_t D,
   const mpz_t E,
-  const mpz_t msg,
+  const unsigned char *msg,
+  size_t msg_len,
   int verify
 ) {
   unsigned char key[32];
 
-  if (!goo_hash_all(&key[0], group, C1, C2, C3, t, A, B, C, D, E, msg))
+  if (!goo_hash_all(&key[0], group, C1, C2, C3, t, A, B, C, D, E, msg, msg_len))
     return 0;
 
   goo_prng_seed(&group->prng, &key[0]);
@@ -2437,7 +2437,8 @@ static int
 goo_group_sign(
   goo_group_t *group,
   goo_sig_t *sig,
-  const mpz_t msg,
+  const unsigned char *msg,
+  size_t msg_len,
   const mpz_t s_prime,
   const mpz_t p,
   const mpz_t q
@@ -2692,7 +2693,7 @@ goo_group_sign(
     // [chal, ell] = fs_chal(C1, C2, C3, t, A, B, C, D, E, msg)
     if (!goo_group_fs_chal(group,
                            *chal, *ell, NULL, C1, *C2, *C3,
-                           *t, A, B, C, D, E, msg, 0)) {
+                           *t, A, B, C, D, E, msg, msg_len, 0)) {
       goto fail;
     }
   }
@@ -2862,7 +2863,8 @@ fail:
 static int
 goo_group_verify(
   goo_group_t *group,
-  const mpz_t msg,
+  const unsigned char *msg,
+  size_t msg_len,
   const goo_sig_t *sig,
   const mpz_t C1
 ) {
@@ -3015,7 +3017,8 @@ goo_group_verify(
   // Step 2: recompute implicitly claimed V message, viz., chal and ell.
   // [chal_out, ell_r_out, key] = fs_chal(C1, C2, t, A, B, C, D, msg)
   if (!goo_group_fs_chal(group, *chal_out, *ell_r_out, &key[0],
-                         C1, *C2, *C3, *t, *A, *B, *C, *D, *E, msg, 1)) {
+                         C1, *C2, *C3, *t, *A, *B, *C, *D, *E,
+                         msg, msg_len, 1)) {
     return 0;
   }
 
@@ -3255,12 +3258,11 @@ goo_sign(
 
   goo_sig_init(&sig);
 
-  goo_mpz_import(msg_n, msg, msg_len);
   goo_mpz_import(s_prime_n, s_prime, s_prime_len);
   goo_mpz_import(p_n, p, p_len);
   goo_mpz_import(q_n, q, q_len);
 
-  if (!goo_group_sign(ctx, &sig, msg_n, s_prime_n, p_n, q_n))
+  if (!goo_group_sign(ctx, &sig, msg, msg_len, s_prime_n, p_n, q_n))
     goto fail;
 
   size = goo_sig_size(&sig, ctx->bits);
@@ -3308,13 +3310,12 @@ goo_verify(
   if (C1_len != ctx->size)
     return 0;
 
-  goo_mpz_import(ctx->msg, msg, msg_len);
   goo_mpz_import(ctx->C1, C1, C1_len);
 
   if (!goo_sig_import(&ctx->sig, sig, sig_len, ctx->bits))
     return 0;
 
-  return goo_group_verify(ctx, ctx->msg, &ctx->sig, ctx->C1);
+  return goo_group_verify(ctx, msg, msg_len, &ctx->sig, ctx->C1);
 }
 
 #ifdef GOO_TEST
@@ -4346,7 +4347,7 @@ run_goo_test(void) {
   mpz_t mod_n;
   goo_group_t *goo;
   mpz_t s_prime, C1;
-  mpz_t msg;
+  unsigned char msg[32];
   goo_sig_t sig;
 
   mpz_init(p);
@@ -4358,7 +4359,6 @@ run_goo_test(void) {
 
   mpz_init(s_prime);
   mpz_init(C1);
-  mpz_init(msg);
   goo_sig_init(&sig);
 
   assert(mpz_set_str(p, p_hex, 16) == 0);
@@ -4373,11 +4373,11 @@ run_goo_test(void) {
   assert(goo_group_generate(goo, s_prime));
   assert(goo_group_challenge(goo, C1, s_prime, n));
 
-  mpz_set_ui(msg, 0xdeadbeef);
+  memset(&msg[0], 0xaa, sizeof(msg));
 
   assert(goo_group_validate(goo, s_prime, C1, p, q));
-  assert(goo_group_sign(goo, &sig, msg, s_prime, p, q));
-  assert(goo_group_verify(goo, msg, &sig, C1));
+  assert(goo_group_sign(goo, &sig, msg, sizeof(msg), s_prime, p, q));
+  assert(goo_group_verify(goo, msg, sizeof(msg), &sig, C1));
 
   mpz_clear(p);
   mpz_clear(q);
@@ -4385,7 +4385,6 @@ run_goo_test(void) {
   mpz_clear(mod_n);
   mpz_clear(s_prime);
   mpz_clear(C1);
-  mpz_clear(msg);
   goo_sig_uninit(&sig);
   goo_group_uninit(goo);
   goo_free(goo);
