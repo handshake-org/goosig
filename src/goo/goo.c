@@ -3437,12 +3437,12 @@ run_prng_test(void) {
   assert(mpz_cmp(y, x) < 0);
 
   goo_prng_random_bits(&prng, x, 30);
-  assert(mpz_cmp_ui(x, 540405817) == 0);
+  assert(mpz_cmp_ui(x, 660784431) == 0);
   goo_prng_random_bits(&prng, x, 31);
-  assert(mpz_cmp_ui(x, 1312024779) == 0);
+  assert(mpz_cmp_ui(x, 2044965173) == 0);
   goo_prng_random_bits(&prng, x, 31);
   goo_prng_random_int(&prng, y, x);
-  assert(mpz_cmp_ui(y, 665860407) == 0);
+  assert(mpz_cmp_ui(y, 196040056) == 0);
 
   mpz_clear(x);
   mpz_clear(y);
