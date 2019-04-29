@@ -379,12 +379,12 @@ goo_random_num(unsigned long max) {
   if (max == 0)
     return 0;
 
-  unsigned long rand;
+  unsigned long n;
 
-  if (!goo_random((void *)&rand, sizeof(unsigned long)))
+  if (!goo_random((void *)&n, sizeof(unsigned long)))
     assert(0 && "RNG failed.");
 
-  return rand % max;
+  return n % max;
 }
 
 /*

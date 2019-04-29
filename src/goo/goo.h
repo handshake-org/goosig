@@ -29,8 +29,8 @@ extern "C" {
 #define GOO_MAX_COMB_SIZE 512
 #define GOO_CHAL_BITS 128
 #define GOO_ELLDIFF_MAX 512
-#define GOO_HASH_PREFIX "libGooPy:"
-#define GOO_DRBG_PERS "libGooPy_prng"
+#define GOO_HASH_PREFIX "Goo Signature"
+#define GOO_DRBG_PERS "Goo PRNG"
 
 #define GOO_TABLEN (1 << (GOO_WINDOW_SIZE - 2))
 
