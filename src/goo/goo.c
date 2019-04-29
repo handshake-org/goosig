@@ -1151,19 +1151,20 @@ goo_sig_size(const goo_sig_t *sig, size_t bits) {
   size_t mod_bytes = (bits + 7) / 8;
   size_t exp_bytes = (GOO_EXPONENT_SIZE + 7) / 8;
   size_t chal_bytes = (GOO_CHAL_BITS + 7) / 8;
+  size_t ell_bytes = (GOO_ELL_BITS + 7) / 8;
   size_t len = 0;
 
   len += mod_bytes; // C2
   len += mod_bytes; // C3
   len += 2; // t
   len += chal_bytes; // chal
-  len += chal_bytes; // ell
+  len += ell_bytes; // ell
   len += mod_bytes; // Aq
   len += mod_bytes; // Bq
   len += mod_bytes; // Cq
   len += mod_bytes; // Dq
   len += exp_bytes; // Eq
-  len += chal_bytes * 8; // z_prime
+  len += ell_bytes * 8; // z_prime
 
   return len;
 }
@@ -1187,6 +1188,7 @@ goo_sig_export(unsigned char *out, const goo_sig_t *sig, size_t bits) {
   size_t mod_bytes = (bits + 7) / 8;
   size_t exp_bytes = (GOO_EXPONENT_SIZE + 7) / 8;
   size_t chal_bytes = (GOO_CHAL_BITS + 7) / 8;
+  size_t ell_bytes = (GOO_ELL_BITS + 7) / 8;
   size_t pos = 0;
 
   goo_write_int(sig->C2, mod_bytes);
@@ -1194,21 +1196,21 @@ goo_sig_export(unsigned char *out, const goo_sig_t *sig, size_t bits) {
   goo_write_int(sig->t, 2);
 
   goo_write_int(sig->chal, chal_bytes);
-  goo_write_int(sig->ell, chal_bytes);
+  goo_write_int(sig->ell, ell_bytes);
   goo_write_int(sig->Aq, mod_bytes);
   goo_write_int(sig->Bq, mod_bytes);
   goo_write_int(sig->Cq, mod_bytes);
   goo_write_int(sig->Dq, mod_bytes);
   goo_write_int(sig->Eq, exp_bytes);
 
-  goo_write_int(sig->z_w, chal_bytes);
-  goo_write_int(sig->z_w2, chal_bytes);
-  goo_write_int(sig->z_s1, chal_bytes);
-  goo_write_int(sig->z_a, chal_bytes);
-  goo_write_int(sig->z_an, chal_bytes);
-  goo_write_int(sig->z_s1w, chal_bytes);
-  goo_write_int(sig->z_sa, chal_bytes);
-  goo_write_int(sig->z_s2, chal_bytes);
+  goo_write_int(sig->z_w, ell_bytes);
+  goo_write_int(sig->z_w2, ell_bytes);
+  goo_write_int(sig->z_s1, ell_bytes);
+  goo_write_int(sig->z_a, ell_bytes);
+  goo_write_int(sig->z_an, ell_bytes);
+  goo_write_int(sig->z_s1w, ell_bytes);
+  goo_write_int(sig->z_sa, ell_bytes);
+  goo_write_int(sig->z_s2, ell_bytes);
 
   assert(goo_sig_size(sig, bits) == pos);
 
@@ -1235,6 +1237,7 @@ goo_sig_import(
   size_t mod_bytes = (bits + 7) / 8;
   size_t exp_bytes = (GOO_EXPONENT_SIZE + 7) / 8;
   size_t chal_bytes = (GOO_CHAL_BITS + 7) / 8;
+  size_t ell_bytes = (GOO_ELL_BITS + 7) / 8;
   size_t pos = 0;
 
   goo_read_int(sig->C2, mod_bytes);
@@ -1242,21 +1245,21 @@ goo_sig_import(
   goo_read_int(sig->t, 2);
 
   goo_read_int(sig->chal, chal_bytes);
-  goo_read_int(sig->ell, chal_bytes);
+  goo_read_int(sig->ell, ell_bytes);
   goo_read_int(sig->Aq, mod_bytes);
   goo_read_int(sig->Bq, mod_bytes);
   goo_read_int(sig->Cq, mod_bytes);
   goo_read_int(sig->Dq, mod_bytes);
   goo_read_int(sig->Eq, exp_bytes);
 
-  goo_read_int(sig->z_w, chal_bytes);
-  goo_read_int(sig->z_w2, chal_bytes);
-  goo_read_int(sig->z_s1, chal_bytes);
-  goo_read_int(sig->z_a, chal_bytes);
-  goo_read_int(sig->z_an, chal_bytes);
-  goo_read_int(sig->z_s1w, chal_bytes);
-  goo_read_int(sig->z_sa, chal_bytes);
-  goo_read_int(sig->z_s2, chal_bytes);
+  goo_read_int(sig->z_w, ell_bytes);
+  goo_read_int(sig->z_w2, ell_bytes);
+  goo_read_int(sig->z_s1, ell_bytes);
+  goo_read_int(sig->z_a, ell_bytes);
+  goo_read_int(sig->z_an, ell_bytes);
+  goo_read_int(sig->z_s1w, ell_bytes);
+  goo_read_int(sig->z_sa, ell_bytes);
+  goo_read_int(sig->z_s2, ell_bytes);
 
   assert(pos <= data_len);
 
@@ -1332,7 +1335,7 @@ goo_combspec_init(
   long bits,
   long maxsize
 ) {
-  if (bits < 128 || maxsize < 0)
+  if (bits < 0 || maxsize < 0)
     return 0;
 
   size_t map_size = combspec_size(bits);
@@ -1561,7 +1564,7 @@ goo_group_init(
     long big1 = 2 * modbits;
     long big2 = modbits + group->rand_bits;
     long big = big1 > big2 ? big1 : big2;
-    long big_bits = big + GOO_CHAL_BITS + 1;
+    long big_bits = big + GOO_ELL_BITS + 1;
 
     goo_combspec_t big_spec;
     assert(goo_combspec_init(&big_spec, big_bits, GOO_MAX_COMB_SIZE));
@@ -1576,7 +1579,7 @@ goo_group_init(
     goo_comb_init(&group->combs[1].g, group, group->g, &big_spec);
     goo_comb_init(&group->combs[1].h, group, group->h, &big_spec);
   } else {
-    long tiny_bits = GOO_CHAL_BITS;
+    long tiny_bits = GOO_ELL_BITS;
 
     goo_combspec_t tiny_spec;
     assert(goo_combspec_init(&tiny_spec, tiny_bits, GOO_MAX_COMB_SIZE));
@@ -2011,7 +2014,7 @@ goo_group_pow_wnaf(
 
   size_t totlen = goo_mpz_bitlen(e) + 1;
 
-  assert(totlen <= GOO_CHAL_BITS + 1);
+  assert(totlen <= GOO_ELL_BITS + 1);
 
   long *ebits = goo_group_wnaf(group, e, &group->e1bits[0], totlen);
 
@@ -2052,7 +2055,7 @@ goo_group_pow2(
   size_t e2len = goo_mpz_bitlen(e2);
   size_t totlen = (e1len > e2len ? e1len : e2len) + 1;
 
-  if (totlen > GOO_CHAL_BITS + 1)
+  if (totlen > GOO_ELL_BITS + 1)
     return 0;
 
   long *e1bits = goo_group_wnaf(group, e1, &group->e1bits[0], totlen);
@@ -2238,7 +2241,7 @@ goo_group_fs_chal(
 
   goo_prng_seed(&group->prng, &key[0]);
   goo_prng_random_bits_nz(&group->prng, chal, GOO_CHAL_BITS);
-  goo_prng_random_bits_nz(&group->prng, ell, GOO_CHAL_BITS);
+  goo_prng_random_bits_nz(&group->prng, ell, GOO_ELL_BITS);
 
   if (k != NULL)
     memcpy(k, key, 32);
@@ -2674,8 +2677,8 @@ goo_group_sign(
   mpz_set_ui(*ell, 0);
 
   // V's message: random challenge and random prime.
-  // while bitlen(ell) != 128
-  while (goo_mpz_bitlen(*ell) != 128) {
+  // while bitlen(ell) != ELL_BITS
+  while (goo_mpz_bitlen(*ell) != GOO_ELL_BITS) {
     // Randomize the signature until Fiat-Shamir
     // returns an admissable ell. Note that it's
     // not necessary to re-start the whole
@@ -2930,8 +2933,8 @@ goo_group_verify(
     return 0;
   }
 
-  // if bitlen(ell) > 128
-  if (goo_mpz_bitlen(*ell) > 128)
+  // if bitlen(ell) > ELL_BITS
+  if (goo_mpz_bitlen(*ell) > GOO_ELL_BITS)
     return 0;
 
   // `t` must be one of the small primes in our list.
@@ -4018,21 +4021,37 @@ run_ops_test(void) {
     assert(goo->combs[0].h.points_per_subcomb == 255);
     assert(goo->combs[0].h.size == 510);
 
-    assert(goo->combs[1].g.points_per_add == 7);
-    assert(goo->combs[1].g.adds_per_shift == 4);
-    assert(goo->combs[1].g.shifts == 151);
-    assert(goo->combs[1].g.bits_per_window == 604);
-    assert(goo->combs[1].g.bits == 4228);
-    assert(goo->combs[1].g.points_per_subcomb == 127);
-    assert(goo->combs[1].g.size == 508);
+    // assert(goo->combs[1].g.points_per_add == 7);
+    // assert(goo->combs[1].g.adds_per_shift == 4);
+    // assert(goo->combs[1].g.shifts == 151);
+    // assert(goo->combs[1].g.bits_per_window == 604);
+    // assert(goo->combs[1].g.bits == 4228);
+    // assert(goo->combs[1].g.points_per_subcomb == 127);
+    // assert(goo->combs[1].g.size == 508);
 
-    assert(goo->combs[1].h.points_per_add == 7);
-    assert(goo->combs[1].h.adds_per_shift == 4);
-    assert(goo->combs[1].h.shifts == 151);
-    assert(goo->combs[1].h.bits_per_window == 604);
-    assert(goo->combs[1].h.bits == 4228);
-    assert(goo->combs[1].h.points_per_subcomb == 127);
-    assert(goo->combs[1].h.size == 508);
+    // assert(goo->combs[1].h.points_per_add == 7);
+    // assert(goo->combs[1].h.adds_per_shift == 4);
+    // assert(goo->combs[1].h.shifts == 151);
+    // assert(goo->combs[1].h.bits_per_window == 604);
+    // assert(goo->combs[1].h.bits == 4228);
+    // assert(goo->combs[1].h.points_per_subcomb == 127);
+    // assert(goo->combs[1].h.size == 508);
+
+    assert(goo->combs[1].g.points_per_add == 8);
+    assert(goo->combs[1].g.adds_per_shift == 2);
+    assert(goo->combs[1].g.shifts == 265);
+    assert(goo->combs[1].g.bits_per_window == 530);
+    assert(goo->combs[1].g.bits == 4240);
+    assert(goo->combs[1].g.points_per_subcomb == 255);
+    assert(goo->combs[1].g.size == 510);
+
+    assert(goo->combs[1].h.points_per_add == 8);
+    assert(goo->combs[1].h.adds_per_shift == 2);
+    assert(goo->combs[1].h.shifts == 265);
+    assert(goo->combs[1].h.bits_per_window == 530);
+    assert(goo->combs[1].h.bits == 4240);
+    assert(goo->combs[1].h.points_per_subcomb == 255);
+    assert(goo->combs[1].h.size == 510);
   }
 
   // test pow2
@@ -4089,8 +4108,8 @@ run_ops_test(void) {
     mpz_init(r1);
     mpz_init(r2);
 
-    assert(goo_random_bits(e1, 2048 + GOO_CHAL_BITS + 2 - 1));
-    assert(goo_random_bits(e2, 2048 + GOO_CHAL_BITS + 2 - 1));
+    assert(goo_random_bits(e1, 2048 + GOO_ELL_BITS + 2 - 1));
+    assert(goo_random_bits(e2, 2048 + GOO_ELL_BITS + 2 - 1));
 
     assert(goo_group_powgh_slow(goo, r1, e1, e2));
     assert(goo_group_powgh(goo, r2, e1, e2));
@@ -4227,21 +4246,37 @@ run_combspec_test(void) {
   assert(mpz_set_str(n, mod_hex, 16) == 0);
   assert(goo_group_init(goo, n, 2, 3, 0));
 
-  assert(goo->combs[0].g.points_per_add == 8);
-  assert(goo->combs[0].g.adds_per_shift == 2);
-  assert(goo->combs[0].g.shifts == 8);
-  assert(goo->combs[0].g.bits_per_window == 16);
-  assert(goo->combs[0].g.bits == 128);
-  assert(goo->combs[0].g.points_per_subcomb == 255);
-  assert(goo->combs[0].g.size == 510);
+  // assert(goo->combs[0].g.points_per_add == 8);
+  // assert(goo->combs[0].g.adds_per_shift == 2);
+  // assert(goo->combs[0].g.shifts == 8);
+  // assert(goo->combs[0].g.bits_per_window == 16);
+  // assert(goo->combs[0].g.bits == 128);
+  // assert(goo->combs[0].g.points_per_subcomb == 255);
+  // assert(goo->combs[0].g.size == 510);
 
-  assert(goo->combs[0].h.points_per_add == 8);
-  assert(goo->combs[0].h.adds_per_shift == 2);
-  assert(goo->combs[0].h.shifts == 8);
-  assert(goo->combs[0].h.bits_per_window == 16);
-  assert(goo->combs[0].h.bits == 128);
-  assert(goo->combs[0].h.points_per_subcomb == 255);
-  assert(goo->combs[0].h.size == 510);
+  // assert(goo->combs[0].h.points_per_add == 8);
+  // assert(goo->combs[0].h.adds_per_shift == 2);
+  // assert(goo->combs[0].h.shifts == 8);
+  // assert(goo->combs[0].h.bits_per_window == 16);
+  // assert(goo->combs[0].h.bits == 128);
+  // assert(goo->combs[0].h.points_per_subcomb == 255);
+  // assert(goo->combs[0].h.size == 510);
+
+  assert(goo->combs[0].g.points_per_add == 7);
+  assert(goo->combs[0].g.adds_per_shift == 4);
+  assert(goo->combs[0].g.shifts == 5);
+  assert(goo->combs[0].g.bits_per_window == 20);
+  assert(goo->combs[0].g.bits == 140);
+  assert(goo->combs[0].g.points_per_subcomb == 127);
+  assert(goo->combs[0].g.size == 508);
+
+  assert(goo->combs[0].h.points_per_add == 7);
+  assert(goo->combs[0].h.adds_per_shift == 4);
+  assert(goo->combs[0].h.shifts == 5);
+  assert(goo->combs[0].h.bits_per_window == 20);
+  assert(goo->combs[0].h.bits == 140);
+  assert(goo->combs[0].h.points_per_subcomb == 127);
+  assert(goo->combs[0].h.size == 508);
 
   mpz_clear(n);
   goo_group_uninit(goo);
