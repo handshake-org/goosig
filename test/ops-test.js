@@ -57,8 +57,8 @@ describe('Group Ops', function() {
   });
 
   it('should compute powgh (t1)', () => {
-    const e1 = util.randomBits(2 * 2048 + constants.CHAL_BITS + 2 - 1); // -1
-    const e2 = util.randomBits(2 * 2048 + constants.CHAL_BITS + 2 - 1); // -1
+    const e1 = util.randomBits(2 * 2048 + constants.ELL_BITS + 2 - 1); // -1
+    const e2 = util.randomBits(2 * 2048 + constants.ELL_BITS + 2 - 1); // -1
 
     const p1 = new BN(2).powm(e1, t1.n);
     const p2 = new BN(3).powm(e2, t1.n);
@@ -70,11 +70,11 @@ describe('Group Ops', function() {
   });
 
   it('should compute powgh (t2)', () => {
-    const e1 = util.randomBits(2 * 2048 + constants.CHAL_BITS + 2 - 1); // -1
-    const e2 = util.randomBits(2 * 2048 + constants.CHAL_BITS + 2 - 1); // -1
+    const e1 = util.randomBits(2 * 2048 + constants.ELL_BITS + 2 - 1); // -1
+    const e2 = util.randomBits(2 * 2048 + constants.ELL_BITS + 2 - 1); // -1
 
-    const e1_s = e1.ushrn(2048 + constants.CHAL_BITS);
-    const e2_s = e2.ushrn(2048 + constants.CHAL_BITS);
+    const e1_s = e1.ushrn(2048 + constants.ELL_BITS);
+    const e2_s = e2.ushrn(2048 + constants.ELL_BITS);
 
     const p1 = new BN(5).powm(e1_s, t2.n);
     const p2 = new BN(7).powm(e2_s, t2.n);

@@ -28,6 +28,7 @@ extern "C" {
 #define GOO_WINDOW_SIZE 6
 #define GOO_MAX_COMB_SIZE 512
 #define GOO_CHAL_BITS 128
+#define GOO_ELL_BITS 136
 #define GOO_ELLDIFF_MAX 512
 #define GOO_HASH_PREFIX "Goo Signature"
 #define GOO_DRBG_PERS "Goo PRNG"
@@ -109,8 +110,8 @@ typedef struct goo_group_s {
   mpz_t pctab_n1[GOO_TABLEN];
   mpz_t pctab_n2[GOO_TABLEN];
   mpz_t pctab_p2[GOO_TABLEN];
-  long e1bits[GOO_CHAL_BITS + 1];
-  long e2bits[GOO_CHAL_BITS + 1];
+  long e1bits[GOO_ELL_BITS + 1];
+  long e2bits[GOO_ELL_BITS + 1];
 
   goo_prng_t prng;
   goo_sha256_t sha;
