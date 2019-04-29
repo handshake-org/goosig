@@ -2776,7 +2776,7 @@ goo_group_sign(
   mpz_tdiv_q(x, *z_a, *ell);
   mpz_tdiv_q(y, *z_an, *ell);
   mpz_tdiv_q(z, *z_sa, *ell);
-  goo_group_pow(group, xx, C1_inv, *C2, x);
+  goo_group_pow(group, xx, C1_inv, C1, x);
 
   if (!goo_group_powgh(group, yy, y, z))
     goto fail;
