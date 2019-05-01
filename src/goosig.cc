@@ -44,7 +44,7 @@ Goo::Init(v8::Local<v8::Object> &target) {
   v8::Local<v8::FunctionTemplate> ctor =
     Nan::New<v8::FunctionTemplate>(goosig_constructor);
 
-  target->Set(Nan::New("Goo").ToLocalChecked(),
+  Nan::Set(target, Nan::New("Goo").ToLocalChecked(),
     Nan::GetFunction(ctor).ToLocalChecked());
 }
 
