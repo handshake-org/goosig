@@ -67,7 +67,8 @@ static const char goo_pers[] = GOO_DRBG_PERS;
 
 #define goo_mpz_lshift mpz_mul_2exp
 #define goo_mpz_rshift mpz_fdiv_q_2exp
-#define goo_mpz_mod_ui mpz_tdiv_ui
+#define goo_mpz_urshift mpz_tdiv_q_2exp
+#define goo_mpz_mod_ui mpz_fdiv_ui
 #define goo_mpz_and_ui(x, y) mpz_tdiv_ui((x), (y) + 1)
 
 // Note: violates strict aliasing.
@@ -216,7 +217,7 @@ goo_mpz_jacobi(const mpz_t x, const mpz_t y) {
     }
 
     // c = a >> s
-    mpz_fdiv_q_2exp(c, a, s);
+    mpz_tdiv_q_2exp(c, a, s);
 
     // if b & 3 == 3 and c & 3 == 3
     if (mpz_tdiv_ui(b, 4) == 3 && mpz_tdiv_ui(c, 4) == 3)
@@ -328,7 +329,7 @@ goo_random_bits(mpz_t ret, unsigned long bits) {
   unsigned long left = total - bits;
 
   // ret >>= left;
-  mpz_fdiv_q_2exp(ret, ret, left);
+  mpz_tdiv_q_2exp(ret, ret, left);
 
   r = 1;
 fail:
@@ -451,7 +452,7 @@ goo_prng_random_bits(goo_prng_t *prng, mpz_t ret, unsigned long bits) {
   prng->total = left;
 
   // ret >>= left;
-  mpz_fdiv_q_2exp(ret, ret, left);
+  mpz_tdiv_q_2exp(ret, ret, left);
 }
 
 static void
@@ -559,7 +560,7 @@ goo_mpz_sqrtp(mpz_t ret, const mpz_t num, const mpz_t p) {
   if (mpz_tdiv_ui(p, 4) == 3) {
     // e = (p + 1) >> 2
     mpz_add_ui(e, p, 1);
-    mpz_fdiv_q_2exp(e, e, 2);
+    mpz_tdiv_q_2exp(e, e, 2);
     // ret = x^e mod p
     mpz_powm(ret, x, e, p);
     goto success;
@@ -568,7 +569,7 @@ goo_mpz_sqrtp(mpz_t ret, const mpz_t num, const mpz_t p) {
   // if p mod 8 == 5
   if (mpz_tdiv_ui(p, 8) == 5) {
     // e = p >> 3
-    mpz_fdiv_q_2exp(e, p, 3);
+    mpz_tdiv_q_2exp(e, p, 3);
     // t = x << 1
     mpz_mul_2exp(t, x, 1);
     // a = t^e mod p
@@ -599,7 +600,7 @@ goo_mpz_sqrtp(mpz_t ret, const mpz_t num, const mpz_t p) {
   unsigned long z = goo_mpz_zerobits(s);
 
   // s = s >> z
-  mpz_fdiv_q_2exp(s, s, z);
+  mpz_tdiv_q_2exp(s, s, z);
 
   // n = 2
   mpz_set_ui(n, 2);
@@ -613,7 +614,7 @@ goo_mpz_sqrtp(mpz_t ret, const mpz_t num, const mpz_t p) {
   // y = s + 1
   mpz_add_ui(y, s, 1);
   // y = y >> 1
-  mpz_fdiv_q_2exp(y, y, 1);
+  mpz_tdiv_q_2exp(y, y, 1);
   // y = x^y mod p
   mpz_powm(y, x, y, p);
   // b = x^s mod p
@@ -747,7 +748,7 @@ goo_is_prime_div(const mpz_t n) {
       return 2;
 
     // if n mod test_primes[i] == 0
-    if (mpz_tdiv_ui(n, goo_test_primes[i]) == 0)
+    if (mpz_fdiv_ui(n, goo_test_primes[i]) == 0)
       return 0;
   }
 
@@ -793,7 +794,7 @@ goo_is_prime_mr(
   // k = zero_bits(nm1)
   k = goo_mpz_zerobits(nm1);
   // q = nm1 >> k
-  mpz_fdiv_q_2exp(q, nm1, k);
+  mpz_tdiv_q_2exp(q, nm1, k);
 
   // Setup PRNG.
   goo_prng_t prng;
@@ -938,7 +939,7 @@ goo_is_prime_lucas(const mpz_t n) {
   mpz_sub_ui(nm2, n, 2);
 
   // s >>= zb
-  mpz_fdiv_q_2exp(s, s, zb);
+  mpz_tdiv_q_2exp(s, s, zb);
 
   unsigned long bp = p;
 
@@ -1551,7 +1552,7 @@ goo_group_init(
   group->size = (group->bits + 7) / 8;
 
   // nh = n >> 1
-  mpz_fdiv_q_2exp(group->nh, group->n, 1);
+  mpz_tdiv_q_2exp(group->nh, group->n, 1);
 
   // g = g
   mpz_set_ui(group->g, g);
@@ -1955,7 +1956,7 @@ goo_group_wnaf(goo_group_t *group, const mpz_t exp, long *out, long bitlen) {
     val = 0;
 
     // if e & 1
-    if (mpz_tstbit(*e, 0)) {
+    if (mpz_odd_p(*e)) {
       // val = e & mask;
       val = (long)mpz_tdiv_ui(*e, mask + 1);
 
@@ -1973,7 +1974,7 @@ goo_group_wnaf(goo_group_t *group, const mpz_t exp, long *out, long bitlen) {
     out[i] = val;
 
     // e = e >> 1
-    mpz_fdiv_q_2exp(*e, *e, 1);
+    mpz_tdiv_q_2exp(*e, *e, 1);
   }
 
   // e == 0
@@ -2557,13 +2558,15 @@ goo_group_sign(
   // assert w > 0
   assert(mpz_sgn(w) > 0);
 
-  // a = (w^2 - t) / n
+  // a = w^2 - t
   mpz_pow_ui(a, w, 2);
   mpz_sub(a, a, *t);
-  mpz_tdiv_q(a, a, n);
 
   // assert a >= 0
   assert(mpz_sgn(a) >= 0);
+
+  // a = a / n
+  mpz_fdiv_q(a, a, n);
 
   // x = a * n
   mpz_mul(x, a, n);
@@ -2746,8 +2749,8 @@ goo_group_sign(
   // Compute quotient commitments.
 
   // Aq = powgh(z_w / ell, z_s1 / ell)
-  mpz_tdiv_q(x, *z_w, *ell);
-  mpz_tdiv_q(y, *z_s1, *ell);
+  mpz_fdiv_q(x, *z_w, *ell);
+  mpz_fdiv_q(y, *z_s1, *ell);
 
   if (!goo_group_powgh(group, *Aq, x, y))
     goto fail;
@@ -2755,8 +2758,8 @@ goo_group_sign(
   goo_group_reduce(group, *Aq, *Aq);
 
   // Bq = powgh(z_a / ell, z_s2 / ell)
-  mpz_tdiv_q(x, *z_a, *ell);
-  mpz_tdiv_q(y, *z_s2, *ell);
+  mpz_fdiv_q(x, *z_a, *ell);
+  mpz_fdiv_q(y, *z_s2, *ell);
 
   if (!goo_group_powgh(group, *Bq, x, y))
     goto fail;
@@ -2764,9 +2767,9 @@ goo_group_sign(
   goo_group_reduce(group, *Bq, *Bq);
 
   // Cq = pow(C2_inv, C2, z_w / ell) * powgh(z_w2 / ell, z_s1w / ell)
-  mpz_tdiv_q(x, *z_w, *ell);
-  mpz_tdiv_q(y, *z_w2, *ell);
-  mpz_tdiv_q(z, *z_s1w, *ell);
+  mpz_fdiv_q(x, *z_w, *ell);
+  mpz_fdiv_q(y, *z_w2, *ell);
+  mpz_fdiv_q(z, *z_s1w, *ell);
   goo_group_pow(group, xx, C2_inv, *C2, x);
 
   if (!goo_group_powgh(group, yy, y, z))
@@ -2776,9 +2779,9 @@ goo_group_sign(
   goo_group_reduce(group, *Cq, *Cq);
 
   // Dq = pow(C1_inv, C2, z_a / ell) * powgh(z_an / ell, z_sa / ell)
-  mpz_tdiv_q(x, *z_a, *ell);
-  mpz_tdiv_q(y, *z_an, *ell);
-  mpz_tdiv_q(z, *z_sa, *ell);
+  mpz_fdiv_q(x, *z_a, *ell);
+  mpz_fdiv_q(y, *z_an, *ell);
+  mpz_fdiv_q(z, *z_sa, *ell);
   goo_group_pow(group, xx, C1_inv, C1, x);
 
   if (!goo_group_powgh(group, yy, y, z))
@@ -2789,7 +2792,7 @@ goo_group_sign(
 
   // Eq = (z_w2 - z_an) / ell
   mpz_sub(*Eq, *z_w2, *z_an);
-  mpz_tdiv_q(*Eq, *Eq, *ell);
+  mpz_fdiv_q(*Eq, *Eq, *ell);
 
   // assert Eq >= 0
   assert(mpz_sgn(*Eq) >= 0);
