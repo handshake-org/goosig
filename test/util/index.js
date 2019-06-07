@@ -294,7 +294,7 @@ const testUtil = {
       let d = null;
 
       try {
-        d = e.invm(lam);
+        d = e.invert(lam);
       } catch (e) {
         continue;
       }
