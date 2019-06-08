@@ -380,12 +380,17 @@ goo_random_num(unsigned long max) {
   if (max == 0)
     return 0;
 
-  unsigned long n;
+  unsigned long x, r;
 
-  if (!goo_random((void *)&n, sizeof(unsigned long)))
-    assert(0 && "RNG failed.");
+  // http://www.pcg-random.org/posts/bounded-rands.html
+  do {
+    if (!goo_random((void *)&x, sizeof(unsigned long)))
+      assert(0 && "RNG failed.");
 
-  return n % max;
+    r = x % max;
+  } while (x - r > (-max));
+
+  return r;
 }
 
 /*
