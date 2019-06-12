@@ -65,16 +65,14 @@ describe('Signature', function() {
       Cq: new BN(0x07),
       Dq: new BN(0x08),
       Eq: new BN(0x08),
-      z_prime: [
-        new BN(0x09),
-        new BN(0x0a),
-        new BN(0x0b),
-        new BN(0x0c),
-        new BN(0x0d),
-        new BN(0x0e),
-        new BN(0x0f),
-        new BN(0x0f)
-      ]
+      z_w: new BN(0x09),
+      z_w2: new BN(0x0a),
+      z_s1: new BN(0x0b),
+      z_a: new BN(0x0c),
+      z_an: new BN(0x0d),
+      z_s1w: new BN(0x0e),
+      z_sa: new BN(0x0f),
+      z_s2: new BN(0x0f)
     });
 
     const sig2 = Signature.decode(sig1.encode(2048), 2048);
@@ -111,16 +109,14 @@ describe('Signature', function() {
       Cq: new BN(0x07),
       Dq: new BN(0x08),
       Eq: new BN(0x08),
-      z_prime: [
-        new BN(0x09),
-        new BN(0x0a),
-        new BN(0x0b),
-        new BN(0x0c),
-        new BN(0x0d),
-        new BN(0x0e),
-        new BN(0x0f),
-        new BN(0x0f)
-      ]
+      z_w: new BN(0x09),
+      z_w2: new BN(0x0a),
+      z_s1: new BN(0x0b),
+      z_a: new BN(0x0c),
+      z_an: new BN(0x0d),
+      z_s1w: new BN(0x0e),
+      z_sa: new BN(0x0f),
+      z_s2: new BN(0x0f)
     });
 
     const sig2 = Signature.fromJSON(sig1.toJSON());
