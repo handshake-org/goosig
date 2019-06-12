@@ -30,8 +30,8 @@ describe('Group Ops', function() {
     const e1 = util.randomBits(128);
     const e2 = util.randomBits(128);
 
-    const p1 = b1.redPowm(e1);
-    const p2 = b2.redPowm(e2);
+    const p1 = b1.redPow(e1);
+    const p2 = b2.redPow(e2);
     const r1 = p1.redMul(p2);
 
     const [b1Inv, b2Inv] = t1.inv2(b1, b2);
@@ -46,8 +46,8 @@ describe('Group Ops', function() {
     const e1 = util.randomBits(128);
     const e2 = util.randomBits(128);
 
-    const p1 = b1.redPowm(e1);
-    const p2 = b2.redPowm(e2);
+    const p1 = b1.redPow(e1);
+    const p2 = b2.redPow(e2);
     const r1 = p1.redMul(p2);
 
     const [b1Inv, b2Inv] = t2.inv2(b1, b2);
