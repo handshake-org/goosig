@@ -4,14 +4,14 @@
 'use strict';
 
 const assert = require('bsert');
-const DRBG = require('bcrypto/lib/drbg');
+const HmacDRBG = require('bcrypto/lib/hmac-drbg');
 const SHA256 = require('bcrypto/lib/sha256');
 
 describe('DRBG', function() {
   it('should generate deterministically random bits', () => {
     const entropy = Buffer.alloc(32, 0xaa);
     const nonce = Buffer.alloc(32, 0xaa);
-    const drbg = new DRBG(SHA256, entropy, nonce);
+    const drbg = new HmacDRBG(SHA256, entropy, nonce);
 
     const h1 = drbg.generate(32);
     const h2 = drbg.generate(16);
