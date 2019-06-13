@@ -2567,11 +2567,11 @@ goo_group_sign(
   mpz_pow_ui(a, w, 2);
   mpz_sub(a, a, *t);
 
-  // assert a >= 0
-  assert(mpz_sgn(a) >= 0);
-
   // a = a / n
   mpz_fdiv_q(a, a, n);
+
+  // assert a >= 0
+  assert(mpz_sgn(a) >= 0);
 
   // x = a * n
   mpz_mul(x, a, n);
@@ -2617,14 +2617,6 @@ goo_group_sign(
   }
 
   goo_group_reduce(group, *C3, *C3);
-
-  // if C1 <= 0 or C2 <= 0 or C3 <= 0
-  if (mpz_sgn(C1) <= 0
-      || mpz_sgn(*C2) <= 0
-      || mpz_sgn(*C3) <= 0) {
-    // Invalid C1, C2, or C3 value.
-    goto fail;
-  }
 
   // Inverses of `C1` and `C2`.
   // [C1_inv, C2_inv] = inv2(C1, C2)
@@ -2707,16 +2699,6 @@ goo_group_sign(
                            *t, A, B, C, D, E, msg, msg_len, 0)) {
       goto fail;
     }
-  }
-
-  // if A <= 0 or B <= 0 or C <= 0 or D <= 0 or E <= 0
-  if (mpz_sgn(A) <= 0
-      || mpz_sgn(B) <= 0
-      || mpz_sgn(C) <= 0
-      || mpz_sgn(D) <= 0
-      || mpz_sgn(E) <= 0) {
-    // Invalid A, B, C, D, or E value.
-    goto fail;
   }
 
   // P's second message: compute quotient message.
@@ -2803,16 +2785,6 @@ goo_group_sign(
   assert(mpz_sgn(*Eq) >= 0);
   assert(goo_mpz_bitlen(*Eq) <= GOO_EXPONENT_SIZE);
 
-  // if Aq <= 0 or Bq <= 0 or Cq <= 0 or Dq <= 0 or Eq <= 0
-  if (mpz_sgn(*Aq) <= 0
-      || mpz_sgn(*Bq) <= 0
-      || mpz_sgn(*Cq) <= 0
-      || mpz_sgn(*Dq) <= 0
-      || mpz_sgn(*Eq) <= 0) {
-    // Invalid Aq, Bq, Cq, Dq, or Eq value.
-    goto fail;
-  }
-
   mpz_mod(*z_w, *z_w, *ell);
   mpz_mod(*z_w2, *z_w2, *ell);
   mpz_mod(*z_s1, *z_s1, *ell);
@@ -2822,17 +2794,31 @@ goo_group_sign(
   mpz_mod(*z_sa, *z_sa, *ell);
   mpz_mod(*z_s2, *z_s2, *ell);
 
-  // if z_w <= 0 or z_w2 <= 0 or z_s1 <= 0 or z_a <= 0
-  // or z_an <= 0 or z_s1w <= 0 or z_sa <= 0 or z_s2 <= 0
-  if (mpz_sgn(*z_w) <= 0
-      || mpz_sgn(*z_w2) <= 0
-      || mpz_sgn(*z_s1) <= 0
-      || mpz_sgn(*z_a) <= 0
-      || mpz_sgn(*z_an) <= 0
-      || mpz_sgn(*z_s1w) <= 0
-      || mpz_sgn(*z_sa) <= 0
-      || mpz_sgn(*z_s2) <= 0) {
-    // Invalid z_prime value.
+  // Check for zero. Should almost never happen.
+  if (mpz_sgn(*chal) == 0
+      || mpz_sgn(C1) == 0
+      || mpz_sgn(*C2) == 0
+      || mpz_sgn(*C3) == 0
+      || mpz_sgn(A) == 0
+      || mpz_sgn(B) == 0
+      || mpz_sgn(C) == 0
+      || mpz_sgn(D) == 0
+      || mpz_sgn(E) == 0
+      || mpz_sgn(*Aq) == 0
+      || mpz_sgn(*Bq) == 0
+      || mpz_sgn(*Cq) == 0
+      || mpz_sgn(*Dq) == 0
+      || mpz_sgn(*Eq) == 0
+      || mpz_sgn(*z_w) == 0
+      || mpz_sgn(*z_w2) == 0
+      || mpz_sgn(*z_s1) == 0
+      || mpz_sgn(*z_a) == 0
+      || mpz_sgn(*z_an) == 0
+      || mpz_sgn(*z_s1w) == 0
+      || mpz_sgn(*z_sa) == 0
+      || mpz_sgn(*z_s2) == 0) {
+    // Try again.
+    r = 2;
     goto fail;
   }
 
@@ -2868,6 +2854,10 @@ fail:
   mpz_clear(C);
   mpz_clear(D);
   mpz_clear(E);
+
+  if (r == 2)
+    return goo_group_sign(group, sig, msg, msg_len, s_prime, p, q);
+
   return r;
 }
 
@@ -2918,31 +2908,8 @@ goo_group_verify(
 
   unsigned char key[32];
 
-  // Sanity check.
-  if (mpz_sgn(C1) <= 0
-      || mpz_sgn(*C2) <= 0
-      || mpz_sgn(*C3) <= 0
-      || mpz_sgn(*t) <= 0
-      || mpz_sgn(*chal) <= 0
-      || mpz_sgn(*ell) <= 0
-      || mpz_sgn(*Aq) <= 0
-      || mpz_sgn(*Bq) <= 0
-      || mpz_sgn(*Cq) <= 0
-      || mpz_sgn(*Dq) <= 0
-      || mpz_sgn(*Eq) <= 0
-      || mpz_sgn(*z_w) <= 0
-      || mpz_sgn(*z_w2) <= 0
-      || mpz_sgn(*z_s1) <= 0
-      || mpz_sgn(*z_a) <= 0
-      || mpz_sgn(*z_an) <= 0
-      || mpz_sgn(*z_s1w) <= 0
-      || mpz_sgn(*z_sa) <= 0
-      || mpz_sgn(*z_s2) <= 0) {
-    return 0;
-  }
-
-  // if bitlen(ell) > ELL_BITS
-  if (goo_mpz_bitlen(*ell) > GOO_ELL_BITS)
+  // if t <= 0
+  if (mpz_sgn(*t) <= 0)
     return 0;
 
   // `t` must be one of the small primes in our list.
@@ -2959,15 +2926,43 @@ goo_group_verify(
   if (!found)
     return 0;
 
+  // if chal <= 0 || bitlen(chal) > CHAL_BITS
+  if (mpz_sgn(*chal) <= 0 || goo_mpz_bitlen(*chal) > GOO_CHAL_BITS)
+    return 0;
+
+  // if ell <= 0 || bitlen(ell) > ELL_BITS
+  if (mpz_sgn(*ell) <= 0 || goo_mpz_bitlen(*ell) > GOO_ELL_BITS)
+    return 0;
+
+  // if ell & 1 == 0
+  if (!mpz_odd_p(*ell))
+    return 0;
+
   // All group elements must be the "canonical"
   // element of the quotient group (Z/n)/{1,-1}.
-  if (!goo_group_is_reduced(group, C1)
-      || !goo_group_is_reduced(group, *C2)
-      || !goo_group_is_reduced(group, *C3)
-      || !goo_group_is_reduced(group, *Aq)
-      || !goo_group_is_reduced(group, *Bq)
-      || !goo_group_is_reduced(group, *Cq)
-      || !goo_group_is_reduced(group, *Dq)) {
+  if (mpz_sgn(C1) <= 0 || !goo_group_is_reduced(group, C1)
+      || mpz_sgn(*C2) <= 0 || !goo_group_is_reduced(group, *C2)
+      || mpz_sgn(*C3) <= 0 || !goo_group_is_reduced(group, *C3)
+      || mpz_sgn(*Aq) <= 0 || !goo_group_is_reduced(group, *Aq)
+      || mpz_sgn(*Bq) <= 0 || !goo_group_is_reduced(group, *Bq)
+      || mpz_sgn(*Cq) <= 0 || !goo_group_is_reduced(group, *Cq)
+      || mpz_sgn(*Dq) <= 0 || !goo_group_is_reduced(group, *Dq)) {
+    return 0;
+  }
+
+  // if Eq <= 0 || bitlen(Eq) > EXPONENT_SIZE
+  if (mpz_sgn(*Eq) <= 0 || goo_mpz_bitlen(*Eq) > GOO_EXPONENT_SIZE)
+    return 0;
+
+  // z_prime must be within range.
+  if (mpz_sgn(*z_w) <= 0 || mpz_cmp(*z_w, *ell) >= 0
+      || mpz_sgn(*z_w2) <= 0 || mpz_cmp(*z_w2, *ell) >= 0
+      || mpz_sgn(*z_s1) <= 0 || mpz_cmp(*z_s1, *ell) >= 0
+      || mpz_sgn(*z_a) <= 0 || mpz_cmp(*z_a, *ell) >= 0
+      || mpz_sgn(*z_an) <= 0 || mpz_cmp(*z_an, *ell) >= 0
+      || mpz_sgn(*z_s1w) <= 0 || mpz_cmp(*z_s1w, *ell) >= 0
+      || mpz_sgn(*z_sa) <= 0 || mpz_cmp(*z_sa, *ell) >= 0
+      || mpz_sgn(*z_s2) <= 0 || mpz_cmp(*z_s2, *ell) >= 0) {
     return 0;
   }
 
