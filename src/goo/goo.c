@@ -525,7 +525,7 @@ goo_dsqrt(unsigned long x) {
 
 // https://github.com/golang/go/blob/c86d464/src/math/big/int.go#L906
 static int
-goo_mpz_sqrtp(mpz_t ret, const mpz_t num, const mpz_t p) {
+goo_mpz_sqrtm(mpz_t ret, const mpz_t num, const mpz_t p) {
   int r = 0;
   mpz_t x, e, t, a, s, n, y, b, g;
 
@@ -699,10 +699,10 @@ goo_mpz_sqrtpq(mpz_t ret, const mpz_t x, const mpz_t p, const mpz_t q) {
   mpz_init(xx);
   mpz_init(yy);
 
-  // sp = mod_sqrtp(x, p)
-  // sq = mod_sqrtp(x, q)
-  if (!goo_mpz_sqrtp(sp, x, p)
-      || !goo_mpz_sqrtp(sq, x, q)) {
+  // sp = mod_sqrtm(x, p)
+  // sq = mod_sqrtm(x, q)
+  if (!goo_mpz_sqrtm(sp, x, p)
+      || !goo_mpz_sqrtm(sq, x, q)) {
     goto fail;
   }
 
@@ -3656,7 +3656,7 @@ run_util_test(void) {
       assert(goo_random_int(r1, p));
       mpz_powm_ui(r1, r1, 2, p);
 
-      assert(goo_mpz_sqrtp(sr1, r1, p));
+      assert(goo_mpz_sqrtm(sr1, r1, p));
 
       mpz_powm_ui(sr1, sr1, 2, p);
 
