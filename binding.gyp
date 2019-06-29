@@ -1,7 +1,7 @@
 {
   "variables": {
     "goo_byteorder%":
-      "<!(python -c 'from __future__ import print_function; import sys; print(sys.byteorder)')",
+      "<!(python -c \"from __future__ import print_function; import sys; print(sys.byteorder)\")"
   },
   "targets": [{
     "target_name": "goosig",
