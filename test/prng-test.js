@@ -21,9 +21,9 @@ describe('PRNG', function() {
     assert(y.bitLength() <= 256);
     assert(y.cmp(x) < 0);
 
-    assert.strictEqual(rng.randomBits(30).toString(), '660784431');
-    assert.strictEqual(rng.randomBits(31).toString(), '2044965173');
+    assert.strictEqual(rng.randomBits(30).toString(), '889224476');
+    assert.strictEqual(rng.randomBits(31).toString(), '1264675751');
     assert.strictEqual(rng.randomInt(rng.randomBits(31)).toString(),
-                       '196040056');
+                       '768829332');
   });
 });

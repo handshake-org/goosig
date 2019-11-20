@@ -37,9 +37,6 @@
 #include "random.h"
 #include "primes.h"
 
-static const char goo_prefix[] = GOO_HASH_PREFIX;
-static const char goo_pers[] = GOO_DRBG_PERS;
-
 /*
  * GMP helpers
  */
@@ -414,13 +411,12 @@ goo_prng_uninit(goo_prng_t *prng) {
 
 static void
 goo_prng_seed(goo_prng_t *prng, const unsigned char *key) {
-  unsigned char entropy[64 + sizeof(goo_pers) - 1];
+  unsigned char entropy[96];
 
   memcpy(&entropy[0], key, 32);
-  memset(&entropy[32], 0x00, 32);
-  memcpy(&entropy[64], &goo_pers[0], sizeof(goo_pers) - 1);
+  memcpy(&entropy[32], GOO_DRBG_PERS, 64);
 
-  goo_drbg_init(&prng->ctx, entropy, sizeof(entropy));
+  goo_drbg_init(&prng->ctx, entropy, 96);
 
   mpz_set_ui(prng->save, 0);
   prng->total = 0;
@@ -804,7 +800,6 @@ goo_is_prime_mr(
   // Setup PRNG.
   goo_prng_t prng;
   goo_prng_init(&prng);
-  // XOR with the prime we're testing?
   goo_prng_seed(&prng, key);
 
   for (long i = 0; i < reps; i++) {
@@ -1605,7 +1600,7 @@ goo_group_init(
   goo_prng_init(&group->prng);
 
   goo_sha256_init(&group->sha);
-  goo_sha256_update(&group->sha, (void *)goo_prefix, sizeof(goo_prefix) - 1);
+  goo_sha256_update(&group->sha, (void *)GOO_HASH_PREFIX, 64);
   assert(goo_hash_item(&group->sha, group->n, group->size, group->slab));
   assert(goo_hash_item(&group->sha, group->g, 4, group->slab));
   assert(goo_hash_item(&group->sha, group->h, 4, group->slab));
@@ -3443,12 +3438,12 @@ run_prng_test(void) {
   assert(mpz_cmp(y, x) < 0);
 
   goo_prng_random_bits(&prng, x, 30);
-  assert(mpz_cmp_ui(x, 660784431) == 0);
+  assert(mpz_cmp_ui(x, 889224476) == 0);
   goo_prng_random_bits(&prng, x, 31);
-  assert(mpz_cmp_ui(x, 2044965173) == 0);
+  assert(mpz_cmp_ui(x, 1264675751) == 0);
   goo_prng_random_bits(&prng, x, 31);
   goo_prng_random_int(&prng, y, x);
-  assert(mpz_cmp_ui(y, 196040056) == 0);
+  assert(mpz_cmp_ui(y, 768829332) == 0);
 
   mpz_clear(x);
   mpz_clear(y);
