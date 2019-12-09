@@ -1,8 +1,4 @@
 {
-  "variables": {
-    "goo_byteorder%":
-      "<!(python -c \"from __future__ import print_function; import sys; print(sys.byteorder)\")"
-  },
   "targets": [{
     "target_name": "goosig",
     "sources": [
@@ -14,22 +10,17 @@
     ],
     "cflags": [
       "-Wall",
-      "-Wno-implicit-fallthrough",
-      "-Wno-uninitialized",
-      "-Wno-unused-function",
       "-Wextra",
+      "-Wno-unknown-warning",
+      "-Wno-unused-function",
       "-O3"
     ],
     "cflags_c": [
-      "-std=c99",
-      "-Wno-unused-parameter"
+      "-std=c99"
     ],
     "cflags_cc+": [
       "-std=c++0x",
-      "-Wno-maybe-uninitialized",
-      "-Wno-cast-function-type",
-      "-Wno-unused-parameter",
-      "-Wno-unknown-warning-option"
+      "-Wno-cast-function-type"
     ],
     "include_dirs": [
       "<!(node -e \"require('nan')\")"
@@ -51,26 +42,16 @@
         ["OS=='win'", {
           "with_gmp%": "false"
         }, {
-          "with_gmp%": "<!(utils/has_lib.sh gmpxx gmp)"
+          "with_gmp%": "<!(./utils/has_gmp.sh)"
         }]
       ]
     },
     "conditions": [
-      ["goo_byteorder=='little'", {
-        "defines": [
-          "GOO_LITTLE_ENDIAN"
-        ]
-      }, {
-        "defines": [
-          "GOO_BIG_ENDIAN"
-        ]
-      }],
       ["with_gmp=='true'", {
         "defines": [
           "GOO_HAS_GMP"
         ],
         "libraries": [
-          "-lgmpxx",
           "-lgmp"
         ]
       }, {
@@ -89,6 +70,20 @@
         "include_dirs": [
           "<(node_root_dir)/deps/openssl/openssl/include"
         ]
+      }],
+      ["OS=='mac'", {
+        "include_dirs": [
+          "/usr/local/include"
+        ],
+        "libraries": [
+          "-L/usr/local/lib"
+        ],
+        "xcode_settings": {
+          "MACOSX_DEPLOYMENT_TARGET": "10.7",
+          "OTHER_CPLUSPLUSFLAGS": [
+            "-stdlib=libc++"
+          ]
+        }
       }]
     ]
   }]
