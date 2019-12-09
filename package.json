@@ -24,7 +24,7 @@
     "bcrypto": "~4.2.3",
     "bsert": "~0.0.10",
     "loady": "~0.0.1",
-    "nan": "^2.13.1"
+    "nan": "^2.14.0"
   },
   "devDependencies": {
     "bmocha": "^2.1.3"
