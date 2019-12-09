@@ -12,8 +12,8 @@
 void
 goo_poll(void) {
   for (;;) {
-    // https://github.com/openssl/openssl/blob/bc420eb/crypto/rand/rand_lib.c#L792
-    // https://github.com/openssl/openssl/blob/bc420eb/crypto/rand/drbg_lib.c#L988
+    /* https://github.com/openssl/openssl/blob/bc420eb/crypto/rand/rand_lib.c#L792 */
+    /* https://github.com/openssl/openssl/blob/bc420eb/crypto/rand/drbg_lib.c#L988 */
     int status = RAND_status();
 
     assert(status >= 0);
@@ -21,8 +21,8 @@ goo_poll(void) {
     if (status != 0)
       break;
 
-    // https://github.com/openssl/openssl/blob/bc420eb/crypto/rand/rand_lib.c#L376
-    // https://github.com/openssl/openssl/blob/32f803d/crypto/rand/drbg_lib.c#L471
+    /* https://github.com/openssl/openssl/blob/bc420eb/crypto/rand/rand_lib.c#L376 */
+    /* https://github.com/openssl/openssl/blob/32f803d/crypto/rand/drbg_lib.c#L471 */
     if (RAND_poll() == 0)
       break;
   }
@@ -30,9 +30,11 @@ goo_poll(void) {
 
 int
 goo_random(void *dst, size_t len) {
+  int r;
+
   goo_poll();
 
-  int r = RAND_bytes(dst, len);
+  r = RAND_bytes(dst, len);
 
   if (r != 1)
     return 0;

@@ -1,5 +1,5 @@
 /*!
- * goo.c - groups of unknown order for C
+ * goo.c - groups of unknown order for C89
  * Copyright (c) 2018, Christopher Jeffrey (MIT License).
  * https://github.com/handshake-org/goosig
  *
@@ -50,7 +50,7 @@
 #define goo_mpz_print(n) \
   (mpz_out_str(stdout, 16, (n)), printf("\n"))
 
-// For debugging
+/* For debugging */
 #define goo_print_hex(data, len) do { \
   mpz_t n;                            \
   mpz_init(n);                        \
@@ -68,10 +68,10 @@
 #define goo_mpz_mod_ui mpz_fdiv_ui
 #define goo_mpz_and_ui(x, y) mpz_tdiv_ui((x), (y) + 1)
 
-// Note: violates strict aliasing.
+/* Note: violates strict aliasing. */
 #define goo_mpz_unconst(n) *((mpz_t *)&(n))
 
-static inline size_t
+static size_t
 goo_mpz_bitlen(const mpz_t n) {
   if (mpz_sgn(n) == 0)
     return 0;
@@ -79,9 +79,10 @@ goo_mpz_bitlen(const mpz_t n) {
   return mpz_sizeinbase(n, 2);
 }
 
-static inline void *
-goo_mpz_pad(void *out, size_t size, const mpz_t n) {
+static void *
+goo_mpz_pad(unsigned char *out, size_t size, const mpz_t n) {
   size_t len = goo_mpz_bytelen(n);
+  size_t pos;
 
   if (len > size)
     return NULL;
@@ -95,7 +96,7 @@ goo_mpz_pad(void *out, size_t size, const mpz_t n) {
       return NULL;
   }
 
-  size_t pos = size - len;
+  pos = size - len;
 
   memset(out, 0x00, pos);
 
@@ -104,125 +105,124 @@ goo_mpz_pad(void *out, size_t size, const mpz_t n) {
   return out;
 }
 
-static inline unsigned long
+static unsigned long
 goo_mpz_zerobits(const mpz_t n) {
   int sgn = mpz_sgn(n);
+  unsigned long bits;
 
-  // if n == 0
+  /* if n == 0 */
   if (sgn == 0)
     return 0;
 
-  // Note: mpz_ptr is undocumented.
-  // https://gmplib.org/list-archives/gmp-discuss/2009-May/003769.html
-  // https://gmplib.org/list-archives/gmp-devel/2013-February/002775.html
+  /* Note: mpz_ptr is undocumented. */
+  /* https://gmplib.org/list-archives/gmp-discuss/2009-May/003769.html */
+  /* https://gmplib.org/list-archives/gmp-devel/2013-February/002775.html */
 
-  // if n < 0
+  /* if n < 0 */
   if (sgn < 0) {
-    // n = -n;
+    /* n = -n; */
     mpz_neg((mpz_ptr)n, n);
   }
 
-  unsigned long bits = mpz_scan1(n, 0);
+  bits = mpz_scan1(n, 0);
 
   if (sgn < 0) {
-    // n = -n;
+    /* n = -n; */
     mpz_neg((mpz_ptr)n, n);
   }
 
   return bits;
 }
 
-static inline void
+static void
 goo_mpz_mask(mpz_t r, const mpz_t n, unsigned long bit, mpz_t mask) {
   if (bit == 0) {
     mpz_set_ui(r, 0);
     return;
   }
 
-  // mask = (1 << bit) - 1
+  /* mask = (1 << bit) - 1 */
   mpz_set_ui(mask, 1);
   mpz_mul_2exp(mask, mask, bit);
   mpz_sub_ui(mask, mask, 1);
 
-  // r = n & mask
+  /* r = n & mask */
   mpz_and(r, n, mask);
 }
 
 #if !defined(GOO_HAS_GMP) || defined(GOO_TEST)
-// https://github.com/golang/go/blob/aadaec5/src/math/big/int.go#L754
+/* https://github.com/golang/go/blob/aadaec5/src/math/big/int.go#L754 */
 static int
 goo_mpz_jacobi(const mpz_t x, const mpz_t y) {
-  // Undefined behavior.
-  // if y == 0 || y & 1 == 0
+  mpz_t a, b, c;
+  unsigned long s, bmod8;
+  int j;
+
+  /* Undefined behavior. */
+  /* if y == 0 || y & 1 == 0 */
   if (mpz_sgn(y) == 0 || mpz_even_p(y))
     return 0;
-
-  mpz_t a;
-  mpz_t b;
-  mpz_t c;
-  int j;
 
   mpz_init(a);
   mpz_init(b);
   mpz_init(c);
-  j = 0;
 
-  // a = x
+  /* a = x */
   mpz_set(a, x);
-  // b = y
+  /* b = y */
   mpz_set(b, y);
   j = 1;
 
-  // if b < 0
+  /* if b < 0 */
   if (mpz_sgn(b) < 0) {
-    // if a < 0
+    /* if a < 0 */
     if (mpz_sgn(a) < 0)
       j = -1;
-    // b = -b
+    /* b = -b */
     mpz_neg(b, b);
   }
 
   for (;;) {
-    // if b == 1
+    /* if b == 1 */
     if (mpz_cmp_ui(b, 1) == 0)
       break;
 
-    // if a == 0
+    /* if a == 0 */
     if (mpz_sgn(a) == 0) {
       j = 0;
       break;
     }
 
-    // a = a mod b
+    /* a = a mod b */
     mpz_mod(a, a, b);
 
-    // if a == 0
+    /* if a == 0 */
     if (mpz_sgn(a) == 0) {
       j = 0;
       break;
     }
 
-    // s = bitlen(a)
-    unsigned long s = goo_mpz_zerobits(a);
+    /* s = bitlen(a) */
+    s = goo_mpz_zerobits(a);
 
     if (s & 1) {
-      // bmod8 = b & 7
-      unsigned long bmod8 = mpz_tdiv_ui(b, 8);
+      /* bmod8 = b & 7 */
+      bmod8 = mpz_tdiv_ui(b, 8);
 
       if (bmod8 == 3 || bmod8 == 5)
         j = -j;
     }
 
-    // c = a >> s
+    /* c = a >> s */
     mpz_tdiv_q_2exp(c, a, s);
 
-    // if b & 3 == 3 and c & 3 == 3
+    /* if b & 3 == 3 and c & 3 == 3 */
     if (mpz_tdiv_ui(b, 4) == 3 && mpz_tdiv_ui(c, 4) == 3)
       j = -j;
 
-    // a = b
+    /* a = b */
     mpz_set(a, b);
-    // b = c
+    /* b = c */
     mpz_set(b, c);
   }
 
@@ -235,11 +235,11 @@ goo_mpz_jacobi(const mpz_t x, const mpz_t y) {
 #endif
 
 #ifndef GOO_HAS_GMP
-// Jacobi is not implemented in mini-gmp.
+/* Jacobi is not implemented in mini-gmp. */
 #define mpz_jacobi goo_mpz_jacobi
 #endif
 
-static inline void
+static void
 goo_mpz_add_si(mpz_t r, const mpz_t n, long val) {
   if (val < 0)
     mpz_sub_ui(r, n, -val);
@@ -247,7 +247,7 @@ goo_mpz_add_si(mpz_t r, const mpz_t n, long val) {
     mpz_add_ui(r, n, val);
 }
 
-static inline void
+static void
 goo_mpz_sub_si(mpz_t r, const mpz_t n, long val) {
   if (val < 0)
     mpz_add_ui(r, n, -val);
@@ -259,37 +259,50 @@ goo_mpz_sub_si(mpz_t r, const mpz_t n, long val) {
  * Allocator
  */
 
-static inline void *
+static void *
 goo_malloc(size_t size) {
+  void *ptr;
+
   if (size == 0)
     return NULL;
 
-  void *ptr = malloc(size);
-  assert(ptr != NULL);
+  ptr = malloc(size);
+
+  if (ptr == NULL)
+    abort();
+
   return ptr;
 }
 
-static inline void *
+static void *
 goo_calloc(size_t nmemb, size_t size) {
+  void *ptr;
+
   if (nmemb == 0 || size == 0)
     return NULL;
 
-  void *ptr = calloc(nmemb, size);
-  assert(ptr != NULL);
+  ptr = calloc(nmemb, size);
+
+  if (ptr == NULL)
+    abort();
+
   return ptr;
 }
 
-static inline void *
+static void *
 goo_realloc(void *ptr, size_t size) {
   if (size == 0)
     return realloc(ptr, size);
 
-  void *p = realloc(ptr, size);
-  assert(p != NULL);
-  return p;
+  ptr = realloc(ptr, size);
+
+  if (ptr == NULL)
+    abort();
+
+  return ptr;
 }
 
-static inline void
+static void
 goo_free(void *ptr) {
   if (ptr != NULL)
     free(ptr);
@@ -304,28 +317,32 @@ goo_random_bits(mpz_t ret, unsigned long bits) {
   int r = 0;
   unsigned long total = 0;
   unsigned char out[32];
+  unsigned long left;
 
   mpz_t tmp;
   mpz_init(tmp);
 
-  // ret = 0
+  /* ret = 0 */
   mpz_set_ui(ret, 0);
 
   while (total < bits) {
-    // ret = ret << 256
+    /* ret = ret << 256 */
     mpz_mul_2exp(ret, ret, 256);
-    // tmp = nextrand()
+
+    /* tmp = nextrand() */
     if (!goo_random(&out[0], 32))
       goto fail;
+
     goo_mpz_import(tmp, &out[0], 32);
-    // ret = ret | tmp
+
+    /* ret = ret | tmp */
     mpz_ior(ret, ret, tmp);
     total += 256;
   }
 
-  unsigned long left = total - bits;
+  left = total - bits;
 
-  // ret >>= left;
+  /* ret >>= left; */
   mpz_tdiv_q_2exp(ret, ret, left);
 
   r = 1;
@@ -348,22 +365,24 @@ goo_random_bits_nz(mpz_t ret, unsigned long bits) {
 
 static int
 goo_random_int(mpz_t ret, const mpz_t max) {
-  // if max <= 0
+  size_t bits;
+
+  /* if max <= 0 */
   if (mpz_sgn(max) <= 0) {
-    // ret = 0
+    /* ret = 0 */
     mpz_set_ui(ret, 0);
     return 1;
   }
 
-  // ret = max
+  /* ret = max */
   mpz_set(ret, max);
 
-  // bits = bitlen(ret)
-  size_t bits = goo_mpz_bitlen(ret);
+  /* bits = bitlen(ret) */
+  bits = goo_mpz_bitlen(ret);
 
   assert(bits > 0);
 
-  // while ret >= max
+  /* while ret >= max */
   while (mpz_cmp(ret, max) >= 0) {
     if (!goo_random_bits(ret, bits))
       return 0;
@@ -374,12 +393,12 @@ goo_random_int(mpz_t ret, const mpz_t max) {
 
 static unsigned long
 goo_random_num(unsigned long max) {
+  unsigned long x, r;
+
   if (max == 0)
     return 0;
 
-  unsigned long x, r;
-
-  // http://www.pcg-random.org/posts/bounded-rands.html
+  /* http://www.pcg-random.org/posts/bounded-rands.html */
   do {
     if (!goo_random((void *)&x, sizeof(unsigned long)))
       assert(0 && "RNG failed.");
@@ -429,30 +448,33 @@ goo_prng_next_random(goo_prng_t *prng, unsigned char *out) {
 
 static void
 goo_prng_random_bits(goo_prng_t *prng, mpz_t ret, unsigned long bits) {
-  // ret = save
-  mpz_set(ret, prng->save);
-
   unsigned long total = prng->total;
   unsigned char out[32];
+  unsigned long left;
+
+  /* ret = save */
+  mpz_set(ret, prng->save);
 
   while (total < bits) {
-    // ret = ret << 256
+    /* ret = ret << 256 */
     mpz_mul_2exp(ret, ret, 256);
-    // tmp = nextrand()
+
+    /* tmp = nextrand() */
     goo_prng_next_random(prng, &out[0]);
     goo_mpz_import(prng->tmp, &out[0], 32);
-    // ret = ret | tmp
+
+    /* ret = ret | tmp */
     mpz_ior(ret, ret, prng->tmp);
     total += 256;
   }
 
-  unsigned long left = total - bits;
+  left = total - bits;
 
-  // save = ret & ((1 << left) - 1)
+  /* save = ret & ((1 << left) - 1) */
   goo_mpz_mask(prng->save, ret, left, prng->tmp);
   prng->total = left;
 
-  // ret >>= left;
+  /* ret >>= left; */
   mpz_tdiv_q_2exp(ret, ret, left);
 }
 
@@ -467,22 +489,24 @@ goo_prng_random_bits_nz(goo_prng_t *prng, mpz_t ret, unsigned long bits) {
 
 static void
 goo_prng_random_int(goo_prng_t *prng, mpz_t ret, const mpz_t max) {
-  // if max <= 0
+  size_t bits;
+
+  /* if max <= 0 */
   if (mpz_sgn(max) <= 0) {
-    // ret = 0
+    /* ret = 0 */
     mpz_set_ui(ret, 0);
     return;
   }
 
-  // ret = max
+  /* ret = max */
   mpz_set(ret, max);
 
-  // bits = bitlen(ret)
-  size_t bits = goo_mpz_bitlen(ret);
+  /* bits = bitlen(ret) */
+  bits = goo_mpz_bitlen(ret);
 
   assert(bits > 0);
 
-  // while ret >= max
+  /* while ret >= max */
   while (mpz_cmp(ret, max) >= 0)
     goo_prng_random_bits(prng, ret, bits);
 }
@@ -493,12 +517,12 @@ goo_prng_random_int(goo_prng_t *prng, mpz_t ret, const mpz_t max) {
 
 static unsigned long
 goo_dsqrt(unsigned long x) {
-  if (x <= 1)
-    return x;
-
   unsigned long len = 0;
   unsigned long y = x;
   unsigned long z1, z2;
+
+  if (x <= 1)
+    return x;
 
   while (y) {
     len += 1;
@@ -519,11 +543,12 @@ goo_dsqrt(unsigned long x) {
   }
 }
 
-// https://github.com/golang/go/blob/c86d464/src/math/big/int.go#L906
+/* https://github.com/golang/go/blob/c86d464/src/math/big/int.go#L906 */
 static int
 goo_mpz_sqrtm(mpz_t ret, const mpz_t num, const mpz_t p) {
   int r = 0;
   mpz_t x, e, t, a, s, n, y, b, g;
+  unsigned long z, k;
 
   mpz_init(x);
   mpz_init(e);
@@ -535,7 +560,7 @@ goo_mpz_sqrtm(mpz_t ret, const mpz_t num, const mpz_t p) {
   mpz_init(b);
   mpz_init(g);
 
-  // x = num
+  /* x = num */
   mpz_set(x, num);
 
   if (mpz_sgn(p) <= 0 || mpz_even_p(p))
@@ -551,120 +576,120 @@ goo_mpz_sqrtm(mpz_t ret, const mpz_t num, const mpz_t p) {
       break;
   }
 
-  // if x < 0 || x >= p
+  /* if x < 0 || x >= p */
   if (mpz_sgn(x) < 0 || mpz_cmp(x, p) >= 0) {
-    // x = x mod p
+    /* x = x mod p */
     mpz_mod(x, x, p);
   }
 
-  // if p mod 4 == 3
+  /* if p mod 4 == 3 */
   if (mpz_tdiv_ui(p, 4) == 3) {
-    // e = (p + 1) >> 2
+    /* e = (p + 1) >> 2 */
     mpz_add_ui(e, p, 1);
     mpz_tdiv_q_2exp(e, e, 2);
-    // ret = x^e mod p
+    /* ret = x^e mod p */
     mpz_powm(ret, x, e, p);
     goto success;
   }
 
-  // if p mod 8 == 5
+  /* if p mod 8 == 5 */
   if (mpz_tdiv_ui(p, 8) == 5) {
-    // e = p >> 3
+    /* e = p >> 3 */
     mpz_tdiv_q_2exp(e, p, 3);
-    // t = x << 1
+    /* t = x << 1 */
     mpz_mul_2exp(t, x, 1);
-    // a = t^e mod p
+    /* a = t^e mod p */
     mpz_powm(a, t, e, p);
-    // b = a^2 mod p
+    /* b = a^2 mod p */
     mpz_powm_ui(b, a, 2, p);
-    // b = (b * t) mod p
+    /* b = (b * t) mod p */
     mpz_mul(b, b, t);
     mpz_mod(b, b, p);
-    // b = (b - 1) mod p
+    /* b = (b - 1) mod p */
     mpz_sub_ui(b, b, 1);
     mpz_mod(b, b, p);
-    // b = (b * x) mod p
+    /* b = (b * x) mod p */
     mpz_mul(b, b, x);
     mpz_mod(b, b, p);
-    // b = (b * a) mod p
+    /* b = (b * a) mod p */
     mpz_mul(b, b, a);
     mpz_mod(b, b, p);
-    // ret = b
+    /* ret = b */
     mpz_set(ret, b);
     goto success;
   }
 
-  // s = p - 1
+  /* s = p - 1 */
   mpz_sub_ui(s, p, 1);
 
-  // z = zerobits(s)
-  unsigned long z = goo_mpz_zerobits(s);
+  /* z = zerobits(s) */
+  z = goo_mpz_zerobits(s);
 
-  // s = s >> z
+  /* s = s >> z */
   mpz_tdiv_q_2exp(s, s, z);
 
-  // n = 2
+  /* n = 2 */
   mpz_set_ui(n, 2);
 
-  // while jacobi(n, p) != -1
+  /* while jacobi(n, p) != -1 */
   while (mpz_jacobi(n, p) != -1) {
-    // n = n + 1
+    /* n = n + 1 */
     mpz_add_ui(n, n, 1);
   }
 
-  // y = s + 1
+  /* y = s + 1 */
   mpz_add_ui(y, s, 1);
-  // y = y >> 1
+  /* y = y >> 1 */
   mpz_tdiv_q_2exp(y, y, 1);
-  // y = x^y mod p
+  /* y = x^y mod p */
   mpz_powm(y, x, y, p);
-  // b = x^s mod p
+  /* b = x^s mod p */
   mpz_powm(b, x, s, p);
-  // g = n^s mod p
+  /* g = n^s mod p */
   mpz_powm(g, n, s, p);
 
-  // k = z
-  unsigned long k = z;
+  /* k = z */
+  k = z;
 
   for (;;) {
     unsigned long m = 0;
 
-    // t = b
+    /* t = b */
     mpz_set(t, b);
 
-    // while t != 1
+    /* while t != 1 */
     while (mpz_cmp_ui(t, 1) != 0) {
-      // t = t^2 mod p
+      /* t = t^2 mod p */
       mpz_powm_ui(t, t, 2, p);
       m += 1;
     }
 
-    // if m == 0
+    /* if m == 0 */
     if (m == 0)
       break;
 
-    // if m == k
+    /* if m == k */
     if (m == k)
       goto fail;
 
-    // t = 1 << (k - m - 1)
+    /* t = 1 << (k - m - 1) */
     mpz_set_ui(t, 1);
     mpz_mul_2exp(t, t, k - m - 1);
-    // t = g^t mod p
+    /* t = g^t mod p */
     mpz_powm(t, g, t, p);
-    // g = t^2 mod p
+    /* g = t^2 mod p */
     mpz_powm_ui(g, t, 2, p);
-    // y = (y * t) mod p
+    /* y = (y * t) mod p */
     mpz_mul(y, y, t);
     mpz_mod(y, y, p);
-    // b = (b * g) mod p
+    /* b = (b * g) mod p */
     mpz_mul(b, b, g);
     mpz_mod(b, b, p);
-    // k = m
+    /* k = m */
     k = m;
   }
 
-  // ret = y
+  /* ret = y */
   mpz_set(ret, y);
   goto success;
 
@@ -695,31 +720,31 @@ goo_mpz_sqrtpq(mpz_t ret, const mpz_t x, const mpz_t p, const mpz_t q) {
   mpz_init(xx);
   mpz_init(yy);
 
-  // sp = mod_sqrtm(x, p)
-  // sq = mod_sqrtm(x, q)
+  /* sp = mod_sqrtm(x, p) */
+  /* sq = mod_sqrtm(x, q) */
   if (!goo_mpz_sqrtm(sp, x, p)
       || !goo_mpz_sqrtm(sq, x, q)) {
     goto fail;
   }
 
-  // [mp, mq] = euclid_lr(p, q)
+  /* [mp, mq] = euclid_lr(p, q) */
   mpz_gcdext(ret, mp, mq, p, q);
 
-  // xx = sq * mp * p
+  /* xx = sq * mp * p */
   mpz_mul(xx, sq, mp);
   mpz_mul(xx, xx, p);
 
-  // yy = sp * mq * q
+  /* yy = sp * mq * q */
   mpz_mul(yy, sp, mq);
   mpz_mul(yy, yy, q);
 
-  // xx = xx + yy
+  /* xx = xx + yy */
   mpz_add(xx, xx, yy);
 
-  // yy = p * q
+  /* yy = p * q */
   mpz_mul(yy, p, q);
 
-  // ret = xx mod yy
+  /* ret = xx mod yy */
   mpz_mod(ret, xx, yy);
 
   r = 1;
@@ -739,16 +764,18 @@ fail:
 
 static int
 goo_is_prime_div(const mpz_t n) {
-  // if n <= 1
+  long i;
+
+  /* if n <= 1 */
   if (mpz_cmp_ui(n, 1) <= 0)
     return 0;
 
-  for (long i = 0; i < GOO_TEST_PRIMES_LEN; i++) {
-    // if p == test_primes[i]
+  for (i = 0; i < GOO_TEST_PRIMES_LEN; i++) {
+    /* if p == test_primes[i] */
     if (mpz_cmp_ui(n, goo_test_primes[i]) == 0)
       return 2;
 
-    // if n mod test_primes[i] == 0
+    /* if n mod test_primes[i] == 0 */
     if (mpz_fdiv_ui(n, goo_test_primes[i]) == 0)
       return 0;
   }
@@ -756,8 +783,8 @@ goo_is_prime_div(const mpz_t n) {
   return 1;
 }
 
-// https://github.com/golang/go/blob/aadaec5/src/math/big/prime.go#L81
-// https://github.com/indutny/miller-rabin/blob/master/lib/mr.js
+/* https://github.com/golang/go/blob/aadaec5/src/math/big/prime.go#L81 */
+/* https://github.com/indutny/miller-rabin/blob/master/lib/mr.js */
 static int
 goo_is_prime_mr(
   const mpz_t n,
@@ -765,9 +792,15 @@ goo_is_prime_mr(
   long reps,
   int force2
 ) {
-  // if n < 7
+  int r = 0;
+  mpz_t nm1, nm3, q, x, y;
+  unsigned long k, j;
+  long i;
+  goo_prng_t prng;
+
+  /* if n < 7 */
   if (mpz_cmp_ui(n, 7) < 0) {
-    // if n == 2 or n == 3 or n == 5
+    /* if n == 2 or n == 3 or n == 5 */
     if (mpz_cmp_ui(n, 2) == 0
         || mpz_cmp_ui(n, 3) == 0
         || mpz_cmp_ui(n, 5) == 0) {
@@ -776,59 +809,54 @@ goo_is_prime_mr(
     return 0;
   }
 
-  int r = 0;
-  mpz_t nm1, nm3, q, x, y;
-  unsigned long k;
-
   mpz_init(nm1);
   mpz_init(nm3);
   mpz_init(q);
   mpz_init(x);
   mpz_init(y);
 
-  // nm1 = n - 1
+  /* nm1 = n - 1 */
   mpz_sub_ui(nm1, n, 1);
 
-  // nm3 = nm1 - 2
+  /* nm3 = nm1 - 2 */
   mpz_sub_ui(nm3, nm1, 2);
 
-  // k = zero_bits(nm1)
+  /* k = zero_bits(nm1) */
   k = goo_mpz_zerobits(nm1);
-  // q = nm1 >> k
+  /* q = nm1 >> k */
   mpz_tdiv_q_2exp(q, nm1, k);
 
-  // Setup PRNG.
-  goo_prng_t prng;
+  /* Setup PRNG. */
   goo_prng_init(&prng);
   goo_prng_seed(&prng, key);
 
-  for (long i = 0; i < reps; i++) {
+  for (i = 0; i < reps; i++) {
     if (i == reps - 1 && force2) {
-      // x = 2
+      /* x = 2 */
       mpz_set_ui(x, 2);
     } else {
-      // x = getrandint(nm3)
+      /* x = getrandint(nm3) */
       goo_prng_random_int(&prng, x, nm3);
-      // x += 2
+      /* x += 2 */
       mpz_add_ui(x, x, 2);
     }
 
-    // y = x^q mod n
+    /* y = x^q mod n */
     mpz_powm(y, x, q, n);
 
-    // if y == 1 || y == nm1
+    /* if y == 1 || y == nm1 */
     if (mpz_cmp_ui(y, 1) == 0 || mpz_cmp(y, nm1) == 0)
       continue;
 
-    for (unsigned long j = 1; j < k; j++) {
-      // y = y^2 mod n
+    for (j = 1; j < k; j++) {
+      /* y = y^2 mod n */
       mpz_powm_ui(y, y, 2, n);
 
-      // if y == nm1
+      /* if y == nm1 */
       if (mpz_cmp(y, nm1) == 0)
         goto next;
 
-      // if y == 1
+      /* if y == 1 */
       if (mpz_cmp_ui(y, 1) == 0)
         goto fail;
     }
@@ -848,7 +876,7 @@ fail:
   return r;
 }
 
-// https://github.com/golang/go/blob/aadaec5/src/math/big/prime.go#L150
+/* https://github.com/golang/go/blob/aadaec5/src/math/big/prime.go#L150 */
 static int
 goo_is_prime_lucas(const mpz_t n) {
   int r = 0;
@@ -857,6 +885,9 @@ goo_is_prime_lucas(const mpz_t n) {
   mpz_t s, nm2;
   mpz_t vk, vk1;
   mpz_t t1, t2, t3;
+  int j;
+  unsigned long zb, bp;
+  long i, t;
 
   mpz_init(d);
   mpz_init(s);
@@ -867,59 +898,59 @@ goo_is_prime_lucas(const mpz_t n) {
   mpz_init(t2);
   mpz_init(t3);
 
-  // Ignore 0 and 1.
-  // if n <= 1
+  /* Ignore 0 and 1. */
+  /* if n <= 1 */
   if (mpz_cmp_ui(n, 1) <= 0)
     goto fail;
 
-  // Two is the only even prime.
-  // if n & 1 == 0
+  /* Two is the only even prime. */
+  /* if n & 1 == 0 */
   if (mpz_even_p(n)) {
-    // if n == 2
+    /* if n == 2 */
     if (mpz_cmp_ui(n, 2) == 0)
       goto succeed;
     goto fail;
   }
 
-  // Baillie-OEIS "method C" for choosing D, P, Q.
-  // See: https://oeis.org/A217719/a217719.txt.
-  // p = 3
+  /* Baillie-OEIS "method C" for choosing D, P, Q. */
+  /* See: https://oeis.org/A217719/a217719.txt. */
+  /* p = 3 */
   p = 3;
-  // d = 1
+  /* d = 1 */
   mpz_set_ui(d, 1);
 
   for (;;) {
     if (p > 10000) {
-      // Thought to be impossible.
+      /* Thought to be impossible. */
       goto fail;
     }
 
     if (p > 50) {
-      // It's thought to be impossible for `p`
-      // to be larger than 10,000, but fail
-      // on anything higher than 50 to prevent
-      // DoS attacks. `p` never seems to be
-      // higher than 30 in practice.
+      /* It's thought to be impossible for `p` */
+      /* to be larger than 10,000, but fail */
+      /* on anything higher than 50 to prevent */
+      /* DoS attacks. `p` never seems to be */
+      /* higher than 30 in practice. */
       goto fail;
     }
 
-    // d = p * p - 4
+    /* d = p * p - 4 */
     mpz_set_ui(d, p * p - 4);
 
-    int j = mpz_jacobi(d, n);
+    j = mpz_jacobi(d, n);
 
     if (j == -1)
       break;
 
     if (j == 0) {
-      // if n == p + 2
+      /* if n == p + 2 */
       if (mpz_cmp_ui(n, p + 2) == 0)
         goto succeed;
       goto fail;
     }
 
     if (p == 40) {
-      // if is_square(n)
+      /* if is_square(n) */
       if (mpz_perfect_square_p(n))
         goto fail;
     }
@@ -927,99 +958,99 @@ goo_is_prime_lucas(const mpz_t n) {
     p += 1;
   }
 
-  // Check for Grantham definition of
-  // "extra strong Lucas pseudoprime".
-  // s = n + 1
+  /* Check for Grantham definition of */
+  /* "extra strong Lucas pseudoprime". */
+  /* s = n + 1 */
   mpz_add_ui(s, n, 1);
 
-  // zb = zerobits(s)
-  unsigned long zb = goo_mpz_zerobits(s);
+  /* zb = zerobits(s) */
+  zb = goo_mpz_zerobits(s);
 
-  // nm2 = n - 2
+  /* nm2 = n - 2 */
   mpz_sub_ui(nm2, n, 2);
 
-  // s >>= zb
+  /* s >>= zb */
   mpz_tdiv_q_2exp(s, s, zb);
 
-  unsigned long bp = p;
+  bp = p;
 
-  // vk = 2
+  /* vk = 2 */
   mpz_set_ui(vk, 2);
-  // vk1 = p
+  /* vk1 = p */
   mpz_set_ui(vk1, p);
 
-  for (long i = (long)goo_mpz_bitlen(s); i >= 0; i--) {
+  for (i = (long)goo_mpz_bitlen(s); i >= 0; i--) {
     if (mpz_tstbit(s, i)) {
-      // t1 = vk * vk1
+      /* t1 = vk * vk1 */
       mpz_mul(t1, vk, vk1);
-      // t1 += n
+      /* t1 += n */
       mpz_add(t1, t1, n);
-      // t1 -= bp
+      /* t1 -= bp */
       mpz_sub_ui(t1, t1, bp);
-      // vk = t1 mod n
+      /* vk = t1 mod n */
       mpz_mod(vk, t1, n);
-      // t1 = vk1 * vk1
+      /* t1 = vk1 * vk1 */
       mpz_mul(t1, vk1, vk1);
-      // t1 += nm2
+      /* t1 += nm2 */
       mpz_add(t1, t1, nm2);
-      // vk1 = t1 mod n
+      /* vk1 = t1 mod n */
       mpz_mod(vk1, t1, n);
     } else {
-      // t1 = vk * vk1
+      /* t1 = vk * vk1 */
       mpz_mul(t1, vk, vk1);
-      // t1 += n
+      /* t1 += n */
       mpz_add(t1, t1, n);
-      // t1 -= bp
+      /* t1 -= bp */
       mpz_sub_ui(t1, t1, bp);
-      // vk1 = t1 mod n
+      /* vk1 = t1 mod n */
       mpz_mod(vk1, t1, n);
-      // t1 = vk * vk
+      /* t1 = vk * vk */
       mpz_mul(t1, vk, vk);
-      // t1 += nm2
+      /* t1 += nm2 */
       mpz_add(t1, t1, nm2);
-      // vk = t1 mod n
+      /* vk = t1 mod n */
       mpz_mod(vk, t1, n);
     }
   }
 
-  // if vk == 2 or vk == nm2
+  /* if vk == 2 or vk == nm2 */
   if (mpz_cmp_ui(vk, 2) == 0 || mpz_cmp(vk, nm2) == 0) {
-    // t1 = vk * bp
+    /* t1 = vk * bp */
     mpz_mul_ui(t1, vk, bp);
-    // t2 = vk1 << 1
+    /* t2 = vk1 << 1 */
     mpz_mul_2exp(t2, vk1, 1);
 
-    // if t1 < t2
+    /* if t1 < t2 */
     if (mpz_cmp(t1, t2) < 0) {
-      // [t1, t2] = [t2, t1]
+      /* [t1, t2] = [t2, t1] */
       mpz_swap(t1, t2);
     }
 
-    // t1 -= t2
+    /* t1 -= t2 */
     mpz_sub(t1, t1, t2);
 
-    // t3 = t1 mod n
+    /* t3 = t1 mod n */
     mpz_mod(t3, t1, n);
 
-    // if t3 == 0
+    /* if t3 == 0 */
     if (mpz_sgn(t3) == 0)
       goto succeed;
   }
 
-  for (long t = 0; t < (long)zb - 1; t++) {
-    // if vk == 0
+  for (t = 0; t < (long)zb - 1; t++) {
+    /* if vk == 0 */
     if (mpz_sgn(vk) == 0)
       goto succeed;
 
-    // if vk == 2
+    /* if vk == 2 */
     if (mpz_cmp_ui(vk, 2) == 0)
       goto fail;
 
-    // t1 = vk * vk
+    /* t1 = vk * vk */
     mpz_mul(t1, vk, vk);
-    // t1 -= 2
+    /* t1 -= 2 */
     mpz_sub_ui(t1, t1, 2);
-    // vk = t1 mod n
+    /* vk = t1 mod n */
     mpz_mod(vk, t1, n);
   }
 
@@ -1041,19 +1072,21 @@ fail:
 
 static int
 goo_is_prime(const mpz_t p, const unsigned char *key) {
-  // if p <= 1
+  int ret;
+
+  /* if p <= 1 */
   if (mpz_cmp_ui(p, 1) <= 0)
     return 0;
 
-  // 0 = not prime
-  // 1 = maybe prime
-  // 2 = definitely prime
-  int ret = goo_is_prime_div(p);
+  /* 0 = not prime */
+  /* 1 = maybe prime */
+  /* 2 = definitely prime */
+  ret = goo_is_prime_div(p);
 
   if (ret == 0)
     return 0;
 
-  // Early exit.
+  /* Early exit. */
   if (ret == 2)
     return 1;
 
@@ -1075,20 +1108,20 @@ goo_next_prime(
 ) {
   unsigned long inc = 0;
 
-  // ret = p
+  /* ret = p */
   mpz_set(ret, p);
 
-  // if ret & 1 == 0
+  /* if ret & 1 == 0 */
   if (mpz_even_p(ret)) {
     inc += 1;
-    // ret += 1
+    /* ret += 1 */
     mpz_add_ui(ret, ret, 1);
   }
 
   while (!goo_is_prime(ret, key)) {
     if (max != 0 && inc > max)
       break;
-    // ret += 2
+    /* ret += 2 */
     mpz_add_ui(ret, ret, 2);
     inc += 2;
   }
@@ -1147,7 +1180,7 @@ goo_sig_uninit(goo_sig_t *sig) {
   mpz_clear(sig->z_s2);
 }
 
-static inline size_t
+static size_t
 goo_sig_size(const goo_sig_t *sig, size_t bits) {
   size_t mod_bytes = (bits + 7) / 8;
   size_t exp_bytes = (GOO_EXPONENT_SIZE + 7) / 8;
@@ -1155,28 +1188,29 @@ goo_sig_size(const goo_sig_t *sig, size_t bits) {
   size_t ell_bytes = (GOO_ELL_BITS + 7) / 8;
   size_t len = 0;
 
-  len += mod_bytes; // C2
-  len += mod_bytes; // C3
-  len += 2; // t
-  len += chal_bytes; // chal
-  len += ell_bytes; // ell
-  len += mod_bytes; // Aq
-  len += mod_bytes; // Bq
-  len += mod_bytes; // Cq
-  len += mod_bytes; // Dq
-  len += exp_bytes; // Eq
-  len += ell_bytes * 8; // z_prime
+  len += mod_bytes; /* C2 */
+  len += mod_bytes; /* C3 */
+  len += 2; /* t */
+  len += chal_bytes; /* chal */
+  len += ell_bytes; /* ell */
+  len += mod_bytes; /* Aq */
+  len += mod_bytes; /* Bq */
+  len += mod_bytes; /* Cq */
+  len += mod_bytes; /* Dq */
+  len += exp_bytes; /* Eq */
+  len += ell_bytes * 8; /* z_prime */
 
   return len;
 }
 
 #define goo_write_int(n, size) do {     \
   size_t bytes = goo_mpz_bytelen((n));  \
+  size_t pad;                           \
                                         \
   if (bytes > (size))                   \
     return 0;                           \
                                         \
-  size_t pad = (size) - bytes;          \
+  pad = (size) - bytes;                 \
   memset(&out[pos], 0x00, pad);         \
   pos += pad;                           \
                                         \
@@ -1184,7 +1218,7 @@ goo_sig_size(const goo_sig_t *sig, size_t bits) {
   pos += bytes;                         \
 } while (0)
 
-static inline int
+static int
 goo_sig_export(unsigned char *out, const goo_sig_t *sig, size_t bits) {
   size_t mod_bytes = (bits + 7) / 8;
   size_t exp_bytes = (GOO_EXPONENT_SIZE + 7) / 8;
@@ -1228,7 +1262,7 @@ goo_sig_export(unsigned char *out, const goo_sig_t *sig, size_t bits) {
   pos += (size);                           \
 } while (0)                                \
 
-static inline int
+static int
 goo_sig_import(
   goo_sig_t *sig,
   const unsigned char *data,
@@ -1264,7 +1298,7 @@ goo_sig_import(
 
   assert(pos <= data_len);
 
-  // non-minimal serialization
+  /* non-minimal serialization */
   if (pos != data_len)
     return 0;
 
@@ -1277,22 +1311,23 @@ goo_sig_import(
  * CombSpec
  */
 
-static inline size_t
+static size_t
 combspec_size(long bits) {
   long max = 0;
+  long ppa, bpw, sqrt, aps, shifts, ops1, ops2, ops;
 
-  for (long ppa = 2; ppa < 18; ppa++) {
-    long bpw = (bits + ppa - 1) / ppa;
-    long sqrt = goo_dsqrt(bpw);
+  for (ppa = 2; ppa < 18; ppa++) {
+    bpw = (bits + ppa - 1) / ppa;
+    sqrt = goo_dsqrt(bpw);
 
-    for (long aps = 1; aps < sqrt + 2; aps++) {
+    for (aps = 1; aps < sqrt + 2; aps++) {
       if (bpw % aps != 0)
         continue;
 
-      long shifts = bpw / aps;
-      long ops1 = shifts * (aps + 1) - 1;
-      long ops2 = aps * (shifts + 1) - 1;
-      long ops = (ops1 > ops2 ? ops1 : ops2) + 1;
+      shifts = bpw / aps;
+      ops1 = shifts * (aps + 1) - 1;
+      ops2 = aps * (shifts + 1) - 1;
+      ops = (ops1 > ops2 ? ops1 : ops2) + 1;
 
       if (ops > max)
         max = ops;
@@ -1313,11 +1348,12 @@ combspec_result(
 ) {
   long ops = shifts * (aps + 1) - 1;
   long size = ((1 << ppa) - 1) * aps;
+  goo_combspec_t *best;
 
   assert(ops >= 0);
   assert((size_t)ops < map_size);
 
-  goo_combspec_t *best = &combs[ops];
+  best = &combs[ops];
 
   if (best->exists == 0 || best->size > size) {
     best->exists = 1;
@@ -1336,34 +1372,38 @@ goo_combspec_init(
   long bits,
   long maxsize
 ) {
+  size_t map_size, i;
+  goo_combspec_t *combs, *ret;
+  long ppa, bpw, sqrt, aps, shifts, sm;
+
   if (bits < 0 || maxsize < 0)
     return 0;
 
-  size_t map_size = combspec_size(bits);
-  goo_combspec_t *combs = goo_calloc(map_size, sizeof(goo_combspec_t));
+  map_size = combspec_size(bits);
+  combs = goo_calloc(map_size, sizeof(goo_combspec_t));
 
-  for (long ppa = 2; ppa < 18; ppa++) {
-    long bpw = (bits + ppa - 1) / ppa;
-    long sqrt = goo_dsqrt(bpw);
+  for (ppa = 2; ppa < 18; ppa++) {
+    bpw = (bits + ppa - 1) / ppa;
+    sqrt = goo_dsqrt(bpw);
 
-    for (long aps = 1; aps < sqrt + 2; aps++) {
+    for (aps = 1; aps < sqrt + 2; aps++) {
       if (bpw % aps != 0) {
-        // Only factorizations of
-        // bits_per_window are useful.
+        /* Only factorizations of */
+        /* bits_per_window are useful. */
         continue;
       }
 
-      long shifts = bpw / aps;
+      shifts = bpw / aps;
 
       combspec_result(combs, map_size, shifts, aps, ppa, bpw);
       combspec_result(combs, map_size, aps, shifts, ppa, bpw);
     }
   }
 
-  long sm = 0;
-  goo_combspec_t *ret = NULL;
+  sm = 0;
+  ret = NULL;
 
-  for (size_t i = 0; i < map_size; i++) {
+  for (i = 0; i < map_size; i++) {
     goo_combspec_t *comb = &combs[i];
 
     if (comb->exists == 0)
@@ -1414,9 +1454,13 @@ goo_comb_init(
   mpz_t base,
   goo_combspec_t *spec
 ) {
+  long skip, i, j;
+  mpz_t *it;
+  mpz_t win;
+
   memset((void *)comb, 0x00, sizeof(goo_comb_t));
 
-  long skip = (1 << spec->points_per_add) - 1;
+  skip = (1 << spec->points_per_add) - 1;
 
   comb->points_per_add = spec->points_per_add;
   comb->adds_per_shift = spec->adds_per_shift;
@@ -1428,41 +1472,40 @@ goo_comb_init(
 
   comb->wins = (long **)goo_calloc(comb->shifts, sizeof(long *));
 
-  for (long i = 0; i < comb->shifts; i++)
+  for (i = 0; i < comb->shifts; i++)
     comb->wins[i] = (long *)goo_calloc(comb->adds_per_shift, sizeof(long));
 
   comb->items = (mpz_t *)goo_calloc(comb->size, sizeof(mpz_t));
 
-  for (long i = 0; i < comb->size; i++)
+  for (i = 0; i < comb->size; i++)
     mpz_init(comb->items[i]);
 
   mpz_set(comb->items[0], base);
 
-  mpz_t *it = &comb->items[0];
+  it = &comb->items[0];
 
-  mpz_t win;
   mpz_init(win);
 
-  // win = 1 << bits_per_window
+  /* win = 1 << bits_per_window */
   mpz_set_ui(win, 1);
   mpz_mul_2exp(win, win, comb->bits_per_window);
 
-  for (long i = 1; i < comb->points_per_add; i++) {
+  for (i = 1; i < comb->points_per_add; i++) {
     long oval = 1 << i;
     long ival = oval >> 1;
 
     goo_group_pow(group, it[oval - 1], it[ival - 1], NULL, win);
 
-    for (long j = oval + 1; j < 2 * oval; j++)
+    for (j = oval + 1; j < 2 * oval; j++)
       goo_group_mul(group, it[j - 1], it[j - oval - 1], it[oval - 1]);
   }
 
-  // win = 1 << shifts
+  /* win = 1 << shifts */
   mpz_set_ui(win, 1);
   mpz_mul_2exp(win, win, comb->shifts);
 
-  for (long i = 1; i < comb->adds_per_shift; i++) {
-    for (long j = 0; j < skip; j++) {
+  for (i = 1; i < comb->adds_per_shift; i++) {
+    for (j = 0; j < skip; j++) {
       long k = i * skip + j;
 
       goo_group_pow(group, it[k], it[k - skip], NULL, win);
@@ -1474,10 +1517,12 @@ goo_comb_init(
 
 static void
 goo_comb_uninit(goo_comb_t *comb) {
-  for (long i = 0; i < comb->size; i++)
+  long i;
+
+  for (i = 0; i < comb->size; i++)
     mpz_clear(comb->items[i]);
 
-  for (long i = 0; i < comb->shifts; i++)
+  for (i = 0; i < comb->shifts; i++)
     goo_free(comb->wins[i]);
 
   goo_free(comb->wins);
@@ -1491,17 +1536,17 @@ goo_comb_uninit(goo_comb_t *comb) {
 static int
 goo_to_comb_exp(goo_comb_t *comb, const mpz_t e) {
   long len = (long)goo_mpz_bitlen(e);
+  long i, j, k, ret, b;
 
   if (len < 0 || len > comb->bits)
     return 0;
 
-  for (long i = comb->adds_per_shift - 1; i >= 0; i--) {
-    for (long j = 0; j < comb->shifts; j++) {
-      long ret = 0;
+  for (i = comb->adds_per_shift - 1; i >= 0; i--) {
+    for (j = 0; j < comb->shifts; j++) {
+      ret = 0;
 
-      for (long k = 0; k < comb->points_per_add; k++) {
-        long b = (i + k * comb->adds_per_shift) * comb->shifts + j;
-
+      for (k = 0; k < comb->points_per_add; k++) {
+        b = (i + k * comb->adds_per_shift) * comb->shifts + j;
         ret <<= 1;
         ret |= (long)mpz_tstbit(e, (comb->bits - 1) - b);
       }
@@ -1517,7 +1562,7 @@ goo_to_comb_exp(goo_comb_t *comb, const mpz_t e) {
  * Group
  */
 
-static inline int
+static int
 goo_hash_item(
   goo_sha256_t *ctx,
   const mpz_t n,
@@ -1533,6 +1578,8 @@ goo_group_init(
   unsigned long h,
   unsigned long modbits
 ) {
+  long i;
+
   if (modbits != 0) {
     if (modbits < GOO_MIN_RSA_BITS || modbits > GOO_MAX_RSA_BITS)
       return 0;
@@ -1545,18 +1592,18 @@ goo_group_init(
   mpz_init(group->g);
   mpz_init(group->h);
 
-  // n = n
+  /* n = n */
   mpz_set(group->n, n);
 
   group->bits = goo_mpz_bitlen(group->n);
   group->size = (group->bits + 7) / 8;
 
-  // nh = n >> 1
+  /* nh = n >> 1 */
   mpz_tdiv_q_2exp(group->nh, group->n, 1);
 
-  // g = g
+  /* g = g */
   mpz_set_ui(group->g, g);
-  // h = h
+  /* h = h */
   mpz_set_ui(group->h, h);
 
   group->rand_bits = goo_mpz_bitlen(group->n) - 1;
@@ -1566,12 +1613,10 @@ goo_group_init(
     long big2 = modbits + group->rand_bits;
     long big = big1 > big2 ? big1 : big2;
     long big_bits = big + GOO_ELL_BITS + 1;
-
-    goo_combspec_t big_spec;
-    assert(goo_combspec_init(&big_spec, big_bits, GOO_MAX_COMB_SIZE));
-
     long small_bits = group->rand_bits;
-    goo_combspec_t small_spec;
+    goo_combspec_t big_spec, small_spec;
+
+    assert(goo_combspec_init(&big_spec, big_bits, GOO_MAX_COMB_SIZE));
     assert(goo_combspec_init(&small_spec, small_bits, GOO_MAX_COMB_SIZE));
 
     group->combs_len = 2;
@@ -1581,8 +1626,8 @@ goo_group_init(
     goo_comb_init(&group->combs[1].h, group, group->h, &big_spec);
   } else {
     long tiny_bits = GOO_ELL_BITS;
-
     goo_combspec_t tiny_spec;
+
     assert(goo_combspec_init(&tiny_spec, tiny_bits, GOO_MAX_COMB_SIZE));
 
     group->combs_len = 1;
@@ -1590,7 +1635,7 @@ goo_group_init(
     goo_comb_init(&group->combs[0].h, group, group->h, &tiny_spec);
   }
 
-  for (long i = 0; i < GOO_TABLEN; i++) {
+  for (i = 0; i < GOO_TABLEN; i++) {
     mpz_init(group->pctab_p1[i]);
     mpz_init(group->pctab_n1[i]);
     mpz_init(group->pctab_p2[i]);
@@ -1634,19 +1679,21 @@ goo_group_init(
 
 static void
 goo_group_uninit(goo_group_t *group) {
+  long i;
+
   mpz_clear(group->n);
   mpz_clear(group->nh);
   mpz_clear(group->g);
   mpz_clear(group->h);
 
-  for (long i = 0; i < group->combs_len; i++) {
+  for (i = 0; i < group->combs_len; i++) {
     goo_comb_uninit(&group->combs[i].g);
     goo_comb_uninit(&group->combs[i].h);
   }
 
   group->combs_len = 0;
 
-  for (long i = 0; i < GOO_TABLEN; i++) {
+  for (i = 0; i < GOO_TABLEN; i++) {
     mpz_clear(group->pctab_p1[i]);
     mpz_clear(group->pctab_n1[i]);
     mpz_clear(group->pctab_p2[i]);
@@ -1682,22 +1729,22 @@ goo_group_uninit(goo_group_t *group) {
 
 static void
 goo_group_reduce(goo_group_t *group, mpz_t ret, const mpz_t b) {
-  // if b > nh
+  /* if b > nh */
   if (mpz_cmp(b, group->nh) > 0) {
-    // ret = n - b
+    /* ret = n - b */
     mpz_sub(ret, group->n, b);
   }
 }
 
 static int
 goo_group_is_reduced(goo_group_t *group, const mpz_t b) {
-  // b <= nh
+  /* b <= nh */
   return mpz_cmp(b, group->nh) <= 0 ? 1 : 0;
 }
 
 static void
 goo_group_sqr(goo_group_t *group, mpz_t ret, const mpz_t b) {
-  // ret = b^2 mod n
+  /* ret = b^2 mod n */
   mpz_powm_ui(ret, b, 2, group->n);
 }
 
@@ -1709,21 +1756,21 @@ goo_group_pow(
   const mpz_t b_inv,
   const mpz_t e
 ) {
-  // ret = b^e mod n
+  /* ret = b^e mod n */
   mpz_powm(ret, b, e, group->n);
 }
 
 static void
 goo_group_mul(goo_group_t *group, mpz_t ret, const mpz_t m1, const mpz_t m2) {
-  // ret = (m1 * m2) mod n
+  /* ret = (m1 * m2) mod n */
   mpz_mul(ret, m1, m2);
   mpz_mod(ret, ret, group->n);
 }
 
 static int
 goo_group_inv(goo_group_t *group, mpz_t ret, const mpz_t b) {
-  // ret = b^-1 mod n
-  return mpz_invert(ret, b, group->n) != 0 ? 1 : 0;
+  /* ret = b^-1 mod n */
+  return mpz_invert(ret, b, group->n);
 }
 
 static int
@@ -1737,15 +1784,15 @@ goo_group_inv2(
   int r = 0;
   mpz_ptr b12_inv = r2;
 
-  // b12_inv = (b1 * b2)^-1 mod n
+  /* b12_inv = (b1 * b2)^-1 mod n */
   mpz_mul(b12_inv, b1, b2);
 
   if (!goo_group_inv(group, b12_inv, b12_inv))
     goto fail;
 
-  // r1 = (b2 * b12_inv) mod n
+  /* r1 = (b2 * b12_inv) mod n */
   goo_group_mul(group, r1, b2, b12_inv);
-  // r2 = (b1 * b12_inv) mod n
+  /* r2 = (b1 * b12_inv) mod n */
   goo_group_mul(group, r2, b1, b12_inv);
 
   r = 1;
@@ -1773,8 +1820,8 @@ goo_group_inv7(
 ) {
   int r = 0;
 
-  // Tricky memory management
-  // to avoid allocations.
+  /* Tricky memory management */
+  /* to avoid allocations. */
   mpz_ptr b12 = r4;
   mpz_ptr b34 = r2;
   mpz_ptr b56 = r3;
@@ -1788,47 +1835,47 @@ goo_group_inv7(
   mpz_ptr b34_inv = r4;
   mpz_ptr b12_inv = r2;
 
-  // b12 = (b1 * b2) mod n
+  /* b12 = (b1 * b2) mod n */
   goo_group_mul(group, b12, b1, b2);
-  // b34 = (b3 * b4) mod n
+  /* b34 = (b3 * b4) mod n */
   goo_group_mul(group, b34, b3, b4);
-  // b56 = (b5 * b6) mod n
+  /* b56 = (b5 * b6) mod n */
   goo_group_mul(group, b56, b5, b6);
-  // b1234 = (b12 * b34) mod n
+  /* b1234 = (b12 * b34) mod n */
   goo_group_mul(group, b1234, b12, b34);
-  // b123456 = (b1234 * b56) mod n
+  /* b123456 = (b1234 * b56) mod n */
   goo_group_mul(group, b123456, b1234, b56);
-  // b1234567 = (b123456 * b7) mod n
+  /* b1234567 = (b123456 * b7) mod n */
   goo_group_mul(group, b1234567, b123456, b7);
 
-  // b1234567_inv = b1234567^-1 mod n
+  /* b1234567_inv = b1234567^-1 mod n */
   if (!goo_group_inv(group, b1234567_inv, b1234567))
     goto fail;
 
-  // b123456_inv = (b1234567_inv * b7) mod n
+  /* b123456_inv = (b1234567_inv * b7) mod n */
   goo_group_mul(group, b123456_inv, b1234567_inv, b7);
-  // b1234_inv = (b123456_inv * b56) mod n
+  /* b1234_inv = (b123456_inv * b56) mod n */
   goo_group_mul(group, b1234_inv, b123456_inv, b56);
-  // b56_inv = (b123456_inv * b1234) mod n
+  /* b56_inv = (b123456_inv * b1234) mod n */
   goo_group_mul(group, b56_inv, b123456_inv, b1234);
-  // b34_inv = (b1234_inv * b12) mod n
+  /* b34_inv = (b1234_inv * b12) mod n */
   goo_group_mul(group, b34_inv, b1234_inv, b12);
-  // b12_inv = (b1234_inv * b34) mod n
+  /* b12_inv = (b1234_inv * b34) mod n */
   goo_group_mul(group, b12_inv, b1234_inv, b34);
 
-  // r7 = (b1234567_inv * b123456) mod n
+  /* r7 = (b1234567_inv * b123456) mod n */
   goo_group_mul(group, r7, b1234567_inv, b123456);
-  // r5 = (b56_inv * b6) mod n
+  /* r5 = (b56_inv * b6) mod n */
   goo_group_mul(group, r5, b56_inv, b6);
-  // r6 = (b56_inv * b5) mod n
+  /* r6 = (b56_inv * b5) mod n */
   goo_group_mul(group, r6, b56_inv, b5);
-  // r1 = (b12_inv * b2) mod n
+  /* r1 = (b12_inv * b2) mod n */
   goo_group_mul(group, r1, b12_inv, b2);
-  // r2 = (b12_inv * b1) mod n
+  /* r2 = (b12_inv * b1) mod n */
   goo_group_mul(group, r2, b12_inv, b1);
-  // r3 = (b34_inv * b4) mod n
+  /* r3 = (b34_inv * b4) mod n */
   goo_group_mul(group, r3, b34_inv, b4);
-  // r4 = (b34_inv * b3) mod n
+  /* r4 = (b34_inv * b3) mod n */
   goo_group_mul(group, r4, b34_inv, b3);
 
   r = 1;
@@ -1841,11 +1888,12 @@ goo_group_powgh(goo_group_t *group, mpz_t ret, const mpz_t e1, const mpz_t e2) {
   long e1bits = (long)goo_mpz_bitlen(e1);
   long e2bits = (long)goo_mpz_bitlen(e2);
   long loge = e1bits > e2bits ? e1bits : e2bits;
+  long i;
 
   goo_comb_t *gcomb = NULL;
   goo_comb_t *hcomb = NULL;
 
-  for (long i = 0; i < group->combs_len; i++) {
+  for (i = 0; i < group->combs_len; i++) {
     if (loge <= group->combs[i].g.bits) {
       gcomb = &group->combs[i].g;
       hcomb = &group->combs[i].h;
@@ -1862,18 +1910,19 @@ goo_group_powgh(goo_group_t *group, mpz_t ret, const mpz_t e1, const mpz_t e2) {
   if (!goo_to_comb_exp(hcomb, e2))
     return 0;
 
-  // ret = 1
+  /* ret = 1 */
   mpz_set_ui(ret, 1);
 
-  for (long i = 0; i < gcomb->shifts; i++) {
+  for (i = 0; i < gcomb->shifts; i++) {
     long *e1vs = gcomb->wins[i];
     long *e2vs = hcomb->wins[i];
+    long j;
 
-    // if ret != 1
+    /* if ret != 1 */
     if (mpz_cmp_ui(ret, 1) != 0)
       goo_group_sqr(group, ret, ret);
 
-    for (long j = 0; j < gcomb->adds_per_shift; j++) {
+    for (j = 0; j < gcomb->adds_per_shift; j++) {
       long e1v = e1vs[j];
       long e2v = e2vs[j];
 
@@ -1902,11 +1951,11 @@ goo_group_powgh_slow(
   mpz_t q1, q2;
   mpz_init(q1);
   mpz_init(q2);
-  // q1 = g^e1 mod n
+  /* q1 = g^e1 mod n */
   mpz_powm(q1, group->g, e1, group->n);
-  // q2 = h^e2 mod n
+  /* q2 = h^e2 mod n */
   mpz_powm(q2, group->h, e2, group->n);
-  // ret = (q1 * q2) mod n
+  /* ret = (q1 * q2) mod n */
   mpz_mul(ret, q1, q2);
   mpz_mod(ret, ret, group->n);
   mpz_clear(q1);
@@ -1917,15 +1966,16 @@ goo_group_powgh_slow(
 static void
 goo_group_wnaf_pc_help(goo_group_t *group, const mpz_t b, mpz_t *out) {
   mpz_t *bsq = &out[GOO_TABLEN - 1];
+  long i;
 
-  // bsq = b * b
+  /* bsq = b * b */
   goo_group_sqr(group, *bsq, b);
 
-  // out[0] = b
+  /* out[0] = b */
   mpz_set(out[0], b);
 
-  for (long i = 1; i < GOO_TABLEN; i++) {
-    // out[i] = out[i - 1] * bsq
+  for (i = 1; i < GOO_TABLEN; i++) {
+    /* out[i] = out[i - 1] * bsq */
     goo_group_mul(group, out[i], out[i - 1], *bsq);
   }
 }
@@ -1947,37 +1997,37 @@ goo_group_wnaf(goo_group_t *group, const mpz_t exp, long *out, long bitlen) {
   mpz_t *e = &group->e;
   long w = GOO_WINDOW_SIZE;
   long mask = (1 << w) - 1;
-  long val;
+  long val, i;
 
-  // e = exp
+  /* e = exp */
   mpz_set(*e, exp);
 
-  for (long i = bitlen - 1; i >= 0; i--) {
+  for (i = bitlen - 1; i >= 0; i--) {
     val = 0;
 
-    // if e & 1
+    /* if e & 1 */
     if (mpz_odd_p(*e)) {
-      // val = e & mask;
+      /* val = e & mask; */
       val = (long)mpz_tdiv_ui(*e, mask + 1);
 
       if (val & (1 << (w - 1)))
         val -= 1 << w;
 
-      // e = e - val
+      /* e = e - val */
       if (val < 0)
         mpz_add_ui(*e, *e, -val);
       else
         mpz_sub_ui(*e, *e, val);
     }
 
-    // out[i] = val
+    /* out[i] = val */
     out[i] = val;
 
-    // e = e >> 1
+    /* e = e >> 1 */
     mpz_tdiv_q_2exp(*e, *e, 1);
   }
 
-  // e == 0
+  /* e == 0 */
   assert(mpz_sgn(*e) == 0);
 
   return out;
@@ -1988,8 +2038,8 @@ goo_group_one_mul(
   goo_group_t *group,
   mpz_t ret,
   long w,
-  const mpz_t *p,
-  const mpz_t *n
+  mpz_t *p,
+  mpz_t *n
 ) {
   if (w > 0)
     goo_group_mul(group, ret, ret, p[(w - 1) >> 1]);
@@ -2005,27 +2055,33 @@ goo_group_pow_wnaf(
   const mpz_t b_inv,
   const mpz_t e
 ) {
-  if (b_inv == NULL)
-    return goo_group_pow(group, ret, b, b_inv, e);
+  mpz_t *p, *n;
+  size_t totlen, i;
+  long *ebits;
 
-  mpz_t *p = &group->pctab_p1[0];
-  mpz_t *n = &group->pctab_n1[0];
+  if (b_inv == NULL) {
+    goo_group_pow(group, ret, b, b_inv, e);
+    return;
+  }
+
+  p = &group->pctab_p1[0];
+  n = &group->pctab_n1[0];
 
   goo_group_precomp_wnaf(group, b, b_inv, p, n);
 
-  size_t totlen = goo_mpz_bitlen(e) + 1;
+  totlen = goo_mpz_bitlen(e) + 1;
 
   assert(totlen <= GOO_ELL_BITS + 1);
 
-  long *ebits = goo_group_wnaf(group, e, &group->e1bits[0], totlen);
+  ebits = goo_group_wnaf(group, e, &group->e1bits[0], totlen);
 
-  // ret = 1
+  /* ret = 1 */
   mpz_set_ui(ret, 1);
 
-  for (size_t i = 0; i < totlen; i++) {
+  for (i = 0; i < totlen; i++) {
     long w = ebits[i];
 
-    // if ret != 1
+    /* if ret != 1 */
     if (mpz_cmp_ui(ret, 1) != 0)
       goo_group_sqr(group, ret, ret);
 
@@ -2048,28 +2104,30 @@ goo_group_pow2(
   mpz_t *n1 = &group->pctab_n1[0];
   mpz_t *p2 = &group->pctab_p2[0];
   mpz_t *n2 = &group->pctab_n2[0];
+  size_t e1len, e2len, totlen, i;
+  long *e1bits, *e2bits;
 
   goo_group_precomp_wnaf(group, b1, b1_inv, p1, n1);
   goo_group_precomp_wnaf(group, b2, b2_inv, p2, n2);
 
-  size_t e1len = goo_mpz_bitlen(e1);
-  size_t e2len = goo_mpz_bitlen(e2);
-  size_t totlen = (e1len > e2len ? e1len : e2len) + 1;
+  e1len = goo_mpz_bitlen(e1);
+  e2len = goo_mpz_bitlen(e2);
+  totlen = (e1len > e2len ? e1len : e2len) + 1;
 
   if (totlen > GOO_ELL_BITS + 1)
     return 0;
 
-  long *e1bits = goo_group_wnaf(group, e1, &group->e1bits[0], totlen);
-  long *e2bits = goo_group_wnaf(group, e2, &group->e2bits[0], totlen);
+  e1bits = goo_group_wnaf(group, e1, &group->e1bits[0], totlen);
+  e2bits = goo_group_wnaf(group, e2, &group->e2bits[0], totlen);
 
-  // ret = 1
+  /* ret = 1 */
   mpz_set_ui(ret, 1);
 
-  for (size_t i = 0; i < totlen; i++) {
+  for (i = 0; i < totlen; i++) {
     long w1 = e1bits[i];
     long w2 = e2bits[i];
 
-    // if ret != 1
+    /* if ret != 1 */
     if (mpz_cmp_ui(ret, 1) != 0)
       goo_group_sqr(group, ret, ret);
 
@@ -2094,11 +2152,11 @@ goo_group_pow2_slow(
   mpz_t q1, q2;
   mpz_init(q1);
   mpz_init(q2);
-  // q1 = b1^e2 mod n
+  /* q1 = b1^e2 mod n */
   mpz_powm(q1, b1, e1, group->n);
-  // q2 = b2^e2 mod n
+  /* q2 = b2^e2 mod n */
   mpz_powm(q2, b2, e2, group->n);
-  // ret = (q1 * q2) mod n
+  /* ret = (q1 * q2) mod n */
   mpz_mul(ret, q1, q2);
   mpz_mod(ret, ret, group->n);
   mpz_clear(q1);
@@ -2123,18 +2181,18 @@ goo_group_recon(
   mpz_ptr pow = ret;
   mpz_t *gh = &group->gh;
 
-  // pow = pow2(b1, b1_inv, e1, b2, b2_inv, e2)
+  /* pow = pow2(b1, b1_inv, e1, b2, b2_inv, e2) */
   if (!goo_group_pow2(group, pow, b1, b1_inv, e1, b2, b2_inv, e2))
     goto fail;
 
-  // gh = powgh(e3, e4)
+  /* gh = powgh(e3, e4) */
   if (!goo_group_powgh(group, *gh, e3, e4))
     goto fail;
 
-  // ret = pow * gh
+  /* ret = pow * gh */
   goo_group_mul(group, ret, pow, *gh);
 
-  // ret = reduce(ret)
+  /* ret = reduce(ret) */
   goo_group_reduce(group, ret, ret);
 
   r = 1;
@@ -2142,17 +2200,19 @@ fail:
   return r;
 }
 
-static inline int
+static int
 goo_hash_item(
   goo_sha256_t *ctx,
   const mpz_t n,
   size_t size,
   unsigned char *buf
 ) {
+  size_t len, pos;
+
   if (mpz_sgn(n) < 0)
     return 0;
 
-  size_t len = goo_mpz_bytelen(n);
+  len = goo_mpz_bytelen(n);
 
   if (len > size)
     return 0;
@@ -2160,7 +2220,7 @@ goo_hash_item(
   if (len > (GOO_MAX_RSA_BITS + 7) / 8)
     return 0;
 
-  size_t pos = size - len;
+  pos = size - len;
 
   memset(buf, 0x00, pos);
 
@@ -2194,8 +2254,8 @@ goo_hash_all(
 
   goo_sha256_t ctx;
 
-  // Copy the state of SHA256(prefix || n || g || h).
-  // This gives us a very minor speedup.
+  /* Copy the state of SHA256(prefix || n || g || h). */
+  /* This gives us a very minor speedup. */
   memcpy(&ctx, &group->sha, sizeof(goo_sha256_t));
 
   if (!goo_hash_item(&ctx, C1, mod_bytes, buf)
@@ -2248,7 +2308,7 @@ goo_group_fs_chal(
     memcpy(k, key, 32);
 
   if (!verify) {
-    // For prover, call next_prime on ell_r to get ell.
+    /* For prover, call next_prime on ell_r to get ell. */
     if (!goo_next_prime(ell, ell, key, GOO_ELLDIFF_MAX)) {
       mpz_set_ui(chal, 0);
       mpz_set_ui(ell, 0);
@@ -2263,11 +2323,12 @@ static int
 goo_group_expand_sprime(goo_group_t *group, mpz_t s, const mpz_t s_prime) {
   unsigned char key[32];
   size_t bytes = goo_mpz_bytelen(s_prime);
+  size_t pos;
 
   if (bytes > 32)
     return 0;
 
-  size_t pos = 32 - bytes;
+  pos = 32 - bytes;
 
   memset(&key[0], 0x00, pos);
   goo_mpz_export(&key[pos], NULL, s_prime);
@@ -2288,30 +2349,34 @@ goo_group_random_scalar(goo_group_t *group, mpz_t ret) {
   return goo_random_bits_nz(ret, bits);
 }
 
-static inline int
+static int
 goo_is_valid_prime(const mpz_t n) {
-  // if n <= 0
+  size_t bits;
+
+  /* if n <= 0 */
   if (mpz_sgn(n) <= 0)
     return 0;
 
-  size_t bits = goo_mpz_bitlen(n);
+  bits = goo_mpz_bitlen(n);
 
-  // if bitlen(n) > 4096
+  /* if bitlen(n) > 4096 */
   if (bits > GOO_MAX_RSA_BITS)
     return 0;
 
   return 1;
 }
 
-static inline int
+static int
 goo_is_valid_rsa(const mpz_t n) {
-  // if n <= 0
+  size_t bits;
+
+  /* if n <= 0 */
   if (mpz_sgn(n) <= 0)
     return 0;
 
-  size_t bits = goo_mpz_bitlen(n);
+  bits = goo_mpz_bitlen(n);
 
-  // if bitlen(n) < 1024 or bitlen(n) > 4096
+  /* if bitlen(n) < 1024 or bitlen(n) > 4096 */
   if (bits < GOO_MIN_RSA_BITS || bits > GOO_MAX_RSA_BITS)
     return 0;
 
@@ -2320,7 +2385,7 @@ goo_is_valid_rsa(const mpz_t n) {
 
 static int
 goo_group_generate(goo_group_t *group, mpz_t s_prime) {
-  // s_prime = randbits(256)
+  /* s_prime = randbits(256) */
   if (!goo_random_bits_nz(s_prime, 256))
     return 0;
 
@@ -2340,29 +2405,29 @@ goo_group_challenge(
   mpz_init(s);
 
   if (mpz_sgn(s_prime) <= 0) {
-    // Invalid seed length.
+    /* Invalid seed length. */
     goto fail;
   }
 
-  // if n < 2^1023 or n > 2^4096 - 1
+  /* if n < 2^1023 or n > 2^4096 - 1 */
   if (!goo_is_valid_rsa(n)) {
-    // Invalid RSA public key.
+    /* Invalid RSA public key. */
     goto fail;
   }
 
-  // s = expand_sprime(s_prime)
+  /* s = expand_sprime(s_prime) */
   if (!goo_group_expand_sprime(group, s, s_prime))
     goto fail;
 
-  // The challenge: a commitment to the RSA modulus.
-  // C1 = powgh(n, s)
+  /* The challenge: a commitment to the RSA modulus. */
+  /* C1 = powgh(n, s) */
   if (!goo_group_powgh(group, C1, n, s))
     goto fail;
 
-  // C1 = reduce(C1)
+  /* C1 = reduce(C1) */
   goo_group_reduce(group, C1, C1);
 
-  // if C1 <= 0
+  /* if C1 <= 0 */
   if (mpz_sgn(C1) <= 0)
     goto fail;
 
@@ -2381,51 +2446,51 @@ goo_group_validate(
   const mpz_t q
 ) {
   int r = 0;
-
   mpz_t n, s, x;
+
   mpz_init(n);
   mpz_init(s);
   mpz_init(x);
 
-  // if s_prime <= 0 or C1 <= 0 or p <= 0 or q <= 0
+  /* if s_prime <= 0 or C1 <= 0 or p <= 0 or q <= 0 */
   if (mpz_sgn(s_prime) <= 0
       || mpz_sgn(C1) <= 0
       || mpz_sgn(p) <= 0
       || mpz_sgn(q) <= 0) {
-    // Invalid parameters.
+    /* Invalid parameters. */
     goto fail;
   }
 
-  // if p > 2^4096 - 1 or q > 2^4096 - 1
+  /* if p > 2^4096 - 1 or q > 2^4096 - 1 */
   if (!goo_is_valid_prime(p) || !goo_is_valid_prime(q))
     goto fail;
 
-  // n = p * q
+  /* n = p * q */
   mpz_mul(n, p, q);
 
-  // if n < 2^1023 or n > 2^4096 - 1
+  /* if n < 2^1023 or n > 2^4096 - 1 */
   if (!goo_is_valid_rsa(n)) {
-    // Invalid RSA private key.
+    /* Invalid RSA private key. */
     goto fail;
   }
 
-  // s = expand_sprime(s_prime)
+  /* s = expand_sprime(s_prime) */
   if (!goo_group_expand_sprime(group, s, s_prime))
     goto fail;
 
-  // The challenge: a commitment to the RSA modulus.
-  // x = powgh(n, s)
+  /* The challenge: a commitment to the RSA modulus. */
+  /* x = powgh(n, s) */
   if (!goo_group_powgh(group, x, n, s))
     goto fail;
 
-  // x = reduce(x)
+  /* x = reduce(x) */
   goo_group_reduce(group, x, x);
 
-  // if x <= 0
+  /* if x <= 0 */
   if (mpz_sgn(x) <= 0)
     goto fail;
 
-  // if C1 != x
+  /* if C1 != x */
   if (mpz_cmp(C1, x) != 0)
     goto fail;
 
@@ -2448,6 +2513,9 @@ goo_group_sign(
   const mpz_t q
 ) {
   int r = 0;
+  int found;
+  unsigned long primes[GOO_PRIMES_LEN];
+  long i;
 
   mpz_t *C2 = &sig->C2;
   mpz_t *C3 = &sig->C3;
@@ -2502,48 +2570,46 @@ goo_group_sign(
   mpz_init(D);
   mpz_init(E);
 
-  // if s_prime <= 0 or p <= 0 or q <= 0
+  /* if s_prime <= 0 or p <= 0 or q <= 0 */
   if (mpz_sgn(s_prime) <= 0
       || mpz_sgn(p) <= 0
       || mpz_sgn(q) <= 0) {
     goto fail;
   }
 
-  // if p > 2^4096 - 1 or q > 2^4096 - 1
+  /* if p > 2^4096 - 1 or q > 2^4096 - 1 */
   if (!goo_is_valid_prime(p) || !goo_is_valid_prime(q))
     goto fail;
 
-  // n = p * q
+  /* n = p * q */
   mpz_mul(n, p, q);
 
-  // if n < 2^1023 or n > 2^4096 - 1
+  /* if n < 2^1023 or n > 2^4096 - 1 */
   if (!goo_is_valid_rsa(n)) {
-    // Invalid RSA public key.
+    /* Invalid RSA public key. */
     goto fail;
   }
 
-  // Preliminaries: compute values P needs to run the ZKPOK.
-  // Find `t`.
-  int found = 0;
-
-  unsigned long primes[GOO_PRIMES_LEN];
+  /* Preliminaries: compute values P needs to run the ZKPOK. */
+  /* Find `t`. */
+  found = 0;
 
   memcpy(&primes[0], &goo_primes[0], sizeof(goo_primes));
 
-  for (long i = 0; i < GOO_PRIMES_LEN; i++) {
-    // Partial in-place Fisher-Yates shuffle to choose random t.
-    // Note: goo_random_num() is _exclusive_ of endpoints!
+  for (i = 0; i < GOO_PRIMES_LEN; i++) {
+    /* Partial in-place Fisher-Yates shuffle to choose random t. */
+    /* Note: goo_random_num() is _exclusive_ of endpoints! */
     unsigned long j = goo_random_num(GOO_PRIMES_LEN - i);
-    unsigned long x = primes[i];
-    unsigned long y = primes[i + j];
+    unsigned long u = primes[i];
+    unsigned long v = primes[i + j];
 
-    primes[i] = y;
-    primes[i + j] = x;
+    primes[i] = v;
+    primes[i + j] = u;
 
-    // t = small_primes[i]
+    /* t = small_primes[i] */
     mpz_set_ui(*t, primes[i]);
 
-    // w = mod_sqrtn(t, p, q)
+    /* w = mod_sqrtn(t, p, q) */
     if (goo_mpz_sqrtpq(w, *t, p, q)) {
       found = 1;
       break;
@@ -2551,51 +2617,51 @@ goo_group_sign(
   }
 
   if (!found) {
-    // No prime quadratic residue less than 1000 mod N!
+    /* No prime quadratic residue less than 1000 mod N! */
     goto fail;
   }
 
-  // assert w > 0
+  /* assert w > 0 */
   assert(mpz_sgn(w) > 0);
 
-  // a = w^2 - t
+  /* a = w^2 - t */
   mpz_pow_ui(a, w, 2);
   mpz_sub(a, a, *t);
 
-  // a = a / n
+  /* a = a / n */
   mpz_fdiv_q(a, a, n);
 
-  // assert a >= 0
+  /* assert a >= 0 */
   assert(mpz_sgn(a) >= 0);
 
-  // x = a * n
+  /* x = a * n */
   mpz_mul(x, a, n);
 
-  // y = w^2 - t
+  /* y = w^2 - t */
   mpz_pow_ui(y, w, 2);
   mpz_sub(y, y, *t);
 
-  // if x != y
+  /* if x != y */
   if (mpz_cmp(x, y) != 0) {
-    // w^2 - t was not divisible by N!
+    /* w^2 - t was not divisible by N! */
     goto fail;
   }
 
-  // Commitment to `n`.
-  // s = expand_sprime(s_prime)
+  /* Commitment to `n`. */
+  /* s = expand_sprime(s_prime) */
   if (!goo_group_expand_sprime(group, s, s_prime))
     goto fail;
 
-  // C1 = powgh(n, s)
+  /* C1 = powgh(n, s) */
   if (!goo_group_powgh(group, C1, n, s))
     goto fail;
 
-  // C1 = reduce(C1)
+  /* C1 = reduce(C1) */
   goo_group_reduce(group, C1, C1);
 
-  // Commitment to `w`.
-  // s1 = rand_scalar()
-  // C2 = powgh(w, s1)
+  /* Commitment to `w`. */
+  /* s1 = rand_scalar() */
+  /* C2 = powgh(w, s1) */
   if (!goo_group_random_scalar(group, s1)
       || !goo_group_powgh(group, *C2, w, s1)) {
     goto fail;
@@ -2603,9 +2669,9 @@ goo_group_sign(
 
   goo_group_reduce(group, *C2, *C2);
 
-  // Commitment to `a`.
-  // s2 = rand_scalar()
-  // C3 = powgh(a, s2)
+  /* Commitment to `a`. */
+  /* s2 = rand_scalar() */
+  /* C3 = powgh(a, s2) */
   if (!goo_group_random_scalar(group, s2)
       || !goo_group_powgh(group, *C3, a, s2)) {
     goto fail;
@@ -2613,14 +2679,14 @@ goo_group_sign(
 
   goo_group_reduce(group, *C3, *C3);
 
-  // Inverses of `C1` and `C2`.
-  // [C1_inv, C2_inv] = inv2(C1, C2)
+  /* Inverses of `C1` and `C2`. */
+  /* [C1_inv, C2_inv] = inv2(C1, C2) */
   if (!goo_group_inv2(group, C1_inv, C2_inv, C1, *C2))
     goto fail;
 
-  // P's first message: commit to randomness.
-  // P's randomness (except for r_s1; see "V's message", below).
-  // [r_w, r_w2, r_a, r_an, r_s1w, r_sa, r_s2] = rand_scalar(7)
+  /* P's first message: commit to randomness. */
+  /* P's randomness (except for r_s1; see "V's message", below). */
+  /* [r_w, r_w2, r_a, r_an, r_s1w, r_sa, r_s2] = rand_scalar(7) */
   if (!goo_group_random_scalar(group, r_w)
       || !goo_group_random_scalar(group, r_w2)
       || !goo_group_random_scalar(group, r_a)
@@ -2631,20 +2697,20 @@ goo_group_sign(
     goto fail;
   }
 
-  // Prevent E from being negative.
+  /* Prevent E from being negative. */
   if (mpz_cmp(r_w2, r_an) < 0) {
-    // [r_w2, r_an] = [r_an, r_w2]
+    /* [r_w2, r_an] = [r_an, r_w2] */
     mpz_swap(r_w2, r_an);
   }
 
-  // P's first message (except for A; see "V's message", below).
-  // B = powgh(r_a, r_s2)
+  /* P's first message (except for A; see "V's message", below). */
+  /* B = powgh(r_a, r_s2) */
   if (!goo_group_powgh(group, B, r_a, r_s2))
     goto fail;
 
   goo_group_reduce(group, B, B);
 
-  // C = pow(C2_inv, C2, r_w) * powgh(r_w2, r_s1w)
+  /* C = pow(C2_inv, C2, r_w) * powgh(r_w2, r_s1w) */
   goo_group_pow(group, x, C2_inv, *C2, r_w);
 
   if (!goo_group_powgh(group, y, r_w2, r_s1w))
@@ -2653,7 +2719,7 @@ goo_group_sign(
   goo_group_mul(group, C, x, y);
   goo_group_reduce(group, C, C);
 
-  // D = pow(C1_inv, C1, r_a) * powgh(r_an, r_sa)
+  /* D = pow(C1_inv, C1, r_a) * powgh(r_an, r_sa) */
   goo_group_pow(group, x, C1_inv, C1, r_a);
 
   if (!goo_group_powgh(group, y, r_an, r_sa))
@@ -2662,25 +2728,25 @@ goo_group_sign(
   goo_group_mul(group, D, x, y);
   goo_group_reduce(group, D, D);
 
-  // E = r_w2 - r_an
+  /* E = r_w2 - r_an */
   mpz_sub(E, r_w2, r_an);
 
-  // assert E >= 0
+  /* assert E >= 0 */
   assert(mpz_sgn(E) >= 0);
 
-  // ell = 0
+  /* ell = 0 */
   mpz_set_ui(*ell, 0);
 
-  // V's message: random challenge and random prime.
-  // while bitlen(ell) != ELL_BITS
+  /* V's message: random challenge and random prime. */
+  /* while bitlen(ell) != ELL_BITS */
   while (goo_mpz_bitlen(*ell) != GOO_ELL_BITS) {
-    // Randomize the signature until Fiat-Shamir
-    // returns an admissable ell. Note that it's
-    // not necessary to re-start the whole
-    // signature! Just pick a new r_s1, which
-    // only requires re-computing A.
-    // r_s1 = rand_scalar()
-    // A = powgh(r_w, r_s1)
+    /* Randomize the signature until Fiat-Shamir */
+    /* returns an admissable ell. Note that it's */
+    /* not necessary to re-start the whole */
+    /* signature! Just pick a new r_s1, which */
+    /* only requires re-computing A. */
+    /* r_s1 = rand_scalar() */
+    /* A = powgh(r_w, r_s1) */
     if (!goo_group_random_scalar(group, r_s1)
         || !goo_group_powgh(group, A, r_w, r_s1)) {
       goto fail;
@@ -2688,7 +2754,7 @@ goo_group_sign(
 
     goo_group_reduce(group, A, A);
 
-    // [chal, ell] = fs_chal(C1, C2, C3, t, A, B, C, D, E, msg)
+    /* [chal, ell] = fs_chal(C1, C2, C3, t, A, B, C, D, E, msg) */
     if (!goo_group_fs_chal(group,
                            *chal, *ell, NULL, C1, *C2, *C3,
                            *t, A, B, C, D, E, msg, msg_len, 0)) {
@@ -2696,41 +2762,41 @@ goo_group_sign(
     }
   }
 
-  // P's second message: compute quotient message.
-  // Compute z' = c*(w, w2, s1, a, an, s1w, sa, s2)
-  //            + (r_w, r_w2, r_s1, r_a, r_an, r_s1w, r_sa, r_s2)
-  // z_w = chal * w + r_w
+  /* P's second message: compute quotient message. */
+  /* Compute z' = c*(w, w2, s1, a, an, s1w, sa, s2) */
+  /*            + (r_w, r_w2, r_s1, r_a, r_an, r_s1w, r_sa, r_s2) */
+  /* z_w = chal * w + r_w */
   mpz_mul(*z_w, *chal, w);
   mpz_add(*z_w, *z_w, r_w);
-  // z_w2 = chal * w * w + r_w2
+  /* z_w2 = chal * w * w + r_w2 */
   mpz_mul(*z_w2, *chal, w);
   mpz_mul(*z_w2, *z_w2, w);
   mpz_add(*z_w2, *z_w2, r_w2);
-  // z_s1 = chal * s1 + r_s1
+  /* z_s1 = chal * s1 + r_s1 */
   mpz_mul(*z_s1, *chal, s1);
   mpz_add(*z_s1, *z_s1, r_s1);
-  // z_a = chal * a + r_a
+  /* z_a = chal * a + r_a */
   mpz_mul(*z_a, *chal, a);
   mpz_add(*z_a, *z_a, r_a);
-  // z_an = chal * a * n + r_an
+  /* z_an = chal * a * n + r_an */
   mpz_mul(*z_an, *chal, a);
   mpz_mul(*z_an, *z_an, n);
   mpz_add(*z_an, *z_an, r_an);
-  // z_s1w = chal * s1 * w + r_s1w
+  /* z_s1w = chal * s1 * w + r_s1w */
   mpz_mul(*z_s1w, *chal, s1);
   mpz_mul(*z_s1w, *z_s1w, w);
   mpz_add(*z_s1w, *z_s1w, r_s1w);
-  // z_sa = chal * s * a + r_sa
+  /* z_sa = chal * s * a + r_sa */
   mpz_mul(*z_sa, *chal, s);
   mpz_mul(*z_sa, *z_sa, a);
   mpz_add(*z_sa, *z_sa, r_sa);
-  // z_s2 = chal * s2 + r_s2
+  /* z_s2 = chal * s2 + r_s2 */
   mpz_mul(*z_s2, *chal, s2);
   mpz_add(*z_s2, *z_s2, r_s2);
 
-  // Compute quotient commitments.
+  /* Compute quotient commitments. */
 
-  // Aq = powgh(z_w / ell, z_s1 / ell)
+  /* Aq = powgh(z_w / ell, z_s1 / ell) */
   mpz_fdiv_q(x, *z_w, *ell);
   mpz_fdiv_q(y, *z_s1, *ell);
 
@@ -2739,7 +2805,7 @@ goo_group_sign(
 
   goo_group_reduce(group, *Aq, *Aq);
 
-  // Bq = powgh(z_a / ell, z_s2 / ell)
+  /* Bq = powgh(z_a / ell, z_s2 / ell) */
   mpz_fdiv_q(x, *z_a, *ell);
   mpz_fdiv_q(y, *z_s2, *ell);
 
@@ -2748,7 +2814,7 @@ goo_group_sign(
 
   goo_group_reduce(group, *Bq, *Bq);
 
-  // Cq = pow(C2_inv, C2, z_w / ell) * powgh(z_w2 / ell, z_s1w / ell)
+  /* Cq = pow(C2_inv, C2, z_w / ell) * powgh(z_w2 / ell, z_s1w / ell) */
   mpz_fdiv_q(x, *z_w, *ell);
   mpz_fdiv_q(y, *z_w2, *ell);
   mpz_fdiv_q(z, *z_s1w, *ell);
@@ -2760,7 +2826,7 @@ goo_group_sign(
   goo_group_mul(group, *Cq, xx, yy);
   goo_group_reduce(group, *Cq, *Cq);
 
-  // Dq = pow(C1_inv, C2, z_a / ell) * powgh(z_an / ell, z_sa / ell)
+  /* Dq = pow(C1_inv, C2, z_a / ell) * powgh(z_an / ell, z_sa / ell) */
   mpz_fdiv_q(x, *z_a, *ell);
   mpz_fdiv_q(y, *z_an, *ell);
   mpz_fdiv_q(z, *z_sa, *ell);
@@ -2772,11 +2838,11 @@ goo_group_sign(
   goo_group_mul(group, *Dq, xx, yy);
   goo_group_reduce(group, *Dq, *Dq);
 
-  // Eq = (z_w2 - z_an) / ell
+  /* Eq = (z_w2 - z_an) / ell */
   mpz_sub(*Eq, *z_w2, *z_an);
   mpz_fdiv_q(*Eq, *Eq, *ell);
 
-  // assert Eq >= 0
+  /* assert Eq >= 0 */
   assert(mpz_sgn(*Eq) >= 0);
   assert(goo_mpz_bitlen(*Eq) <= GOO_EXPONENT_SIZE);
 
@@ -2789,7 +2855,7 @@ goo_group_sign(
   mpz_mod(*z_sa, *z_sa, *ell);
   mpz_mod(*z_s2, *z_s2, *ell);
 
-  // Check for zero. Should almost never happen.
+  /* Check for zero. Should almost never happen. */
   if (mpz_sgn(*chal) == 0
       || mpz_sgn(C1) == 0
       || mpz_sgn(*C2) == 0
@@ -2812,13 +2878,13 @@ goo_group_sign(
       || mpz_sgn(*z_s1w) == 0
       || mpz_sgn(*z_sa) == 0
       || mpz_sgn(*z_s2) == 0) {
-    // Try again.
+    /* Try again. */
     r = 2;
     goto fail;
   }
 
-  // z_prime: (z_w, z_w2, z_s1, z_a, z_an, z_s1w, z_sa, z_s2).
-  // Signature: (chal, ell, Aq, Bq, Cq, Dq, Eq, z_prime).
+  /* z_prime: (z_w, z_w2, z_s1, z_a, z_an, z_s1w, z_sa, z_s2). */
+  /* Signature: (chal, ell, Aq, Bq, Cq, Dq, Eq, z_prime). */
 
   r = 1;
 fail:
@@ -2902,16 +2968,17 @@ goo_group_verify(
   mpz_t *elldiff = &group->elldiff;
 
   unsigned char key[32];
+  int found, i;
 
-  // if t <= 0
+  /* if t <= 0 */
   if (mpz_sgn(*t) <= 0)
     return 0;
 
-  // `t` must be one of the small primes in our list.
-  int found = 0;
+  /* `t` must be one of the small primes in our list. */
+  found = 0;
 
-  for (long i = 0; i < GOO_PRIMES_LEN; i++) {
-    // if t == primes[i]
+  for (i = 0; i < GOO_PRIMES_LEN; i++) {
+    /* if t == primes[i] */
     if (mpz_cmp_ui(*t, goo_primes[i]) == 0) {
       found = 1;
       break;
@@ -2921,20 +2988,20 @@ goo_group_verify(
   if (!found)
     return 0;
 
-  // if chal <= 0 || bitlen(chal) > CHAL_BITS
+  /* if chal <= 0 || bitlen(chal) > CHAL_BITS */
   if (mpz_sgn(*chal) <= 0 || goo_mpz_bitlen(*chal) > GOO_CHAL_BITS)
     return 0;
 
-  // if ell <= 0 || bitlen(ell) > ELL_BITS
+  /* if ell <= 0 || bitlen(ell) > ELL_BITS */
   if (mpz_sgn(*ell) <= 0 || goo_mpz_bitlen(*ell) > GOO_ELL_BITS)
     return 0;
 
-  // if ell & 1 == 0
+  /* if ell & 1 == 0 */
   if (!mpz_odd_p(*ell))
     return 0;
 
-  // All group elements must be the "canonical"
-  // element of the quotient group (Z/n)/{1,-1}.
+  /* All group elements must be the "canonical" */
+  /* element of the quotient group (Z/n)/{1,-1}. */
   if (mpz_sgn(C1) <= 0 || !goo_group_is_reduced(group, C1)
       || mpz_sgn(*C2) <= 0 || !goo_group_is_reduced(group, *C2)
       || mpz_sgn(*C3) <= 0 || !goo_group_is_reduced(group, *C3)
@@ -2945,11 +3012,11 @@ goo_group_verify(
     return 0;
   }
 
-  // if Eq <= 0 || bitlen(Eq) > EXPONENT_SIZE
+  /* if Eq <= 0 || bitlen(Eq) > EXPONENT_SIZE */
   if (mpz_sgn(*Eq) <= 0 || goo_mpz_bitlen(*Eq) > GOO_EXPONENT_SIZE)
     return 0;
 
-  // z_prime must be within range.
+  /* z_prime must be within range. */
   if (mpz_sgn(*z_w) <= 0 || mpz_cmp(*z_w, *ell) >= 0
       || mpz_sgn(*z_w2) <= 0 || mpz_cmp(*z_w2, *ell) >= 0
       || mpz_sgn(*z_s1) <= 0 || mpz_cmp(*z_s1, *ell) >= 0
@@ -2961,79 +3028,79 @@ goo_group_verify(
     return 0;
   }
 
-  // Compute inverses of C1, C2, C3, Aq, Bq, Cq, Dq.
-  // [C1_inv, C2_inv, C3_inv,
-  //  Aq_inv, Bq_inv, Cq_inv, Dq_inv] = inv7(C1, C2, C3, Aq, Bq, Cq, Dq)
+  /* Compute inverses of C1, C2, C3, Aq, Bq, Cq, Dq. */
+  /* [C1_inv, C2_inv, C3_inv, */
+  /*  Aq_inv, Bq_inv, Cq_inv, Dq_inv] = inv7(C1, C2, C3, Aq, Bq, Cq, Dq) */
   if (!goo_group_inv7(group, *C1_inv, *C2_inv, *C3_inv,
                              *Aq_inv, *Bq_inv, *Cq_inv, *Dq_inv,
                               C1, *C2, *C3, *Aq, *Bq, *Cq, *Dq)) {
     return 0;
   }
 
-  // Step 1: reconstruct A, B, C, D, and E from signature.
-  // A = recon(Aq, Aq_inv, ell, C2_inv, C2, chal, z_w, z_s1)
+  /* Step 1: reconstruct A, B, C, D, and E from signature. */
+  /* A = recon(Aq, Aq_inv, ell, C2_inv, C2, chal, z_w, z_s1) */
   if (!goo_group_recon(group, *A, *Aq, *Aq_inv, *ell,
                        *C2_inv, *C2, *chal, *z_w, *z_s1)) {
     return 0;
   }
 
-  // B = recon(Bq, Bq_inv, ell, C3_inv, C3, chal, z_a, z_s2)
+  /* B = recon(Bq, Bq_inv, ell, C3_inv, C3, chal, z_a, z_s2) */
   if (!goo_group_recon(group, *B, *Bq, *Bq_inv, *ell,
                        *C3_inv, *C3, *chal, *z_a, *z_s2)) {
     return 0;
   }
 
-  // C = recon(Cq, Cq_inv, ell, C2_inv, C2, z_w, z_w2, z_s1w)
+  /* C = recon(Cq, Cq_inv, ell, C2_inv, C2, z_w, z_w2, z_s1w) */
   if (!goo_group_recon(group, *C, *Cq, *Cq_inv, *ell,
                        *C2_inv, *C2, *z_w, *z_w2, *z_s1w)) {
     return 0;
   }
 
-  // D = recon(Dq, Dq_inv, ell, C1_inv, C1, z_a, z_an, z_sa)
+  /* D = recon(Dq, Dq_inv, ell, C1_inv, C1, z_a, z_an, z_sa) */
   if (!goo_group_recon(group, *D, *Dq, *Dq_inv, *ell,
                        *C1_inv, C1, *z_a, *z_an, *z_sa)) {
     return 0;
   }
 
-  // Make sure sign of (z_w2 - z_an) is positive.
-  // z_w2_m_an = z_w2 - z_an
+  /* Make sure sign of (z_w2 - z_an) is positive. */
+  /* z_w2_m_an = z_w2 - z_an */
   mpz_sub(*z_w2_m_an, *z_w2, *z_an);
 
-  // E = Eq * ell + z_w2_m_an - t * chal
+  /* E = Eq * ell + z_w2_m_an - t * chal */
   mpz_mul(*E, *Eq, *ell);
   mpz_add(*E, *E, *z_w2_m_an);
   mpz_mul(*tmp, *t, *chal);
   mpz_sub(*E, *E, *tmp);
 
-  // if z_w2_m_an < 0
+  /* if z_w2_m_an < 0 */
   if (mpz_sgn(*z_w2_m_an) < 0) {
-    // E += ell
+    /* E += ell */
     mpz_add(*E, *E, *ell);
   }
 
-  // if E < 0
+  /* if E < 0 */
   if (mpz_sgn(*E) < 0)
     return 0;
 
-  // Step 2: recompute implicitly claimed V message, viz., chal and ell.
-  // [chal_out, ell_r_out, key] = fs_chal(C1, C2, t, A, B, C, D, msg)
+  /* Step 2: recompute implicitly claimed V message, viz., chal and ell. */
+  /* [chal_out, ell_r_out, key] = fs_chal(C1, C2, t, A, B, C, D, msg) */
   if (!goo_group_fs_chal(group, *chal_out, *ell_r_out, &key[0],
                          C1, *C2, *C3, *t, *A, *B, *C, *D, *E,
                          msg, msg_len, 1)) {
     return 0;
   }
 
-  // Final checks.
-  // chal has to match
-  // AND 0 <= (ell_r_out - ell) <= elldiff_max
-  // AND ell is prime
-  // elldiff = ell - ell_r_out
+  /* Final checks. */
+  /* chal has to match */
+  /* AND 0 <= (ell_r_out - ell) <= elldiff_max */
+  /* AND ell is prime */
+  /* elldiff = ell - ell_r_out */
   mpz_sub(*elldiff, *ell, *ell_r_out);
 
-  // if chal != chal_out
-  //   or elldiff < 0
-  //   or elldiff > ELLDIFF_MAX
-  //   or !is_prime(ell)
+  /* if chal != chal_out */
+  /*   or elldiff < 0 */
+  /*   or elldiff > ELLDIFF_MAX */
+  /*   or !is_prime(ell) */
   if (mpz_cmp(*chal, *chal_out) != 0
       || mpz_cmp_ui(*elldiff, 0) < 0
       || mpz_cmp_ui(*elldiff, GOO_ELLDIFF_MAX) > 0
@@ -3058,11 +3125,11 @@ goo_init(
   unsigned long modbits
 ) {
   int r = 0;
+  mpz_t n_n;
 
   if (ctx == NULL || n == NULL)
     return 0;
 
-  mpz_t n_n;
   mpz_init(n_n);
 
   goo_mpz_import(n_n, n, n_len);
@@ -3089,6 +3156,7 @@ goo_generate(
   size_t *s_prime_len
 ) {
   int r = 0;
+  mpz_t s_prime_n;
 
   if (ctx == NULL
       || s_prime == NULL
@@ -3096,7 +3164,6 @@ goo_generate(
     return 0;
   }
 
-  mpz_t s_prime_n;
   mpz_init(s_prime_n);
 
   if (!goo_group_generate(ctx, s_prime_n))
@@ -3125,6 +3192,7 @@ goo_challenge(
   size_t n_len
 ) {
   int r = 0;
+  mpz_t C1_n, s_prime_n, n_n;
 
   if (ctx == NULL
       || s_prime == NULL
@@ -3137,7 +3205,6 @@ goo_challenge(
   if (s_prime_len != 32)
     return 0;
 
-  mpz_t C1_n, s_prime_n, n_n;
   mpz_init(C1_n);
   mpz_init(s_prime_n);
   mpz_init(n_n);
@@ -3175,6 +3242,7 @@ goo_validate(
   size_t q_len
 ) {
   int r = 0;
+  mpz_t s_prime_n, C1_n, p_n, q_n;
 
   if (ctx == NULL
       || s_prime == NULL
@@ -3189,8 +3257,6 @@ goo_validate(
 
   if (C1_len != ctx->size)
     return 0;
-
-  mpz_t s_prime_n, C1_n, p_n, q_n;
 
   mpz_init(s_prime_n);
   mpz_init(C1_n);
@@ -3230,6 +3296,10 @@ goo_sign(
   size_t q_len
 ) {
   int r = 0;
+  mpz_t msg_n, s_prime_n, p_n, q_n;
+  goo_sig_t sig;
+  size_t size;
+  unsigned char *data = NULL;
 
   if (ctx == NULL
       || out == NULL
@@ -3246,11 +3316,6 @@ goo_sign(
 
   if (s_prime_len != 32)
     return 0;
-
-  mpz_t msg_n, s_prime_n, p_n, q_n;
-  goo_sig_t sig;
-  size_t size;
-  unsigned char *data = NULL;
 
   mpz_init(msg_n);
   mpz_init(s_prime_n);
@@ -3325,6 +3390,7 @@ goo_verify(
 static int
 goo_hex_cmp(const unsigned char *data, size_t len, const char *expect) {
   mpz_t x, y;
+  int r;
 
   mpz_init(x);
   mpz_init(y);
@@ -3333,7 +3399,7 @@ goo_hex_cmp(const unsigned char *data, size_t len, const char *expect) {
 
   assert(mpz_set_str(y, expect, 16) == 0);
 
-  int r = mpz_cmp(x, y);
+  r = mpz_cmp(x, y);
 
   mpz_clear(x);
   mpz_clear(y);
@@ -3350,11 +3416,12 @@ run_hmac_test(void) {
   static const char expect[] =
     "42eb78776ad82f001179f44e9e88264f2d804251e02d988c1194b95de823a14e";
 
+  goo_hmac_t ctx;
+
   memset(&key[0], 0xff, 32);
 
   printf("Testing HMAC...\n");
 
-  goo_hmac_t ctx;
   goo_hmac_init(&ctx, &key[0], 32);
   goo_hmac_update(&ctx, (unsigned char *)data, sizeof(data) - 1);
 
@@ -3374,11 +3441,12 @@ run_drbg_test(void) {
   static const char expect2[] = "4d065662afc2927a3426c12dd1c35262";
   static const char expect3[] = "705119fd1536e2a7ec804db49f8262ce";
 
+  goo_drbg_t ctx;
+
   memset(&entropy[0], 0xaa, 64);
 
   printf("Testing DRBG...\n");
 
-  goo_drbg_t ctx;
   goo_drbg_init(&ctx, &entropy[0], 64);
 
   goo_drbg_generate(&ctx, &out[0], 32);
@@ -3452,11 +3520,12 @@ run_prng_test(void) {
 
 static void
 run_util_test(void) {
-  // test bitlen and zerobits
+  /* test bitlen and zerobits */
   {
+    mpz_t n;
+
     printf("Testing bitlen & zerobits...\n");
 
-    mpz_t n;
     mpz_init(n);
 
     mpz_set_ui(n, 0x010001);
@@ -3482,11 +3551,11 @@ run_util_test(void) {
     mpz_clear(n);
   }
 
-  // test mask
+  /* test mask */
   {
-    printf("Testing mask...\n");
-
     mpz_t n, t;
+
+    printf("Testing mask...\n");
 
     mpz_init(n);
     mpz_init(t);
@@ -3501,7 +3570,7 @@ run_util_test(void) {
     mpz_clear(t);
   }
 
-  // test sqrt
+  /* test sqrt */
   {
     printf("Testing sqrt...\n");
 
@@ -3509,10 +3578,12 @@ run_util_test(void) {
     assert(goo_dsqrt(1025) == 32);
   }
 
-  // test division
+  /* test division */
   {
-    printf("Testing division...\n");
     mpz_t x, y, z;
+
+    printf("Testing division...\n");
+
     mpz_init(x);
     mpz_init(y);
     mpz_init(z);
@@ -3555,21 +3626,23 @@ run_util_test(void) {
     mpz_clear(z);
   }
 
-  // test modulo
+  /* test modulo */
   {
-    printf("Testing modulo...\n");
     mpz_t x, y, z;
+
+    printf("Testing modulo...\n");
+
     mpz_init(x);
     mpz_init(y);
     mpz_init(z);
 
-    // Note: This equals 1 with mpz_mod.
+    /* Note: This equals 1 with mpz_mod. */
     mpz_set_si(x, 3);
     mpz_set_si(y, -2);
     mpz_fdiv_r(z, x, y);
     assert(mpz_get_si(z) == -1);
 
-    // Note: mpz_tdiv_r behaves like mpz_mod.
+    /* Note: mpz_tdiv_r behaves like mpz_mod. */
     mpz_tdiv_r(z, x, y);
     assert(mpz_get_si(z) == 1);
 
@@ -3599,10 +3672,8 @@ run_util_test(void) {
     mpz_clear(z);
   }
 
-  // test sqrts
+  /* test sqrts */
   {
-    printf("Testing roots...\n");
-
     static const char p_hex[] = ""
       "ccbf79ad1f5e47086062274ea9815042fd938149a5557c8cb3b0c33d"
       "dcd87c58a53760826a99d196852460762e16a715e40bee5847324aa1"
@@ -3629,6 +3700,8 @@ run_util_test(void) {
 
     mpz_t p, q, n;
 
+    printf("Testing roots...\n");
+
     mpz_init(p);
     mpz_init(q);
     mpz_init(n);
@@ -3638,12 +3711,11 @@ run_util_test(void) {
 
     mpz_mul(n, p, q);
 
-    // test sqrt_modp
+    /* test sqrt_modp */
     {
-      printf("Testing sqrt_modp...\n");
+      mpz_t r1, sr1;
 
-      mpz_t r1;
-      mpz_t sr1;
+      printf("Testing sqrt_modp...\n");
 
       mpz_init(r1);
       mpz_init(sr1);
@@ -3661,12 +3733,11 @@ run_util_test(void) {
       mpz_clear(sr1);
     }
 
-    // test sqrt_modn
+    /* test sqrt_modn */
     {
-      printf("Testing sqrt_modn...\n");
+      mpz_t r2, sr2;
 
-      mpz_t r2;
-      mpz_t sr2;
+      printf("Testing sqrt_modn...\n");
 
       mpz_init(r2);
       mpz_init(sr2);
@@ -3689,389 +3760,391 @@ run_util_test(void) {
     mpz_clear(n);
   }
 
-  static const int symbols[][3] = {
-    // https://github.com/golang/go/blob/aadaec5/src/math/big/int_test.go#L1590
-    {0, 1, 1}, {0, -1, 1}, {1, 1, 1}, {1, -1, 1}, {0, 5, 0},
-    {1, 5, 1}, {2, 5, -1}, {-2, 5, -1}, {2, -5, -1}, {-2, -5, 1},
-    {3, 5, -1}, {5, 5, 0}, {-5, 5, 0}, {6, 5, 1}, {6, -5, 1},
-    {-6, 5, 1}, {-6, -5, -1},
-
-    // https://en.wikipedia.org/wiki/Legendre_symbol#Table_of_values
-    {1, 3, 1}, {1, 5, 1}, {1, 7, 1}, {1, 11, 1}, {1, 13, 1},
-    {1, 17, 1}, {1, 19, 1}, {1, 23, 1}, {1, 29, 1}, {1, 31, 1},
-    {1, 37, 1}, {1, 41, 1}, {1, 43, 1}, {1, 47, 1}, {1, 53, 1},
-    {1, 59, 1}, {1, 61, 1}, {1, 67, 1}, {1, 71, 1}, {1, 73, 1},
-    {1, 79, 1}, {1, 83, 1}, {1, 89, 1}, {1, 97, 1}, {1, 101, 1},
-    {1, 103, 1}, {1, 107, 1}, {1, 109, 1}, {1, 113, 1}, {1, 127, 1},
-    {2, 3, -1}, {2, 5, -1}, {2, 7, 1}, {2, 11, -1}, {2, 13, -1},
-    {2, 17, 1}, {2, 19, -1}, {2, 23, 1}, {2, 29, -1}, {2, 31, 1},
-    {2, 37, -1}, {2, 41, 1}, {2, 43, -1}, {2, 47, 1}, {2, 53, -1},
-    {2, 59, -1}, {2, 61, -1}, {2, 67, -1}, {2, 71, 1}, {2, 73, 1},
-    {2, 79, 1}, {2, 83, -1}, {2, 89, 1}, {2, 97, 1}, {2, 101, -1},
-    {2, 103, 1}, {2, 107, -1}, {2, 109, -1}, {2, 113, 1}, {2, 127, 1},
-    {3, 3, 0}, {3, 5, -1}, {3, 7, -1}, {3, 11, 1}, {3, 13, 1},
-    {3, 17, -1}, {3, 19, -1}, {3, 23, 1}, {3, 29, -1}, {3, 31, -1},
-    {3, 37, 1}, {3, 41, -1}, {3, 43, -1}, {3, 47, 1}, {3, 53, -1},
-    {3, 59, 1}, {3, 61, 1}, {3, 67, -1}, {3, 71, 1}, {3, 73, 1},
-    {3, 79, -1}, {3, 83, 1}, {3, 89, -1}, {3, 97, 1}, {3, 101, -1},
-    {3, 103, -1}, {3, 107, 1}, {3, 109, 1}, {3, 113, -1}, {3, 127, -1},
-    {4, 3, 1}, {4, 5, 1}, {4, 7, 1}, {4, 11, 1}, {4, 13, 1},
-    {4, 17, 1}, {4, 19, 1}, {4, 23, 1}, {4, 29, 1}, {4, 31, 1},
-    {4, 37, 1}, {4, 41, 1}, {4, 43, 1}, {4, 47, 1}, {4, 53, 1},
-    {4, 59, 1}, {4, 61, 1}, {4, 67, 1}, {4, 71, 1}, {4, 73, 1},
-    {4, 79, 1}, {4, 83, 1}, {4, 89, 1}, {4, 97, 1}, {4, 101, 1},
-    {4, 103, 1}, {4, 107, 1}, {4, 109, 1}, {4, 113, 1}, {4, 127, 1},
-    {5, 3, -1}, {5, 5, 0}, {5, 7, -1}, {5, 11, 1}, {5, 13, -1},
-    {5, 17, -1}, {5, 19, 1}, {5, 23, -1}, {5, 29, 1}, {5, 31, 1},
-    {5, 37, -1}, {5, 41, 1}, {5, 43, -1}, {5, 47, -1}, {5, 53, -1},
-    {5, 59, 1}, {5, 61, 1}, {5, 67, -1}, {5, 71, 1}, {5, 73, -1},
-    {5, 79, 1}, {5, 83, -1}, {5, 89, 1}, {5, 97, -1}, {5, 101, 1},
-    {5, 103, -1}, {5, 107, -1}, {5, 109, 1}, {5, 113, -1}, {5, 127, -1},
-    {6, 3, 0}, {6, 5, 1}, {6, 7, -1}, {6, 11, -1}, {6, 13, -1},
-    {6, 17, -1}, {6, 19, 1}, {6, 23, 1}, {6, 29, 1}, {6, 31, -1},
-    {6, 37, -1}, {6, 41, -1}, {6, 43, 1}, {6, 47, 1}, {6, 53, 1},
-    {6, 59, -1}, {6, 61, -1}, {6, 67, 1}, {6, 71, 1}, {6, 73, 1},
-    {6, 79, -1}, {6, 83, -1}, {6, 89, -1}, {6, 97, 1}, {6, 101, 1},
-    {6, 103, -1}, {6, 107, -1}, {6, 109, -1}, {6, 113, -1}, {6, 127, -1},
-    {7, 3, 1}, {7, 5, -1}, {7, 7, 0}, {7, 11, -1}, {7, 13, -1},
-    {7, 17, -1}, {7, 19, 1}, {7, 23, -1}, {7, 29, 1}, {7, 31, 1},
-    {7, 37, 1}, {7, 41, -1}, {7, 43, -1}, {7, 47, 1}, {7, 53, 1},
-    {7, 59, 1}, {7, 61, -1}, {7, 67, -1}, {7, 71, -1}, {7, 73, -1},
-    {7, 79, -1}, {7, 83, 1}, {7, 89, -1}, {7, 97, -1}, {7, 101, -1},
-    {7, 103, 1}, {7, 107, -1}, {7, 109, 1}, {7, 113, 1}, {7, 127, -1},
-    {8, 3, -1}, {8, 5, -1}, {8, 7, 1}, {8, 11, -1}, {8, 13, -1},
-    {8, 17, 1}, {8, 19, -1}, {8, 23, 1}, {8, 29, -1}, {8, 31, 1},
-    {8, 37, -1}, {8, 41, 1}, {8, 43, -1}, {8, 47, 1}, {8, 53, -1},
-    {8, 59, -1}, {8, 61, -1}, {8, 67, -1}, {8, 71, 1}, {8, 73, 1},
-    {8, 79, 1}, {8, 83, -1}, {8, 89, 1}, {8, 97, 1}, {8, 101, -1},
-    {8, 103, 1}, {8, 107, -1}, {8, 109, -1}, {8, 113, 1}, {8, 127, 1},
-    {9, 3, 0}, {9, 5, 1}, {9, 7, 1}, {9, 11, 1}, {9, 13, 1},
-    {9, 17, 1}, {9, 19, 1}, {9, 23, 1}, {9, 29, 1}, {9, 31, 1},
-    {9, 37, 1}, {9, 41, 1}, {9, 43, 1}, {9, 47, 1}, {9, 53, 1},
-    {9, 59, 1}, {9, 61, 1}, {9, 67, 1}, {9, 71, 1}, {9, 73, 1},
-    {9, 79, 1}, {9, 83, 1}, {9, 89, 1}, {9, 97, 1}, {9, 101, 1},
-    {9, 103, 1}, {9, 107, 1}, {9, 109, 1}, {9, 113, 1}, {9, 127, 1},
-    {10, 3, 1}, {10, 5, 0}, {10, 7, -1}, {10, 11, -1}, {10, 13, 1},
-    {10, 17, -1}, {10, 19, -1}, {10, 23, -1}, {10, 29, -1}, {10, 31, 1},
-    {10, 37, 1}, {10, 41, 1}, {10, 43, 1}, {10, 47, -1}, {10, 53, 1},
-    {10, 59, -1}, {10, 61, -1}, {10, 67, 1}, {10, 71, 1}, {10, 73, -1},
-    {10, 79, 1}, {10, 83, 1}, {10, 89, 1}, {10, 97, -1}, {10, 101, -1},
-    {10, 103, -1}, {10, 107, 1}, {10, 109, -1}, {10, 113, -1}, {10, 127, -1},
-    {11, 3, -1}, {11, 5, 1}, {11, 7, 1}, {11, 11, 0}, {11, 13, -1},
-    {11, 17, -1}, {11, 19, 1}, {11, 23, -1}, {11, 29, -1}, {11, 31, -1},
-    {11, 37, 1}, {11, 41, -1}, {11, 43, 1}, {11, 47, -1}, {11, 53, 1},
-    {11, 59, -1}, {11, 61, -1}, {11, 67, -1}, {11, 71, -1}, {11, 73, -1},
-    {11, 79, 1}, {11, 83, 1}, {11, 89, 1}, {11, 97, 1}, {11, 101, -1},
-    {11, 103, -1}, {11, 107, 1}, {11, 109, -1}, {11, 113, 1}, {11, 127, 1},
-    {12, 3, 0}, {12, 5, -1}, {12, 7, -1}, {12, 11, 1}, {12, 13, 1},
-    {12, 17, -1}, {12, 19, -1}, {12, 23, 1}, {12, 29, -1}, {12, 31, -1},
-    {12, 37, 1}, {12, 41, -1}, {12, 43, -1}, {12, 47, 1}, {12, 53, -1},
-    {12, 59, 1}, {12, 61, 1}, {12, 67, -1}, {12, 71, 1}, {12, 73, 1},
-    {12, 79, -1}, {12, 83, 1}, {12, 89, -1}, {12, 97, 1}, {12, 101, -1},
-    {12, 103, -1}, {12, 107, 1}, {12, 109, 1}, {12, 113, -1}, {12, 127, -1},
-    {13, 3, 1}, {13, 5, -1}, {13, 7, -1}, {13, 11, -1}, {13, 13, 0},
-    {13, 17, 1}, {13, 19, -1}, {13, 23, 1}, {13, 29, 1}, {13, 31, -1},
-    {13, 37, -1}, {13, 41, -1}, {13, 43, 1}, {13, 47, -1}, {13, 53, 1},
-    {13, 59, -1}, {13, 61, 1}, {13, 67, -1}, {13, 71, -1}, {13, 73, -1},
-    {13, 79, 1}, {13, 83, -1}, {13, 89, -1}, {13, 97, -1}, {13, 101, 1},
-    {13, 103, 1}, {13, 107, 1}, {13, 109, -1}, {13, 113, 1}, {13, 127, 1},
-    {14, 3, -1}, {14, 5, 1}, {14, 7, 0}, {14, 11, 1}, {14, 13, 1},
-    {14, 17, -1}, {14, 19, -1}, {14, 23, -1}, {14, 29, -1}, {14, 31, 1},
-    {14, 37, -1}, {14, 41, -1}, {14, 43, 1}, {14, 47, 1}, {14, 53, -1},
-    {14, 59, -1}, {14, 61, 1}, {14, 67, 1}, {14, 71, -1}, {14, 73, -1},
-    {14, 79, -1}, {14, 83, -1}, {14, 89, -1}, {14, 97, -1}, {14, 101, 1},
-    {14, 103, 1}, {14, 107, 1}, {14, 109, -1}, {14, 113, 1}, {14, 127, -1},
-    {15, 3, 0}, {15, 5, 0}, {15, 7, 1}, {15, 11, 1}, {15, 13, -1},
-    {15, 17, 1}, {15, 19, -1}, {15, 23, -1}, {15, 29, -1}, {15, 31, -1},
-    {15, 37, -1}, {15, 41, -1}, {15, 43, 1}, {15, 47, -1}, {15, 53, 1},
-    {15, 59, 1}, {15, 61, 1}, {15, 67, 1}, {15, 71, 1}, {15, 73, -1},
-    {15, 79, -1}, {15, 83, -1}, {15, 89, -1}, {15, 97, -1}, {15, 101, -1},
-    {15, 103, 1}, {15, 107, -1}, {15, 109, 1}, {15, 113, 1}, {15, 127, 1},
-    {16, 3, 1}, {16, 5, 1}, {16, 7, 1}, {16, 11, 1}, {16, 13, 1},
-    {16, 17, 1}, {16, 19, 1}, {16, 23, 1}, {16, 29, 1}, {16, 31, 1},
-    {16, 37, 1}, {16, 41, 1}, {16, 43, 1}, {16, 47, 1}, {16, 53, 1},
-    {16, 59, 1}, {16, 61, 1}, {16, 67, 1}, {16, 71, 1}, {16, 73, 1},
-    {16, 79, 1}, {16, 83, 1}, {16, 89, 1}, {16, 97, 1}, {16, 101, 1},
-    {16, 103, 1}, {16, 107, 1}, {16, 109, 1}, {16, 113, 1}, {16, 127, 1},
-    {17, 3, -1}, {17, 5, -1}, {17, 7, -1}, {17, 11, -1}, {17, 13, 1},
-    {17, 17, 0}, {17, 19, 1}, {17, 23, -1}, {17, 29, -1}, {17, 31, -1},
-    {17, 37, -1}, {17, 41, -1}, {17, 43, 1}, {17, 47, 1}, {17, 53, 1},
-    {17, 59, 1}, {17, 61, -1}, {17, 67, 1}, {17, 71, -1}, {17, 73, -1},
-    {17, 79, -1}, {17, 83, 1}, {17, 89, 1}, {17, 97, -1}, {17, 101, 1},
-    {17, 103, 1}, {17, 107, -1}, {17, 109, -1}, {17, 113, -1}, {17, 127, 1},
-    {18, 3, 0}, {18, 5, -1}, {18, 7, 1}, {18, 11, -1}, {18, 13, -1},
-    {18, 17, 1}, {18, 19, -1}, {18, 23, 1}, {18, 29, -1}, {18, 31, 1},
-    {18, 37, -1}, {18, 41, 1}, {18, 43, -1}, {18, 47, 1}, {18, 53, -1},
-    {18, 59, -1}, {18, 61, -1}, {18, 67, -1}, {18, 71, 1}, {18, 73, 1},
-    {18, 79, 1}, {18, 83, -1}, {18, 89, 1}, {18, 97, 1}, {18, 101, -1},
-    {18, 103, 1}, {18, 107, -1}, {18, 109, -1}, {18, 113, 1}, {18, 127, 1},
-    {19, 3, 1}, {19, 5, 1}, {19, 7, -1}, {19, 11, -1}, {19, 13, -1},
-    {19, 17, 1}, {19, 19, 0}, {19, 23, -1}, {19, 29, -1}, {19, 31, 1},
-    {19, 37, -1}, {19, 41, -1}, {19, 43, -1}, {19, 47, -1}, {19, 53, -1},
-    {19, 59, 1}, {19, 61, 1}, {19, 67, 1}, {19, 71, 1}, {19, 73, 1},
-    {19, 79, 1}, {19, 83, -1}, {19, 89, -1}, {19, 97, -1}, {19, 101, 1},
-    {19, 103, 1}, {19, 107, 1}, {19, 109, -1}, {19, 113, -1}, {19, 127, 1},
-    {20, 3, -1}, {20, 5, 0}, {20, 7, -1}, {20, 11, 1}, {20, 13, -1},
-    {20, 17, -1}, {20, 19, 1}, {20, 23, -1}, {20, 29, 1}, {20, 31, 1},
-    {20, 37, -1}, {20, 41, 1}, {20, 43, -1}, {20, 47, -1}, {20, 53, -1},
-    {20, 59, 1}, {20, 61, 1}, {20, 67, -1}, {20, 71, 1}, {20, 73, -1},
-    {20, 79, 1}, {20, 83, -1}, {20, 89, 1}, {20, 97, -1}, {20, 101, 1},
-    {20, 103, -1}, {20, 107, -1}, {20, 109, 1}, {20, 113, -1}, {20, 127, -1},
-    {21, 3, 0}, {21, 5, 1}, {21, 7, 0}, {21, 11, -1}, {21, 13, -1},
-    {21, 17, 1}, {21, 19, -1}, {21, 23, -1}, {21, 29, -1}, {21, 31, -1},
-    {21, 37, 1}, {21, 41, 1}, {21, 43, 1}, {21, 47, 1}, {21, 53, -1},
-    {21, 59, 1}, {21, 61, -1}, {21, 67, 1}, {21, 71, -1}, {21, 73, -1},
-    {21, 79, 1}, {21, 83, 1}, {21, 89, 1}, {21, 97, -1}, {21, 101, 1},
-    {21, 103, -1}, {21, 107, -1}, {21, 109, 1}, {21, 113, -1}, {21, 127, 1},
-    {22, 3, 1}, {22, 5, -1}, {22, 7, 1}, {22, 11, 0}, {22, 13, 1},
-    {22, 17, -1}, {22, 19, -1}, {22, 23, -1}, {22, 29, 1}, {22, 31, -1},
-    {22, 37, -1}, {22, 41, -1}, {22, 43, -1}, {22, 47, -1}, {22, 53, -1},
-    {22, 59, 1}, {22, 61, 1}, {22, 67, 1}, {22, 71, -1}, {22, 73, -1},
-    {22, 79, 1}, {22, 83, -1}, {22, 89, 1}, {22, 97, 1}, {22, 101, 1},
-    {22, 103, -1}, {22, 107, -1}, {22, 109, 1}, {22, 113, 1}, {22, 127, 1},
-    {23, 3, -1}, {23, 5, -1}, {23, 7, 1}, {23, 11, 1}, {23, 13, 1},
-    {23, 17, -1}, {23, 19, 1}, {23, 23, 0}, {23, 29, 1}, {23, 31, -1},
-    {23, 37, -1}, {23, 41, 1}, {23, 43, 1}, {23, 47, -1}, {23, 53, -1},
-    {23, 59, -1}, {23, 61, -1}, {23, 67, 1}, {23, 71, -1}, {23, 73, 1},
-    {23, 79, 1}, {23, 83, 1}, {23, 89, -1}, {23, 97, -1}, {23, 101, 1},
-    {23, 103, 1}, {23, 107, 1}, {23, 109, -1}, {23, 113, -1}, {23, 127, -1},
-    {24, 3, 0}, {24, 5, 1}, {24, 7, -1}, {24, 11, -1}, {24, 13, -1},
-    {24, 17, -1}, {24, 19, 1}, {24, 23, 1}, {24, 29, 1}, {24, 31, -1},
-    {24, 37, -1}, {24, 41, -1}, {24, 43, 1}, {24, 47, 1}, {24, 53, 1},
-    {24, 59, -1}, {24, 61, -1}, {24, 67, 1}, {24, 71, 1}, {24, 73, 1},
-    {24, 79, -1}, {24, 83, -1}, {24, 89, -1}, {24, 97, 1}, {24, 101, 1},
-    {24, 103, -1}, {24, 107, -1}, {24, 109, -1}, {24, 113, -1}, {24, 127, -1},
-    {25, 3, 1}, {25, 5, 0}, {25, 7, 1}, {25, 11, 1}, {25, 13, 1},
-    {25, 17, 1}, {25, 19, 1}, {25, 23, 1}, {25, 29, 1}, {25, 31, 1},
-    {25, 37, 1}, {25, 41, 1}, {25, 43, 1}, {25, 47, 1}, {25, 53, 1},
-    {25, 59, 1}, {25, 61, 1}, {25, 67, 1}, {25, 71, 1}, {25, 73, 1},
-    {25, 79, 1}, {25, 83, 1}, {25, 89, 1}, {25, 97, 1}, {25, 101, 1},
-    {25, 103, 1}, {25, 107, 1}, {25, 109, 1}, {25, 113, 1}, {25, 127, 1},
-    {26, 3, -1}, {26, 5, 1}, {26, 7, -1}, {26, 11, 1}, {26, 13, 0},
-    {26, 17, 1}, {26, 19, 1}, {26, 23, 1}, {26, 29, -1}, {26, 31, -1},
-    {26, 37, 1}, {26, 41, -1}, {26, 43, -1}, {26, 47, -1}, {26, 53, -1},
-    {26, 59, 1}, {26, 61, -1}, {26, 67, 1}, {26, 71, -1}, {26, 73, -1},
-    {26, 79, 1}, {26, 83, 1}, {26, 89, -1}, {26, 97, -1}, {26, 101, -1},
-    {26, 103, 1}, {26, 107, -1}, {26, 109, 1}, {26, 113, 1}, {26, 127, 1},
-    {27, 3, 0}, {27, 5, -1}, {27, 7, -1}, {27, 11, 1}, {27, 13, 1},
-    {27, 17, -1}, {27, 19, -1}, {27, 23, 1}, {27, 29, -1}, {27, 31, -1},
-    {27, 37, 1}, {27, 41, -1}, {27, 43, -1}, {27, 47, 1}, {27, 53, -1},
-    {27, 59, 1}, {27, 61, 1}, {27, 67, -1}, {27, 71, 1}, {27, 73, 1},
-    {27, 79, -1}, {27, 83, 1}, {27, 89, -1}, {27, 97, 1}, {27, 101, -1},
-    {27, 103, -1}, {27, 107, 1}, {27, 109, 1}, {27, 113, -1}, {27, 127, -1},
-    {28, 3, 1}, {28, 5, -1}, {28, 7, 0}, {28, 11, -1}, {28, 13, -1},
-    {28, 17, -1}, {28, 19, 1}, {28, 23, -1}, {28, 29, 1}, {28, 31, 1},
-    {28, 37, 1}, {28, 41, -1}, {28, 43, -1}, {28, 47, 1}, {28, 53, 1},
-    {28, 59, 1}, {28, 61, -1}, {28, 67, -1}, {28, 71, -1}, {28, 73, -1},
-    {28, 79, -1}, {28, 83, 1}, {28, 89, -1}, {28, 97, -1}, {28, 101, -1},
-    {28, 103, 1}, {28, 107, -1}, {28, 109, 1}, {28, 113, 1}, {28, 127, -1},
-    {29, 3, -1}, {29, 5, 1}, {29, 7, 1}, {29, 11, -1}, {29, 13, 1},
-    {29, 17, -1}, {29, 19, -1}, {29, 23, 1}, {29, 29, 0}, {29, 31, -1},
-    {29, 37, -1}, {29, 41, -1}, {29, 43, -1}, {29, 47, -1}, {29, 53, 1},
-    {29, 59, 1}, {29, 61, -1}, {29, 67, 1}, {29, 71, 1}, {29, 73, -1},
-    {29, 79, -1}, {29, 83, 1}, {29, 89, -1}, {29, 97, -1}, {29, 101, -1},
-    {29, 103, 1}, {29, 107, 1}, {29, 109, 1}, {29, 113, -1}, {29, 127, -1},
-    {30, 3, 0}, {30, 5, 0}, {30, 7, 1}, {30, 11, -1}, {30, 13, 1},
-    {30, 17, 1}, {30, 19, 1}, {30, 23, -1}, {30, 29, 1}, {30, 31, -1},
-    {30, 37, 1}, {30, 41, -1}, {30, 43, -1}, {30, 47, -1}, {30, 53, -1},
-    {30, 59, -1}, {30, 61, -1}, {30, 67, -1}, {30, 71, 1}, {30, 73, -1},
-    {30, 79, -1}, {30, 83, 1}, {30, 89, -1}, {30, 97, -1}, {30, 101, 1},
-    {30, 103, 1}, {30, 107, 1}, {30, 109, -1}, {30, 113, 1}, {30, 127, 1},
-    {12345, 331, -1},
-
-    // https://en.wikipedia.org/wiki/Jacobi_symbol#Table_of_values
-    {1, 1, 1}, {1, 3, 1}, {1, 5, 1}, {1, 7, 1}, {1, 9, 1},
-    {1, 11, 1}, {1, 13, 1}, {1, 15, 1}, {1, 17, 1}, {1, 19, 1},
-    {1, 21, 1}, {1, 23, 1}, {1, 25, 1}, {1, 27, 1}, {1, 29, 1},
-    {1, 31, 1}, {1, 33, 1}, {1, 35, 1}, {1, 37, 1}, {1, 39, 1},
-    {1, 41, 1}, {1, 43, 1}, {1, 45, 1}, {1, 47, 1}, {1, 49, 1},
-    {1, 51, 1}, {1, 53, 1}, {1, 55, 1}, {1, 57, 1}, {1, 59, 1},
-    {2, 1, 1}, {2, 3, -1}, {2, 5, -1}, {2, 7, 1}, {2, 9, 1},
-    {2, 11, -1}, {2, 13, -1}, {2, 15, 1}, {2, 17, 1}, {2, 19, -1},
-    {2, 21, -1}, {2, 23, 1}, {2, 25, 1}, {2, 27, -1}, {2, 29, -1},
-    {2, 31, 1}, {2, 33, 1}, {2, 35, -1}, {2, 37, -1}, {2, 39, 1},
-    {2, 41, 1}, {2, 43, -1}, {2, 45, -1}, {2, 47, 1}, {2, 49, 1},
-    {2, 51, -1}, {2, 53, -1}, {2, 55, 1}, {2, 57, 1}, {2, 59, -1},
-    {3, 1, 1}, {3, 3, 0}, {3, 5, -1}, {3, 7, -1}, {3, 9, 0},
-    {3, 11, 1}, {3, 13, 1}, {3, 15, 0}, {3, 17, -1}, {3, 19, -1},
-    {3, 21, 0}, {3, 23, 1}, {3, 25, 1}, {3, 27, 0}, {3, 29, -1},
-    {3, 31, -1}, {3, 33, 0}, {3, 35, 1}, {3, 37, 1}, {3, 39, 0},
-    {3, 41, -1}, {3, 43, -1}, {3, 45, 0}, {3, 47, 1}, {3, 49, 1},
-    {3, 51, 0}, {3, 53, -1}, {3, 55, -1}, {3, 57, 0}, {3, 59, 1},
-    {4, 1, 1}, {4, 3, 1}, {4, 5, 1}, {4, 7, 1}, {4, 9, 1},
-    {4, 11, 1}, {4, 13, 1}, {4, 15, 1}, {4, 17, 1}, {4, 19, 1},
-    {4, 21, 1}, {4, 23, 1}, {4, 25, 1}, {4, 27, 1}, {4, 29, 1},
-    {4, 31, 1}, {4, 33, 1}, {4, 35, 1}, {4, 37, 1}, {4, 39, 1},
-    {4, 41, 1}, {4, 43, 1}, {4, 45, 1}, {4, 47, 1}, {4, 49, 1},
-    {4, 51, 1}, {4, 53, 1}, {4, 55, 1}, {4, 57, 1}, {4, 59, 1},
-    {5, 1, 1}, {5, 3, -1}, {5, 5, 0}, {5, 7, -1}, {5, 9, 1},
-    {5, 11, 1}, {5, 13, -1}, {5, 15, 0}, {5, 17, -1}, {5, 19, 1},
-    {5, 21, 1}, {5, 23, -1}, {5, 25, 0}, {5, 27, -1}, {5, 29, 1},
-    {5, 31, 1}, {5, 33, -1}, {5, 35, 0}, {5, 37, -1}, {5, 39, 1},
-    {5, 41, 1}, {5, 43, -1}, {5, 45, 0}, {5, 47, -1}, {5, 49, 1},
-    {5, 51, 1}, {5, 53, -1}, {5, 55, 0}, {5, 57, -1}, {5, 59, 1},
-    {6, 1, 1}, {6, 3, 0}, {6, 5, 1}, {6, 7, -1}, {6, 9, 0},
-    {6, 11, -1}, {6, 13, -1}, {6, 15, 0}, {6, 17, -1}, {6, 19, 1},
-    {6, 21, 0}, {6, 23, 1}, {6, 25, 1}, {6, 27, 0}, {6, 29, 1},
-    {6, 31, -1}, {6, 33, 0}, {6, 35, -1}, {6, 37, -1}, {6, 39, 0},
-    {6, 41, -1}, {6, 43, 1}, {6, 45, 0}, {6, 47, 1}, {6, 49, 1},
-    {6, 51, 0}, {6, 53, 1}, {6, 55, -1}, {6, 57, 0}, {6, 59, -1},
-    {7, 1, 1}, {7, 3, 1}, {7, 5, -1}, {7, 7, 0}, {7, 9, 1},
-    {7, 11, -1}, {7, 13, -1}, {7, 15, -1}, {7, 17, -1}, {7, 19, 1},
-    {7, 21, 0}, {7, 23, -1}, {7, 25, 1}, {7, 27, 1}, {7, 29, 1},
-    {7, 31, 1}, {7, 33, -1}, {7, 35, 0}, {7, 37, 1}, {7, 39, -1},
-    {7, 41, -1}, {7, 43, -1}, {7, 45, -1}, {7, 47, 1}, {7, 49, 0},
-    {7, 51, -1}, {7, 53, 1}, {7, 55, 1}, {7, 57, 1}, {7, 59, 1},
-    {8, 1, 1}, {8, 3, -1}, {8, 5, -1}, {8, 7, 1}, {8, 9, 1},
-    {8, 11, -1}, {8, 13, -1}, {8, 15, 1}, {8, 17, 1}, {8, 19, -1},
-    {8, 21, -1}, {8, 23, 1}, {8, 25, 1}, {8, 27, -1}, {8, 29, -1},
-    {8, 31, 1}, {8, 33, 1}, {8, 35, -1}, {8, 37, -1}, {8, 39, 1},
-    {8, 41, 1}, {8, 43, -1}, {8, 45, -1}, {8, 47, 1}, {8, 49, 1},
-    {8, 51, -1}, {8, 53, -1}, {8, 55, 1}, {8, 57, 1}, {8, 59, -1},
-    {9, 1, 1}, {9, 3, 0}, {9, 5, 1}, {9, 7, 1}, {9, 9, 0},
-    {9, 11, 1}, {9, 13, 1}, {9, 15, 0}, {9, 17, 1}, {9, 19, 1},
-    {9, 21, 0}, {9, 23, 1}, {9, 25, 1}, {9, 27, 0}, {9, 29, 1},
-    {9, 31, 1}, {9, 33, 0}, {9, 35, 1}, {9, 37, 1}, {9, 39, 0},
-    {9, 41, 1}, {9, 43, 1}, {9, 45, 0}, {9, 47, 1}, {9, 49, 1},
-    {9, 51, 0}, {9, 53, 1}, {9, 55, 1}, {9, 57, 0}, {9, 59, 1},
-    {10, 1, 1}, {10, 3, 1}, {10, 5, 0}, {10, 7, -1}, {10, 9, 1},
-    {10, 11, -1}, {10, 13, 1}, {10, 15, 0}, {10, 17, -1}, {10, 19, -1},
-    {10, 21, -1}, {10, 23, -1}, {10, 25, 0}, {10, 27, 1}, {10, 29, -1},
-    {10, 31, 1}, {10, 33, -1}, {10, 35, 0}, {10, 37, 1}, {10, 39, 1},
-    {10, 41, 1}, {10, 43, 1}, {10, 45, 0}, {10, 47, -1}, {10, 49, 1},
-    {10, 51, -1}, {10, 53, 1}, {10, 55, 0}, {10, 57, -1}, {10, 59, -1},
-    {11, 1, 1}, {11, 3, -1}, {11, 5, 1}, {11, 7, 1}, {11, 9, 1},
-    {11, 11, 0}, {11, 13, -1}, {11, 15, -1}, {11, 17, -1}, {11, 19, 1},
-    {11, 21, -1}, {11, 23, -1}, {11, 25, 1}, {11, 27, -1}, {11, 29, -1},
-    {11, 31, -1}, {11, 33, 0}, {11, 35, 1}, {11, 37, 1}, {11, 39, 1},
-    {11, 41, -1}, {11, 43, 1}, {11, 45, 1}, {11, 47, -1}, {11, 49, 1},
-    {11, 51, 1}, {11, 53, 1}, {11, 55, 0}, {11, 57, -1}, {11, 59, -1},
-    {12, 1, 1}, {12, 3, 0}, {12, 5, -1}, {12, 7, -1}, {12, 9, 0},
-    {12, 11, 1}, {12, 13, 1}, {12, 15, 0}, {12, 17, -1}, {12, 19, -1},
-    {12, 21, 0}, {12, 23, 1}, {12, 25, 1}, {12, 27, 0}, {12, 29, -1},
-    {12, 31, -1}, {12, 33, 0}, {12, 35, 1}, {12, 37, 1}, {12, 39, 0},
-    {12, 41, -1}, {12, 43, -1}, {12, 45, 0}, {12, 47, 1}, {12, 49, 1},
-    {12, 51, 0}, {12, 53, -1}, {12, 55, -1}, {12, 57, 0}, {12, 59, 1},
-    {13, 1, 1}, {13, 3, 1}, {13, 5, -1}, {13, 7, -1}, {13, 9, 1},
-    {13, 11, -1}, {13, 13, 0}, {13, 15, -1}, {13, 17, 1}, {13, 19, -1},
-    {13, 21, -1}, {13, 23, 1}, {13, 25, 1}, {13, 27, 1}, {13, 29, 1},
-    {13, 31, -1}, {13, 33, -1}, {13, 35, 1}, {13, 37, -1}, {13, 39, 0},
-    {13, 41, -1}, {13, 43, 1}, {13, 45, -1}, {13, 47, -1}, {13, 49, 1},
-    {13, 51, 1}, {13, 53, 1}, {13, 55, 1}, {13, 57, -1}, {13, 59, -1},
-    {14, 1, 1}, {14, 3, -1}, {14, 5, 1}, {14, 7, 0}, {14, 9, 1},
-    {14, 11, 1}, {14, 13, 1}, {14, 15, -1}, {14, 17, -1}, {14, 19, -1},
-    {14, 21, 0}, {14, 23, -1}, {14, 25, 1}, {14, 27, -1}, {14, 29, -1},
-    {14, 31, 1}, {14, 33, -1}, {14, 35, 0}, {14, 37, -1}, {14, 39, -1},
-    {14, 41, -1}, {14, 43, 1}, {14, 45, 1}, {14, 47, 1}, {14, 49, 0},
-    {14, 51, 1}, {14, 53, -1}, {14, 55, 1}, {14, 57, 1}, {14, 59, -1},
-    {15, 1, 1}, {15, 3, 0}, {15, 5, 0}, {15, 7, 1}, {15, 9, 0},
-    {15, 11, 1}, {15, 13, -1}, {15, 15, 0}, {15, 17, 1}, {15, 19, -1},
-    {15, 21, 0}, {15, 23, -1}, {15, 25, 0}, {15, 27, 0}, {15, 29, -1},
-    {15, 31, -1}, {15, 33, 0}, {15, 35, 0}, {15, 37, -1}, {15, 39, 0},
-    {15, 41, -1}, {15, 43, 1}, {15, 45, 0}, {15, 47, -1}, {15, 49, 1},
-    {15, 51, 0}, {15, 53, 1}, {15, 55, 0}, {15, 57, 0}, {15, 59, 1},
-    {16, 1, 1}, {16, 3, 1}, {16, 5, 1}, {16, 7, 1}, {16, 9, 1},
-    {16, 11, 1}, {16, 13, 1}, {16, 15, 1}, {16, 17, 1}, {16, 19, 1},
-    {16, 21, 1}, {16, 23, 1}, {16, 25, 1}, {16, 27, 1}, {16, 29, 1},
-    {16, 31, 1}, {16, 33, 1}, {16, 35, 1}, {16, 37, 1}, {16, 39, 1},
-    {16, 41, 1}, {16, 43, 1}, {16, 45, 1}, {16, 47, 1}, {16, 49, 1},
-    {16, 51, 1}, {16, 53, 1}, {16, 55, 1}, {16, 57, 1}, {16, 59, 1},
-    {17, 1, 1}, {17, 3, -1}, {17, 5, -1}, {17, 7, -1}, {17, 9, 1},
-    {17, 11, -1}, {17, 13, 1}, {17, 15, 1}, {17, 17, 0}, {17, 19, 1},
-    {17, 21, 1}, {17, 23, -1}, {17, 25, 1}, {17, 27, -1}, {17, 29, -1},
-    {17, 31, -1}, {17, 33, 1}, {17, 35, 1}, {17, 37, -1}, {17, 39, -1},
-    {17, 41, -1}, {17, 43, 1}, {17, 45, -1}, {17, 47, 1}, {17, 49, 1},
-    {17, 51, 0}, {17, 53, 1}, {17, 55, 1}, {17, 57, -1}, {17, 59, 1},
-    {18, 1, 1}, {18, 3, 0}, {18, 5, -1}, {18, 7, 1}, {18, 9, 0},
-    {18, 11, -1}, {18, 13, -1}, {18, 15, 0}, {18, 17, 1}, {18, 19, -1},
-    {18, 21, 0}, {18, 23, 1}, {18, 25, 1}, {18, 27, 0}, {18, 29, -1},
-    {18, 31, 1}, {18, 33, 0}, {18, 35, -1}, {18, 37, -1}, {18, 39, 0},
-    {18, 41, 1}, {18, 43, -1}, {18, 45, 0}, {18, 47, 1}, {18, 49, 1},
-    {18, 51, 0}, {18, 53, -1}, {18, 55, 1}, {18, 57, 0}, {18, 59, -1},
-    {19, 1, 1}, {19, 3, 1}, {19, 5, 1}, {19, 7, -1}, {19, 9, 1},
-    {19, 11, -1}, {19, 13, -1}, {19, 15, 1}, {19, 17, 1}, {19, 19, 0},
-    {19, 21, -1}, {19, 23, -1}, {19, 25, 1}, {19, 27, 1}, {19, 29, -1},
-    {19, 31, 1}, {19, 33, -1}, {19, 35, -1}, {19, 37, -1}, {19, 39, -1},
-    {19, 41, -1}, {19, 43, -1}, {19, 45, 1}, {19, 47, -1}, {19, 49, 1},
-    {19, 51, 1}, {19, 53, -1}, {19, 55, -1}, {19, 57, 0}, {19, 59, 1},
-    {20, 1, 1}, {20, 3, -1}, {20, 5, 0}, {20, 7, -1}, {20, 9, 1},
-    {20, 11, 1}, {20, 13, -1}, {20, 15, 0}, {20, 17, -1}, {20, 19, 1},
-    {20, 21, 1}, {20, 23, -1}, {20, 25, 0}, {20, 27, -1}, {20, 29, 1},
-    {20, 31, 1}, {20, 33, -1}, {20, 35, 0}, {20, 37, -1}, {20, 39, 1},
-    {20, 41, 1}, {20, 43, -1}, {20, 45, 0}, {20, 47, -1}, {20, 49, 1},
-    {20, 51, 1}, {20, 53, -1}, {20, 55, 0}, {20, 57, -1}, {20, 59, 1},
-    {21, 1, 1}, {21, 3, 0}, {21, 5, 1}, {21, 7, 0}, {21, 9, 0},
-    {21, 11, -1}, {21, 13, -1}, {21, 15, 0}, {21, 17, 1}, {21, 19, -1},
-    {21, 21, 0}, {21, 23, -1}, {21, 25, 1}, {21, 27, 0}, {21, 29, -1},
-    {21, 31, -1}, {21, 33, 0}, {21, 35, 0}, {21, 37, 1}, {21, 39, 0},
-    {21, 41, 1}, {21, 43, 1}, {21, 45, 0}, {21, 47, 1}, {21, 49, 0},
-    {21, 51, 0}, {21, 53, -1}, {21, 55, -1}, {21, 57, 0}, {21, 59, 1},
-    {22, 1, 1}, {22, 3, 1}, {22, 5, -1}, {22, 7, 1}, {22, 9, 1},
-    {22, 11, 0}, {22, 13, 1}, {22, 15, -1}, {22, 17, -1}, {22, 19, -1},
-    {22, 21, 1}, {22, 23, -1}, {22, 25, 1}, {22, 27, 1}, {22, 29, 1},
-    {22, 31, -1}, {22, 33, 0}, {22, 35, -1}, {22, 37, -1}, {22, 39, 1},
-    {22, 41, -1}, {22, 43, -1}, {22, 45, -1}, {22, 47, -1}, {22, 49, 1},
-    {22, 51, -1}, {22, 53, -1}, {22, 55, 0}, {22, 57, -1}, {22, 59, 1},
-    {23, 1, 1}, {23, 3, -1}, {23, 5, -1}, {23, 7, 1}, {23, 9, 1},
-    {23, 11, 1}, {23, 13, 1}, {23, 15, 1}, {23, 17, -1}, {23, 19, 1},
-    {23, 21, -1}, {23, 23, 0}, {23, 25, 1}, {23, 27, -1}, {23, 29, 1},
-    {23, 31, -1}, {23, 33, -1}, {23, 35, -1}, {23, 37, -1}, {23, 39, -1},
-    {23, 41, 1}, {23, 43, 1}, {23, 45, -1}, {23, 47, -1}, {23, 49, 1},
-    {23, 51, 1}, {23, 53, -1}, {23, 55, -1}, {23, 57, -1}, {23, 59, -1},
-    {24, 1, 1}, {24, 3, 0}, {24, 5, 1}, {24, 7, -1}, {24, 9, 0},
-    {24, 11, -1}, {24, 13, -1}, {24, 15, 0}, {24, 17, -1}, {24, 19, 1},
-    {24, 21, 0}, {24, 23, 1}, {24, 25, 1}, {24, 27, 0}, {24, 29, 1},
-    {24, 31, -1}, {24, 33, 0}, {24, 35, -1}, {24, 37, -1}, {24, 39, 0},
-    {24, 41, -1}, {24, 43, 1}, {24, 45, 0}, {24, 47, 1}, {24, 49, 1},
-    {24, 51, 0}, {24, 53, 1}, {24, 55, -1}, {24, 57, 0}, {24, 59, -1},
-    {25, 1, 1}, {25, 3, 1}, {25, 5, 0}, {25, 7, 1}, {25, 9, 1},
-    {25, 11, 1}, {25, 13, 1}, {25, 15, 0}, {25, 17, 1}, {25, 19, 1},
-    {25, 21, 1}, {25, 23, 1}, {25, 25, 0}, {25, 27, 1}, {25, 29, 1},
-    {25, 31, 1}, {25, 33, 1}, {25, 35, 0}, {25, 37, 1}, {25, 39, 1},
-    {25, 41, 1}, {25, 43, 1}, {25, 45, 0}, {25, 47, 1}, {25, 49, 1},
-    {25, 51, 1}, {25, 53, 1}, {25, 55, 0}, {25, 57, 1}, {25, 59, 1},
-    {26, 1, 1}, {26, 3, -1}, {26, 5, 1}, {26, 7, -1}, {26, 9, 1},
-    {26, 11, 1}, {26, 13, 0}, {26, 15, -1}, {26, 17, 1}, {26, 19, 1},
-    {26, 21, 1}, {26, 23, 1}, {26, 25, 1}, {26, 27, -1}, {26, 29, -1},
-    {26, 31, -1}, {26, 33, -1}, {26, 35, -1}, {26, 37, 1}, {26, 39, 0},
-    {26, 41, -1}, {26, 43, -1}, {26, 45, 1}, {26, 47, -1}, {26, 49, 1},
-    {26, 51, -1}, {26, 53, -1}, {26, 55, 1}, {26, 57, -1}, {26, 59, 1},
-    {27, 1, 1}, {27, 3, 0}, {27, 5, -1}, {27, 7, -1}, {27, 9, 0},
-    {27, 11, 1}, {27, 13, 1}, {27, 15, 0}, {27, 17, -1}, {27, 19, -1},
-    {27, 21, 0}, {27, 23, 1}, {27, 25, 1}, {27, 27, 0}, {27, 29, -1},
-    {27, 31, -1}, {27, 33, 0}, {27, 35, 1}, {27, 37, 1}, {27, 39, 0},
-    {27, 41, -1}, {27, 43, -1}, {27, 45, 0}, {27, 47, 1}, {27, 49, 1},
-    {27, 51, 0}, {27, 53, -1}, {27, 55, -1}, {27, 57, 0}, {27, 59, 1},
-    {28, 1, 1}, {28, 3, 1}, {28, 5, -1}, {28, 7, 0}, {28, 9, 1},
-    {28, 11, -1}, {28, 13, -1}, {28, 15, -1}, {28, 17, -1}, {28, 19, 1},
-    {28, 21, 0}, {28, 23, -1}, {28, 25, 1}, {28, 27, 1}, {28, 29, 1},
-    {28, 31, 1}, {28, 33, -1}, {28, 35, 0}, {28, 37, 1}, {28, 39, -1},
-    {28, 41, -1}, {28, 43, -1}, {28, 45, -1}, {28, 47, 1}, {28, 49, 0},
-    {28, 51, -1}, {28, 53, 1}, {28, 55, 1}, {28, 57, 1}, {28, 59, 1},
-    {29, 1, 1}, {29, 3, -1}, {29, 5, 1}, {29, 7, 1}, {29, 9, 1},
-    {29, 11, -1}, {29, 13, 1}, {29, 15, -1}, {29, 17, -1}, {29, 19, -1},
-    {29, 21, -1}, {29, 23, 1}, {29, 25, 1}, {29, 27, -1}, {29, 29, 0},
-    {29, 31, -1}, {29, 33, 1}, {29, 35, 1}, {29, 37, -1}, {29, 39, -1},
-    {29, 41, -1}, {29, 43, -1}, {29, 45, 1}, {29, 47, -1}, {29, 49, 1},
-    {29, 51, 1}, {29, 53, 1}, {29, 55, -1}, {29, 57, 1}, {29, 59, 1},
-    {30, 1, 1}, {30, 3, 0}, {30, 5, 0}, {30, 7, 1}, {30, 9, 0},
-    {30, 11, -1}, {30, 13, 1}, {30, 15, 0}, {30, 17, 1}, {30, 19, 1},
-    {30, 21, 0}, {30, 23, -1}, {30, 25, 0}, {30, 27, 0}, {30, 29, 1},
-    {30, 31, -1}, {30, 33, 0}, {30, 35, 0}, {30, 37, 1}, {30, 39, 0},
-    {30, 41, -1}, {30, 43, -1}, {30, 45, 0}, {30, 47, -1}, {30, 49, 1},
-    {30, 51, 0}, {30, 53, -1}, {30, 55, 0}, {30, 57, 0}, {30, 59, -1},
-    {1001, 9907, -1}
-  };
-
 #define GOO_ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
-  // test jacobi
+  /* test jacobi */
   {
+    static const int symbols[][3] = {
+      /* https://github.com/golang/go/blob/aadaec5/src/math/big/int_test.go#L1590 */
+      {0, 1, 1}, {0, -1, 1}, {1, 1, 1}, {1, -1, 1}, {0, 5, 0},
+      {1, 5, 1}, {2, 5, -1}, {-2, 5, -1}, {2, -5, -1}, {-2, -5, 1},
+      {3, 5, -1}, {5, 5, 0}, {-5, 5, 0}, {6, 5, 1}, {6, -5, 1},
+      {-6, 5, 1}, {-6, -5, -1},
+
+      /* https://en.wikipedia.org/wiki/Legendre_symbol#Table_of_values */
+      {1, 3, 1}, {1, 5, 1}, {1, 7, 1}, {1, 11, 1}, {1, 13, 1},
+      {1, 17, 1}, {1, 19, 1}, {1, 23, 1}, {1, 29, 1}, {1, 31, 1},
+      {1, 37, 1}, {1, 41, 1}, {1, 43, 1}, {1, 47, 1}, {1, 53, 1},
+      {1, 59, 1}, {1, 61, 1}, {1, 67, 1}, {1, 71, 1}, {1, 73, 1},
+      {1, 79, 1}, {1, 83, 1}, {1, 89, 1}, {1, 97, 1}, {1, 101, 1},
+      {1, 103, 1}, {1, 107, 1}, {1, 109, 1}, {1, 113, 1}, {1, 127, 1},
+      {2, 3, -1}, {2, 5, -1}, {2, 7, 1}, {2, 11, -1}, {2, 13, -1},
+      {2, 17, 1}, {2, 19, -1}, {2, 23, 1}, {2, 29, -1}, {2, 31, 1},
+      {2, 37, -1}, {2, 41, 1}, {2, 43, -1}, {2, 47, 1}, {2, 53, -1},
+      {2, 59, -1}, {2, 61, -1}, {2, 67, -1}, {2, 71, 1}, {2, 73, 1},
+      {2, 79, 1}, {2, 83, -1}, {2, 89, 1}, {2, 97, 1}, {2, 101, -1},
+      {2, 103, 1}, {2, 107, -1}, {2, 109, -1}, {2, 113, 1}, {2, 127, 1},
+      {3, 3, 0}, {3, 5, -1}, {3, 7, -1}, {3, 11, 1}, {3, 13, 1},
+      {3, 17, -1}, {3, 19, -1}, {3, 23, 1}, {3, 29, -1}, {3, 31, -1},
+      {3, 37, 1}, {3, 41, -1}, {3, 43, -1}, {3, 47, 1}, {3, 53, -1},
+      {3, 59, 1}, {3, 61, 1}, {3, 67, -1}, {3, 71, 1}, {3, 73, 1},
+      {3, 79, -1}, {3, 83, 1}, {3, 89, -1}, {3, 97, 1}, {3, 101, -1},
+      {3, 103, -1}, {3, 107, 1}, {3, 109, 1}, {3, 113, -1}, {3, 127, -1},
+      {4, 3, 1}, {4, 5, 1}, {4, 7, 1}, {4, 11, 1}, {4, 13, 1},
+      {4, 17, 1}, {4, 19, 1}, {4, 23, 1}, {4, 29, 1}, {4, 31, 1},
+      {4, 37, 1}, {4, 41, 1}, {4, 43, 1}, {4, 47, 1}, {4, 53, 1},
+      {4, 59, 1}, {4, 61, 1}, {4, 67, 1}, {4, 71, 1}, {4, 73, 1},
+      {4, 79, 1}, {4, 83, 1}, {4, 89, 1}, {4, 97, 1}, {4, 101, 1},
+      {4, 103, 1}, {4, 107, 1}, {4, 109, 1}, {4, 113, 1}, {4, 127, 1},
+      {5, 3, -1}, {5, 5, 0}, {5, 7, -1}, {5, 11, 1}, {5, 13, -1},
+      {5, 17, -1}, {5, 19, 1}, {5, 23, -1}, {5, 29, 1}, {5, 31, 1},
+      {5, 37, -1}, {5, 41, 1}, {5, 43, -1}, {5, 47, -1}, {5, 53, -1},
+      {5, 59, 1}, {5, 61, 1}, {5, 67, -1}, {5, 71, 1}, {5, 73, -1},
+      {5, 79, 1}, {5, 83, -1}, {5, 89, 1}, {5, 97, -1}, {5, 101, 1},
+      {5, 103, -1}, {5, 107, -1}, {5, 109, 1}, {5, 113, -1}, {5, 127, -1},
+      {6, 3, 0}, {6, 5, 1}, {6, 7, -1}, {6, 11, -1}, {6, 13, -1},
+      {6, 17, -1}, {6, 19, 1}, {6, 23, 1}, {6, 29, 1}, {6, 31, -1},
+      {6, 37, -1}, {6, 41, -1}, {6, 43, 1}, {6, 47, 1}, {6, 53, 1},
+      {6, 59, -1}, {6, 61, -1}, {6, 67, 1}, {6, 71, 1}, {6, 73, 1},
+      {6, 79, -1}, {6, 83, -1}, {6, 89, -1}, {6, 97, 1}, {6, 101, 1},
+      {6, 103, -1}, {6, 107, -1}, {6, 109, -1}, {6, 113, -1}, {6, 127, -1},
+      {7, 3, 1}, {7, 5, -1}, {7, 7, 0}, {7, 11, -1}, {7, 13, -1},
+      {7, 17, -1}, {7, 19, 1}, {7, 23, -1}, {7, 29, 1}, {7, 31, 1},
+      {7, 37, 1}, {7, 41, -1}, {7, 43, -1}, {7, 47, 1}, {7, 53, 1},
+      {7, 59, 1}, {7, 61, -1}, {7, 67, -1}, {7, 71, -1}, {7, 73, -1},
+      {7, 79, -1}, {7, 83, 1}, {7, 89, -1}, {7, 97, -1}, {7, 101, -1},
+      {7, 103, 1}, {7, 107, -1}, {7, 109, 1}, {7, 113, 1}, {7, 127, -1},
+      {8, 3, -1}, {8, 5, -1}, {8, 7, 1}, {8, 11, -1}, {8, 13, -1},
+      {8, 17, 1}, {8, 19, -1}, {8, 23, 1}, {8, 29, -1}, {8, 31, 1},
+      {8, 37, -1}, {8, 41, 1}, {8, 43, -1}, {8, 47, 1}, {8, 53, -1},
+      {8, 59, -1}, {8, 61, -1}, {8, 67, -1}, {8, 71, 1}, {8, 73, 1},
+      {8, 79, 1}, {8, 83, -1}, {8, 89, 1}, {8, 97, 1}, {8, 101, -1},
+      {8, 103, 1}, {8, 107, -1}, {8, 109, -1}, {8, 113, 1}, {8, 127, 1},
+      {9, 3, 0}, {9, 5, 1}, {9, 7, 1}, {9, 11, 1}, {9, 13, 1},
+      {9, 17, 1}, {9, 19, 1}, {9, 23, 1}, {9, 29, 1}, {9, 31, 1},
+      {9, 37, 1}, {9, 41, 1}, {9, 43, 1}, {9, 47, 1}, {9, 53, 1},
+      {9, 59, 1}, {9, 61, 1}, {9, 67, 1}, {9, 71, 1}, {9, 73, 1},
+      {9, 79, 1}, {9, 83, 1}, {9, 89, 1}, {9, 97, 1}, {9, 101, 1},
+      {9, 103, 1}, {9, 107, 1}, {9, 109, 1}, {9, 113, 1}, {9, 127, 1},
+      {10, 3, 1}, {10, 5, 0}, {10, 7, -1}, {10, 11, -1}, {10, 13, 1},
+      {10, 17, -1}, {10, 19, -1}, {10, 23, -1}, {10, 29, -1}, {10, 31, 1},
+      {10, 37, 1}, {10, 41, 1}, {10, 43, 1}, {10, 47, -1}, {10, 53, 1},
+      {10, 59, -1}, {10, 61, -1}, {10, 67, 1}, {10, 71, 1}, {10, 73, -1},
+      {10, 79, 1}, {10, 83, 1}, {10, 89, 1}, {10, 97, -1}, {10, 101, -1},
+      {10, 103, -1}, {10, 107, 1}, {10, 109, -1}, {10, 113, -1}, {10, 127, -1},
+      {11, 3, -1}, {11, 5, 1}, {11, 7, 1}, {11, 11, 0}, {11, 13, -1},
+      {11, 17, -1}, {11, 19, 1}, {11, 23, -1}, {11, 29, -1}, {11, 31, -1},
+      {11, 37, 1}, {11, 41, -1}, {11, 43, 1}, {11, 47, -1}, {11, 53, 1},
+      {11, 59, -1}, {11, 61, -1}, {11, 67, -1}, {11, 71, -1}, {11, 73, -1},
+      {11, 79, 1}, {11, 83, 1}, {11, 89, 1}, {11, 97, 1}, {11, 101, -1},
+      {11, 103, -1}, {11, 107, 1}, {11, 109, -1}, {11, 113, 1}, {11, 127, 1},
+      {12, 3, 0}, {12, 5, -1}, {12, 7, -1}, {12, 11, 1}, {12, 13, 1},
+      {12, 17, -1}, {12, 19, -1}, {12, 23, 1}, {12, 29, -1}, {12, 31, -1},
+      {12, 37, 1}, {12, 41, -1}, {12, 43, -1}, {12, 47, 1}, {12, 53, -1},
+      {12, 59, 1}, {12, 61, 1}, {12, 67, -1}, {12, 71, 1}, {12, 73, 1},
+      {12, 79, -1}, {12, 83, 1}, {12, 89, -1}, {12, 97, 1}, {12, 101, -1},
+      {12, 103, -1}, {12, 107, 1}, {12, 109, 1}, {12, 113, -1}, {12, 127, -1},
+      {13, 3, 1}, {13, 5, -1}, {13, 7, -1}, {13, 11, -1}, {13, 13, 0},
+      {13, 17, 1}, {13, 19, -1}, {13, 23, 1}, {13, 29, 1}, {13, 31, -1},
+      {13, 37, -1}, {13, 41, -1}, {13, 43, 1}, {13, 47, -1}, {13, 53, 1},
+      {13, 59, -1}, {13, 61, 1}, {13, 67, -1}, {13, 71, -1}, {13, 73, -1},
+      {13, 79, 1}, {13, 83, -1}, {13, 89, -1}, {13, 97, -1}, {13, 101, 1},
+      {13, 103, 1}, {13, 107, 1}, {13, 109, -1}, {13, 113, 1}, {13, 127, 1},
+      {14, 3, -1}, {14, 5, 1}, {14, 7, 0}, {14, 11, 1}, {14, 13, 1},
+      {14, 17, -1}, {14, 19, -1}, {14, 23, -1}, {14, 29, -1}, {14, 31, 1},
+      {14, 37, -1}, {14, 41, -1}, {14, 43, 1}, {14, 47, 1}, {14, 53, -1},
+      {14, 59, -1}, {14, 61, 1}, {14, 67, 1}, {14, 71, -1}, {14, 73, -1},
+      {14, 79, -1}, {14, 83, -1}, {14, 89, -1}, {14, 97, -1}, {14, 101, 1},
+      {14, 103, 1}, {14, 107, 1}, {14, 109, -1}, {14, 113, 1}, {14, 127, -1},
+      {15, 3, 0}, {15, 5, 0}, {15, 7, 1}, {15, 11, 1}, {15, 13, -1},
+      {15, 17, 1}, {15, 19, -1}, {15, 23, -1}, {15, 29, -1}, {15, 31, -1},
+      {15, 37, -1}, {15, 41, -1}, {15, 43, 1}, {15, 47, -1}, {15, 53, 1},
+      {15, 59, 1}, {15, 61, 1}, {15, 67, 1}, {15, 71, 1}, {15, 73, -1},
+      {15, 79, -1}, {15, 83, -1}, {15, 89, -1}, {15, 97, -1}, {15, 101, -1},
+      {15, 103, 1}, {15, 107, -1}, {15, 109, 1}, {15, 113, 1}, {15, 127, 1},
+      {16, 3, 1}, {16, 5, 1}, {16, 7, 1}, {16, 11, 1}, {16, 13, 1},
+      {16, 17, 1}, {16, 19, 1}, {16, 23, 1}, {16, 29, 1}, {16, 31, 1},
+      {16, 37, 1}, {16, 41, 1}, {16, 43, 1}, {16, 47, 1}, {16, 53, 1},
+      {16, 59, 1}, {16, 61, 1}, {16, 67, 1}, {16, 71, 1}, {16, 73, 1},
+      {16, 79, 1}, {16, 83, 1}, {16, 89, 1}, {16, 97, 1}, {16, 101, 1},
+      {16, 103, 1}, {16, 107, 1}, {16, 109, 1}, {16, 113, 1}, {16, 127, 1},
+      {17, 3, -1}, {17, 5, -1}, {17, 7, -1}, {17, 11, -1}, {17, 13, 1},
+      {17, 17, 0}, {17, 19, 1}, {17, 23, -1}, {17, 29, -1}, {17, 31, -1},
+      {17, 37, -1}, {17, 41, -1}, {17, 43, 1}, {17, 47, 1}, {17, 53, 1},
+      {17, 59, 1}, {17, 61, -1}, {17, 67, 1}, {17, 71, -1}, {17, 73, -1},
+      {17, 79, -1}, {17, 83, 1}, {17, 89, 1}, {17, 97, -1}, {17, 101, 1},
+      {17, 103, 1}, {17, 107, -1}, {17, 109, -1}, {17, 113, -1}, {17, 127, 1},
+      {18, 3, 0}, {18, 5, -1}, {18, 7, 1}, {18, 11, -1}, {18, 13, -1},
+      {18, 17, 1}, {18, 19, -1}, {18, 23, 1}, {18, 29, -1}, {18, 31, 1},
+      {18, 37, -1}, {18, 41, 1}, {18, 43, -1}, {18, 47, 1}, {18, 53, -1},
+      {18, 59, -1}, {18, 61, -1}, {18, 67, -1}, {18, 71, 1}, {18, 73, 1},
+      {18, 79, 1}, {18, 83, -1}, {18, 89, 1}, {18, 97, 1}, {18, 101, -1},
+      {18, 103, 1}, {18, 107, -1}, {18, 109, -1}, {18, 113, 1}, {18, 127, 1},
+      {19, 3, 1}, {19, 5, 1}, {19, 7, -1}, {19, 11, -1}, {19, 13, -1},
+      {19, 17, 1}, {19, 19, 0}, {19, 23, -1}, {19, 29, -1}, {19, 31, 1},
+      {19, 37, -1}, {19, 41, -1}, {19, 43, -1}, {19, 47, -1}, {19, 53, -1},
+      {19, 59, 1}, {19, 61, 1}, {19, 67, 1}, {19, 71, 1}, {19, 73, 1},
+      {19, 79, 1}, {19, 83, -1}, {19, 89, -1}, {19, 97, -1}, {19, 101, 1},
+      {19, 103, 1}, {19, 107, 1}, {19, 109, -1}, {19, 113, -1}, {19, 127, 1},
+      {20, 3, -1}, {20, 5, 0}, {20, 7, -1}, {20, 11, 1}, {20, 13, -1},
+      {20, 17, -1}, {20, 19, 1}, {20, 23, -1}, {20, 29, 1}, {20, 31, 1},
+      {20, 37, -1}, {20, 41, 1}, {20, 43, -1}, {20, 47, -1}, {20, 53, -1},
+      {20, 59, 1}, {20, 61, 1}, {20, 67, -1}, {20, 71, 1}, {20, 73, -1},
+      {20, 79, 1}, {20, 83, -1}, {20, 89, 1}, {20, 97, -1}, {20, 101, 1},
+      {20, 103, -1}, {20, 107, -1}, {20, 109, 1}, {20, 113, -1}, {20, 127, -1},
+      {21, 3, 0}, {21, 5, 1}, {21, 7, 0}, {21, 11, -1}, {21, 13, -1},
+      {21, 17, 1}, {21, 19, -1}, {21, 23, -1}, {21, 29, -1}, {21, 31, -1},
+      {21, 37, 1}, {21, 41, 1}, {21, 43, 1}, {21, 47, 1}, {21, 53, -1},
+      {21, 59, 1}, {21, 61, -1}, {21, 67, 1}, {21, 71, -1}, {21, 73, -1},
+      {21, 79, 1}, {21, 83, 1}, {21, 89, 1}, {21, 97, -1}, {21, 101, 1},
+      {21, 103, -1}, {21, 107, -1}, {21, 109, 1}, {21, 113, -1}, {21, 127, 1},
+      {22, 3, 1}, {22, 5, -1}, {22, 7, 1}, {22, 11, 0}, {22, 13, 1},
+      {22, 17, -1}, {22, 19, -1}, {22, 23, -1}, {22, 29, 1}, {22, 31, -1},
+      {22, 37, -1}, {22, 41, -1}, {22, 43, -1}, {22, 47, -1}, {22, 53, -1},
+      {22, 59, 1}, {22, 61, 1}, {22, 67, 1}, {22, 71, -1}, {22, 73, -1},
+      {22, 79, 1}, {22, 83, -1}, {22, 89, 1}, {22, 97, 1}, {22, 101, 1},
+      {22, 103, -1}, {22, 107, -1}, {22, 109, 1}, {22, 113, 1}, {22, 127, 1},
+      {23, 3, -1}, {23, 5, -1}, {23, 7, 1}, {23, 11, 1}, {23, 13, 1},
+      {23, 17, -1}, {23, 19, 1}, {23, 23, 0}, {23, 29, 1}, {23, 31, -1},
+      {23, 37, -1}, {23, 41, 1}, {23, 43, 1}, {23, 47, -1}, {23, 53, -1},
+      {23, 59, -1}, {23, 61, -1}, {23, 67, 1}, {23, 71, -1}, {23, 73, 1},
+      {23, 79, 1}, {23, 83, 1}, {23, 89, -1}, {23, 97, -1}, {23, 101, 1},
+      {23, 103, 1}, {23, 107, 1}, {23, 109, -1}, {23, 113, -1}, {23, 127, -1},
+      {24, 3, 0}, {24, 5, 1}, {24, 7, -1}, {24, 11, -1}, {24, 13, -1},
+      {24, 17, -1}, {24, 19, 1}, {24, 23, 1}, {24, 29, 1}, {24, 31, -1},
+      {24, 37, -1}, {24, 41, -1}, {24, 43, 1}, {24, 47, 1}, {24, 53, 1},
+      {24, 59, -1}, {24, 61, -1}, {24, 67, 1}, {24, 71, 1}, {24, 73, 1},
+      {24, 79, -1}, {24, 83, -1}, {24, 89, -1}, {24, 97, 1}, {24, 101, 1},
+      {24, 103, -1}, {24, 107, -1}, {24, 109, -1}, {24, 113, -1}, {24, 127, -1},
+      {25, 3, 1}, {25, 5, 0}, {25, 7, 1}, {25, 11, 1}, {25, 13, 1},
+      {25, 17, 1}, {25, 19, 1}, {25, 23, 1}, {25, 29, 1}, {25, 31, 1},
+      {25, 37, 1}, {25, 41, 1}, {25, 43, 1}, {25, 47, 1}, {25, 53, 1},
+      {25, 59, 1}, {25, 61, 1}, {25, 67, 1}, {25, 71, 1}, {25, 73, 1},
+      {25, 79, 1}, {25, 83, 1}, {25, 89, 1}, {25, 97, 1}, {25, 101, 1},
+      {25, 103, 1}, {25, 107, 1}, {25, 109, 1}, {25, 113, 1}, {25, 127, 1},
+      {26, 3, -1}, {26, 5, 1}, {26, 7, -1}, {26, 11, 1}, {26, 13, 0},
+      {26, 17, 1}, {26, 19, 1}, {26, 23, 1}, {26, 29, -1}, {26, 31, -1},
+      {26, 37, 1}, {26, 41, -1}, {26, 43, -1}, {26, 47, -1}, {26, 53, -1},
+      {26, 59, 1}, {26, 61, -1}, {26, 67, 1}, {26, 71, -1}, {26, 73, -1},
+      {26, 79, 1}, {26, 83, 1}, {26, 89, -1}, {26, 97, -1}, {26, 101, -1},
+      {26, 103, 1}, {26, 107, -1}, {26, 109, 1}, {26, 113, 1}, {26, 127, 1},
+      {27, 3, 0}, {27, 5, -1}, {27, 7, -1}, {27, 11, 1}, {27, 13, 1},
+      {27, 17, -1}, {27, 19, -1}, {27, 23, 1}, {27, 29, -1}, {27, 31, -1},
+      {27, 37, 1}, {27, 41, -1}, {27, 43, -1}, {27, 47, 1}, {27, 53, -1},
+      {27, 59, 1}, {27, 61, 1}, {27, 67, -1}, {27, 71, 1}, {27, 73, 1},
+      {27, 79, -1}, {27, 83, 1}, {27, 89, -1}, {27, 97, 1}, {27, 101, -1},
+      {27, 103, -1}, {27, 107, 1}, {27, 109, 1}, {27, 113, -1}, {27, 127, -1},
+      {28, 3, 1}, {28, 5, -1}, {28, 7, 0}, {28, 11, -1}, {28, 13, -1},
+      {28, 17, -1}, {28, 19, 1}, {28, 23, -1}, {28, 29, 1}, {28, 31, 1},
+      {28, 37, 1}, {28, 41, -1}, {28, 43, -1}, {28, 47, 1}, {28, 53, 1},
+      {28, 59, 1}, {28, 61, -1}, {28, 67, -1}, {28, 71, -1}, {28, 73, -1},
+      {28, 79, -1}, {28, 83, 1}, {28, 89, -1}, {28, 97, -1}, {28, 101, -1},
+      {28, 103, 1}, {28, 107, -1}, {28, 109, 1}, {28, 113, 1}, {28, 127, -1},
+      {29, 3, -1}, {29, 5, 1}, {29, 7, 1}, {29, 11, -1}, {29, 13, 1},
+      {29, 17, -1}, {29, 19, -1}, {29, 23, 1}, {29, 29, 0}, {29, 31, -1},
+      {29, 37, -1}, {29, 41, -1}, {29, 43, -1}, {29, 47, -1}, {29, 53, 1},
+      {29, 59, 1}, {29, 61, -1}, {29, 67, 1}, {29, 71, 1}, {29, 73, -1},
+      {29, 79, -1}, {29, 83, 1}, {29, 89, -1}, {29, 97, -1}, {29, 101, -1},
+      {29, 103, 1}, {29, 107, 1}, {29, 109, 1}, {29, 113, -1}, {29, 127, -1},
+      {30, 3, 0}, {30, 5, 0}, {30, 7, 1}, {30, 11, -1}, {30, 13, 1},
+      {30, 17, 1}, {30, 19, 1}, {30, 23, -1}, {30, 29, 1}, {30, 31, -1},
+      {30, 37, 1}, {30, 41, -1}, {30, 43, -1}, {30, 47, -1}, {30, 53, -1},
+      {30, 59, -1}, {30, 61, -1}, {30, 67, -1}, {30, 71, 1}, {30, 73, -1},
+      {30, 79, -1}, {30, 83, 1}, {30, 89, -1}, {30, 97, -1}, {30, 101, 1},
+      {30, 103, 1}, {30, 107, 1}, {30, 109, -1}, {30, 113, 1}, {30, 127, 1},
+      {12345, 331, -1},
+
+      /* https://en.wikipedia.org/wiki/Jacobi_symbol#Table_of_values */
+      {1, 1, 1}, {1, 3, 1}, {1, 5, 1}, {1, 7, 1}, {1, 9, 1},
+      {1, 11, 1}, {1, 13, 1}, {1, 15, 1}, {1, 17, 1}, {1, 19, 1},
+      {1, 21, 1}, {1, 23, 1}, {1, 25, 1}, {1, 27, 1}, {1, 29, 1},
+      {1, 31, 1}, {1, 33, 1}, {1, 35, 1}, {1, 37, 1}, {1, 39, 1},
+      {1, 41, 1}, {1, 43, 1}, {1, 45, 1}, {1, 47, 1}, {1, 49, 1},
+      {1, 51, 1}, {1, 53, 1}, {1, 55, 1}, {1, 57, 1}, {1, 59, 1},
+      {2, 1, 1}, {2, 3, -1}, {2, 5, -1}, {2, 7, 1}, {2, 9, 1},
+      {2, 11, -1}, {2, 13, -1}, {2, 15, 1}, {2, 17, 1}, {2, 19, -1},
+      {2, 21, -1}, {2, 23, 1}, {2, 25, 1}, {2, 27, -1}, {2, 29, -1},
+      {2, 31, 1}, {2, 33, 1}, {2, 35, -1}, {2, 37, -1}, {2, 39, 1},
+      {2, 41, 1}, {2, 43, -1}, {2, 45, -1}, {2, 47, 1}, {2, 49, 1},
+      {2, 51, -1}, {2, 53, -1}, {2, 55, 1}, {2, 57, 1}, {2, 59, -1},
+      {3, 1, 1}, {3, 3, 0}, {3, 5, -1}, {3, 7, -1}, {3, 9, 0},
+      {3, 11, 1}, {3, 13, 1}, {3, 15, 0}, {3, 17, -1}, {3, 19, -1},
+      {3, 21, 0}, {3, 23, 1}, {3, 25, 1}, {3, 27, 0}, {3, 29, -1},
+      {3, 31, -1}, {3, 33, 0}, {3, 35, 1}, {3, 37, 1}, {3, 39, 0},
+      {3, 41, -1}, {3, 43, -1}, {3, 45, 0}, {3, 47, 1}, {3, 49, 1},
+      {3, 51, 0}, {3, 53, -1}, {3, 55, -1}, {3, 57, 0}, {3, 59, 1},
+      {4, 1, 1}, {4, 3, 1}, {4, 5, 1}, {4, 7, 1}, {4, 9, 1},
+      {4, 11, 1}, {4, 13, 1}, {4, 15, 1}, {4, 17, 1}, {4, 19, 1},
+      {4, 21, 1}, {4, 23, 1}, {4, 25, 1}, {4, 27, 1}, {4, 29, 1},
+      {4, 31, 1}, {4, 33, 1}, {4, 35, 1}, {4, 37, 1}, {4, 39, 1},
+      {4, 41, 1}, {4, 43, 1}, {4, 45, 1}, {4, 47, 1}, {4, 49, 1},
+      {4, 51, 1}, {4, 53, 1}, {4, 55, 1}, {4, 57, 1}, {4, 59, 1},
+      {5, 1, 1}, {5, 3, -1}, {5, 5, 0}, {5, 7, -1}, {5, 9, 1},
+      {5, 11, 1}, {5, 13, -1}, {5, 15, 0}, {5, 17, -1}, {5, 19, 1},
+      {5, 21, 1}, {5, 23, -1}, {5, 25, 0}, {5, 27, -1}, {5, 29, 1},
+      {5, 31, 1}, {5, 33, -1}, {5, 35, 0}, {5, 37, -1}, {5, 39, 1},
+      {5, 41, 1}, {5, 43, -1}, {5, 45, 0}, {5, 47, -1}, {5, 49, 1},
+      {5, 51, 1}, {5, 53, -1}, {5, 55, 0}, {5, 57, -1}, {5, 59, 1},
+      {6, 1, 1}, {6, 3, 0}, {6, 5, 1}, {6, 7, -1}, {6, 9, 0},
+      {6, 11, -1}, {6, 13, -1}, {6, 15, 0}, {6, 17, -1}, {6, 19, 1},
+      {6, 21, 0}, {6, 23, 1}, {6, 25, 1}, {6, 27, 0}, {6, 29, 1},
+      {6, 31, -1}, {6, 33, 0}, {6, 35, -1}, {6, 37, -1}, {6, 39, 0},
+      {6, 41, -1}, {6, 43, 1}, {6, 45, 0}, {6, 47, 1}, {6, 49, 1},
+      {6, 51, 0}, {6, 53, 1}, {6, 55, -1}, {6, 57, 0}, {6, 59, -1},
+      {7, 1, 1}, {7, 3, 1}, {7, 5, -1}, {7, 7, 0}, {7, 9, 1},
+      {7, 11, -1}, {7, 13, -1}, {7, 15, -1}, {7, 17, -1}, {7, 19, 1},
+      {7, 21, 0}, {7, 23, -1}, {7, 25, 1}, {7, 27, 1}, {7, 29, 1},
+      {7, 31, 1}, {7, 33, -1}, {7, 35, 0}, {7, 37, 1}, {7, 39, -1},
+      {7, 41, -1}, {7, 43, -1}, {7, 45, -1}, {7, 47, 1}, {7, 49, 0},
+      {7, 51, -1}, {7, 53, 1}, {7, 55, 1}, {7, 57, 1}, {7, 59, 1},
+      {8, 1, 1}, {8, 3, -1}, {8, 5, -1}, {8, 7, 1}, {8, 9, 1},
+      {8, 11, -1}, {8, 13, -1}, {8, 15, 1}, {8, 17, 1}, {8, 19, -1},
+      {8, 21, -1}, {8, 23, 1}, {8, 25, 1}, {8, 27, -1}, {8, 29, -1},
+      {8, 31, 1}, {8, 33, 1}, {8, 35, -1}, {8, 37, -1}, {8, 39, 1},
+      {8, 41, 1}, {8, 43, -1}, {8, 45, -1}, {8, 47, 1}, {8, 49, 1},
+      {8, 51, -1}, {8, 53, -1}, {8, 55, 1}, {8, 57, 1}, {8, 59, -1},
+      {9, 1, 1}, {9, 3, 0}, {9, 5, 1}, {9, 7, 1}, {9, 9, 0},
+      {9, 11, 1}, {9, 13, 1}, {9, 15, 0}, {9, 17, 1}, {9, 19, 1},
+      {9, 21, 0}, {9, 23, 1}, {9, 25, 1}, {9, 27, 0}, {9, 29, 1},
+      {9, 31, 1}, {9, 33, 0}, {9, 35, 1}, {9, 37, 1}, {9, 39, 0},
+      {9, 41, 1}, {9, 43, 1}, {9, 45, 0}, {9, 47, 1}, {9, 49, 1},
+      {9, 51, 0}, {9, 53, 1}, {9, 55, 1}, {9, 57, 0}, {9, 59, 1},
+      {10, 1, 1}, {10, 3, 1}, {10, 5, 0}, {10, 7, -1}, {10, 9, 1},
+      {10, 11, -1}, {10, 13, 1}, {10, 15, 0}, {10, 17, -1}, {10, 19, -1},
+      {10, 21, -1}, {10, 23, -1}, {10, 25, 0}, {10, 27, 1}, {10, 29, -1},
+      {10, 31, 1}, {10, 33, -1}, {10, 35, 0}, {10, 37, 1}, {10, 39, 1},
+      {10, 41, 1}, {10, 43, 1}, {10, 45, 0}, {10, 47, -1}, {10, 49, 1},
+      {10, 51, -1}, {10, 53, 1}, {10, 55, 0}, {10, 57, -1}, {10, 59, -1},
+      {11, 1, 1}, {11, 3, -1}, {11, 5, 1}, {11, 7, 1}, {11, 9, 1},
+      {11, 11, 0}, {11, 13, -1}, {11, 15, -1}, {11, 17, -1}, {11, 19, 1},
+      {11, 21, -1}, {11, 23, -1}, {11, 25, 1}, {11, 27, -1}, {11, 29, -1},
+      {11, 31, -1}, {11, 33, 0}, {11, 35, 1}, {11, 37, 1}, {11, 39, 1},
+      {11, 41, -1}, {11, 43, 1}, {11, 45, 1}, {11, 47, -1}, {11, 49, 1},
+      {11, 51, 1}, {11, 53, 1}, {11, 55, 0}, {11, 57, -1}, {11, 59, -1},
+      {12, 1, 1}, {12, 3, 0}, {12, 5, -1}, {12, 7, -1}, {12, 9, 0},
+      {12, 11, 1}, {12, 13, 1}, {12, 15, 0}, {12, 17, -1}, {12, 19, -1},
+      {12, 21, 0}, {12, 23, 1}, {12, 25, 1}, {12, 27, 0}, {12, 29, -1},
+      {12, 31, -1}, {12, 33, 0}, {12, 35, 1}, {12, 37, 1}, {12, 39, 0},
+      {12, 41, -1}, {12, 43, -1}, {12, 45, 0}, {12, 47, 1}, {12, 49, 1},
+      {12, 51, 0}, {12, 53, -1}, {12, 55, -1}, {12, 57, 0}, {12, 59, 1},
+      {13, 1, 1}, {13, 3, 1}, {13, 5, -1}, {13, 7, -1}, {13, 9, 1},
+      {13, 11, -1}, {13, 13, 0}, {13, 15, -1}, {13, 17, 1}, {13, 19, -1},
+      {13, 21, -1}, {13, 23, 1}, {13, 25, 1}, {13, 27, 1}, {13, 29, 1},
+      {13, 31, -1}, {13, 33, -1}, {13, 35, 1}, {13, 37, -1}, {13, 39, 0},
+      {13, 41, -1}, {13, 43, 1}, {13, 45, -1}, {13, 47, -1}, {13, 49, 1},
+      {13, 51, 1}, {13, 53, 1}, {13, 55, 1}, {13, 57, -1}, {13, 59, -1},
+      {14, 1, 1}, {14, 3, -1}, {14, 5, 1}, {14, 7, 0}, {14, 9, 1},
+      {14, 11, 1}, {14, 13, 1}, {14, 15, -1}, {14, 17, -1}, {14, 19, -1},
+      {14, 21, 0}, {14, 23, -1}, {14, 25, 1}, {14, 27, -1}, {14, 29, -1},
+      {14, 31, 1}, {14, 33, -1}, {14, 35, 0}, {14, 37, -1}, {14, 39, -1},
+      {14, 41, -1}, {14, 43, 1}, {14, 45, 1}, {14, 47, 1}, {14, 49, 0},
+      {14, 51, 1}, {14, 53, -1}, {14, 55, 1}, {14, 57, 1}, {14, 59, -1},
+      {15, 1, 1}, {15, 3, 0}, {15, 5, 0}, {15, 7, 1}, {15, 9, 0},
+      {15, 11, 1}, {15, 13, -1}, {15, 15, 0}, {15, 17, 1}, {15, 19, -1},
+      {15, 21, 0}, {15, 23, -1}, {15, 25, 0}, {15, 27, 0}, {15, 29, -1},
+      {15, 31, -1}, {15, 33, 0}, {15, 35, 0}, {15, 37, -1}, {15, 39, 0},
+      {15, 41, -1}, {15, 43, 1}, {15, 45, 0}, {15, 47, -1}, {15, 49, 1},
+      {15, 51, 0}, {15, 53, 1}, {15, 55, 0}, {15, 57, 0}, {15, 59, 1},
+      {16, 1, 1}, {16, 3, 1}, {16, 5, 1}, {16, 7, 1}, {16, 9, 1},
+      {16, 11, 1}, {16, 13, 1}, {16, 15, 1}, {16, 17, 1}, {16, 19, 1},
+      {16, 21, 1}, {16, 23, 1}, {16, 25, 1}, {16, 27, 1}, {16, 29, 1},
+      {16, 31, 1}, {16, 33, 1}, {16, 35, 1}, {16, 37, 1}, {16, 39, 1},
+      {16, 41, 1}, {16, 43, 1}, {16, 45, 1}, {16, 47, 1}, {16, 49, 1},
+      {16, 51, 1}, {16, 53, 1}, {16, 55, 1}, {16, 57, 1}, {16, 59, 1},
+      {17, 1, 1}, {17, 3, -1}, {17, 5, -1}, {17, 7, -1}, {17, 9, 1},
+      {17, 11, -1}, {17, 13, 1}, {17, 15, 1}, {17, 17, 0}, {17, 19, 1},
+      {17, 21, 1}, {17, 23, -1}, {17, 25, 1}, {17, 27, -1}, {17, 29, -1},
+      {17, 31, -1}, {17, 33, 1}, {17, 35, 1}, {17, 37, -1}, {17, 39, -1},
+      {17, 41, -1}, {17, 43, 1}, {17, 45, -1}, {17, 47, 1}, {17, 49, 1},
+      {17, 51, 0}, {17, 53, 1}, {17, 55, 1}, {17, 57, -1}, {17, 59, 1},
+      {18, 1, 1}, {18, 3, 0}, {18, 5, -1}, {18, 7, 1}, {18, 9, 0},
+      {18, 11, -1}, {18, 13, -1}, {18, 15, 0}, {18, 17, 1}, {18, 19, -1},
+      {18, 21, 0}, {18, 23, 1}, {18, 25, 1}, {18, 27, 0}, {18, 29, -1},
+      {18, 31, 1}, {18, 33, 0}, {18, 35, -1}, {18, 37, -1}, {18, 39, 0},
+      {18, 41, 1}, {18, 43, -1}, {18, 45, 0}, {18, 47, 1}, {18, 49, 1},
+      {18, 51, 0}, {18, 53, -1}, {18, 55, 1}, {18, 57, 0}, {18, 59, -1},
+      {19, 1, 1}, {19, 3, 1}, {19, 5, 1}, {19, 7, -1}, {19, 9, 1},
+      {19, 11, -1}, {19, 13, -1}, {19, 15, 1}, {19, 17, 1}, {19, 19, 0},
+      {19, 21, -1}, {19, 23, -1}, {19, 25, 1}, {19, 27, 1}, {19, 29, -1},
+      {19, 31, 1}, {19, 33, -1}, {19, 35, -1}, {19, 37, -1}, {19, 39, -1},
+      {19, 41, -1}, {19, 43, -1}, {19, 45, 1}, {19, 47, -1}, {19, 49, 1},
+      {19, 51, 1}, {19, 53, -1}, {19, 55, -1}, {19, 57, 0}, {19, 59, 1},
+      {20, 1, 1}, {20, 3, -1}, {20, 5, 0}, {20, 7, -1}, {20, 9, 1},
+      {20, 11, 1}, {20, 13, -1}, {20, 15, 0}, {20, 17, -1}, {20, 19, 1},
+      {20, 21, 1}, {20, 23, -1}, {20, 25, 0}, {20, 27, -1}, {20, 29, 1},
+      {20, 31, 1}, {20, 33, -1}, {20, 35, 0}, {20, 37, -1}, {20, 39, 1},
+      {20, 41, 1}, {20, 43, -1}, {20, 45, 0}, {20, 47, -1}, {20, 49, 1},
+      {20, 51, 1}, {20, 53, -1}, {20, 55, 0}, {20, 57, -1}, {20, 59, 1},
+      {21, 1, 1}, {21, 3, 0}, {21, 5, 1}, {21, 7, 0}, {21, 9, 0},
+      {21, 11, -1}, {21, 13, -1}, {21, 15, 0}, {21, 17, 1}, {21, 19, -1},
+      {21, 21, 0}, {21, 23, -1}, {21, 25, 1}, {21, 27, 0}, {21, 29, -1},
+      {21, 31, -1}, {21, 33, 0}, {21, 35, 0}, {21, 37, 1}, {21, 39, 0},
+      {21, 41, 1}, {21, 43, 1}, {21, 45, 0}, {21, 47, 1}, {21, 49, 0},
+      {21, 51, 0}, {21, 53, -1}, {21, 55, -1}, {21, 57, 0}, {21, 59, 1},
+      {22, 1, 1}, {22, 3, 1}, {22, 5, -1}, {22, 7, 1}, {22, 9, 1},
+      {22, 11, 0}, {22, 13, 1}, {22, 15, -1}, {22, 17, -1}, {22, 19, -1},
+      {22, 21, 1}, {22, 23, -1}, {22, 25, 1}, {22, 27, 1}, {22, 29, 1},
+      {22, 31, -1}, {22, 33, 0}, {22, 35, -1}, {22, 37, -1}, {22, 39, 1},
+      {22, 41, -1}, {22, 43, -1}, {22, 45, -1}, {22, 47, -1}, {22, 49, 1},
+      {22, 51, -1}, {22, 53, -1}, {22, 55, 0}, {22, 57, -1}, {22, 59, 1},
+      {23, 1, 1}, {23, 3, -1}, {23, 5, -1}, {23, 7, 1}, {23, 9, 1},
+      {23, 11, 1}, {23, 13, 1}, {23, 15, 1}, {23, 17, -1}, {23, 19, 1},
+      {23, 21, -1}, {23, 23, 0}, {23, 25, 1}, {23, 27, -1}, {23, 29, 1},
+      {23, 31, -1}, {23, 33, -1}, {23, 35, -1}, {23, 37, -1}, {23, 39, -1},
+      {23, 41, 1}, {23, 43, 1}, {23, 45, -1}, {23, 47, -1}, {23, 49, 1},
+      {23, 51, 1}, {23, 53, -1}, {23, 55, -1}, {23, 57, -1}, {23, 59, -1},
+      {24, 1, 1}, {24, 3, 0}, {24, 5, 1}, {24, 7, -1}, {24, 9, 0},
+      {24, 11, -1}, {24, 13, -1}, {24, 15, 0}, {24, 17, -1}, {24, 19, 1},
+      {24, 21, 0}, {24, 23, 1}, {24, 25, 1}, {24, 27, 0}, {24, 29, 1},
+      {24, 31, -1}, {24, 33, 0}, {24, 35, -1}, {24, 37, -1}, {24, 39, 0},
+      {24, 41, -1}, {24, 43, 1}, {24, 45, 0}, {24, 47, 1}, {24, 49, 1},
+      {24, 51, 0}, {24, 53, 1}, {24, 55, -1}, {24, 57, 0}, {24, 59, -1},
+      {25, 1, 1}, {25, 3, 1}, {25, 5, 0}, {25, 7, 1}, {25, 9, 1},
+      {25, 11, 1}, {25, 13, 1}, {25, 15, 0}, {25, 17, 1}, {25, 19, 1},
+      {25, 21, 1}, {25, 23, 1}, {25, 25, 0}, {25, 27, 1}, {25, 29, 1},
+      {25, 31, 1}, {25, 33, 1}, {25, 35, 0}, {25, 37, 1}, {25, 39, 1},
+      {25, 41, 1}, {25, 43, 1}, {25, 45, 0}, {25, 47, 1}, {25, 49, 1},
+      {25, 51, 1}, {25, 53, 1}, {25, 55, 0}, {25, 57, 1}, {25, 59, 1},
+      {26, 1, 1}, {26, 3, -1}, {26, 5, 1}, {26, 7, -1}, {26, 9, 1},
+      {26, 11, 1}, {26, 13, 0}, {26, 15, -1}, {26, 17, 1}, {26, 19, 1},
+      {26, 21, 1}, {26, 23, 1}, {26, 25, 1}, {26, 27, -1}, {26, 29, -1},
+      {26, 31, -1}, {26, 33, -1}, {26, 35, -1}, {26, 37, 1}, {26, 39, 0},
+      {26, 41, -1}, {26, 43, -1}, {26, 45, 1}, {26, 47, -1}, {26, 49, 1},
+      {26, 51, -1}, {26, 53, -1}, {26, 55, 1}, {26, 57, -1}, {26, 59, 1},
+      {27, 1, 1}, {27, 3, 0}, {27, 5, -1}, {27, 7, -1}, {27, 9, 0},
+      {27, 11, 1}, {27, 13, 1}, {27, 15, 0}, {27, 17, -1}, {27, 19, -1},
+      {27, 21, 0}, {27, 23, 1}, {27, 25, 1}, {27, 27, 0}, {27, 29, -1},
+      {27, 31, -1}, {27, 33, 0}, {27, 35, 1}, {27, 37, 1}, {27, 39, 0},
+      {27, 41, -1}, {27, 43, -1}, {27, 45, 0}, {27, 47, 1}, {27, 49, 1},
+      {27, 51, 0}, {27, 53, -1}, {27, 55, -1}, {27, 57, 0}, {27, 59, 1},
+      {28, 1, 1}, {28, 3, 1}, {28, 5, -1}, {28, 7, 0}, {28, 9, 1},
+      {28, 11, -1}, {28, 13, -1}, {28, 15, -1}, {28, 17, -1}, {28, 19, 1},
+      {28, 21, 0}, {28, 23, -1}, {28, 25, 1}, {28, 27, 1}, {28, 29, 1},
+      {28, 31, 1}, {28, 33, -1}, {28, 35, 0}, {28, 37, 1}, {28, 39, -1},
+      {28, 41, -1}, {28, 43, -1}, {28, 45, -1}, {28, 47, 1}, {28, 49, 0},
+      {28, 51, -1}, {28, 53, 1}, {28, 55, 1}, {28, 57, 1}, {28, 59, 1},
+      {29, 1, 1}, {29, 3, -1}, {29, 5, 1}, {29, 7, 1}, {29, 9, 1},
+      {29, 11, -1}, {29, 13, 1}, {29, 15, -1}, {29, 17, -1}, {29, 19, -1},
+      {29, 21, -1}, {29, 23, 1}, {29, 25, 1}, {29, 27, -1}, {29, 29, 0},
+      {29, 31, -1}, {29, 33, 1}, {29, 35, 1}, {29, 37, -1}, {29, 39, -1},
+      {29, 41, -1}, {29, 43, -1}, {29, 45, 1}, {29, 47, -1}, {29, 49, 1},
+      {29, 51, 1}, {29, 53, 1}, {29, 55, -1}, {29, 57, 1}, {29, 59, 1},
+      {30, 1, 1}, {30, 3, 0}, {30, 5, 0}, {30, 7, 1}, {30, 9, 0},
+      {30, 11, -1}, {30, 13, 1}, {30, 15, 0}, {30, 17, 1}, {30, 19, 1},
+      {30, 21, 0}, {30, 23, -1}, {30, 25, 0}, {30, 27, 0}, {30, 29, 1},
+      {30, 31, -1}, {30, 33, 0}, {30, 35, 0}, {30, 37, 1}, {30, 39, 0},
+      {30, 41, -1}, {30, 43, -1}, {30, 45, 0}, {30, 47, -1}, {30, 49, 1},
+      {30, 51, 0}, {30, 53, -1}, {30, 55, 0}, {30, 57, 0}, {30, 59, -1},
+      {1001, 9907, -1}
+    };
+
+    size_t i;
+
     printf("Testing jacobi...\n");
 
     assert(GOO_ARRAY_SIZE(symbols) > 0);
 
-    for (int i = 0; i < (int)GOO_ARRAY_SIZE(symbols); i++) {
+    for (i = 0; i < GOO_ARRAY_SIZE(symbols); i++) {
       const int *v = symbols[i];
       mpz_t x, y;
 
@@ -4092,7 +4165,7 @@ run_util_test(void) {
 
 static void
 run_primes_test(void) {
-  // https://github.com/golang/go/blob/aadaec5/src/math/big/prime_test.go
+  /* https://github.com/golang/go/blob/aadaec5/src/math/big/prime_test.go */
   static const char *primes[] = {
     "2",
     "3",
@@ -4105,7 +4178,7 @@ run_primes_test(void) {
     "10953742525620032441",
     "17908251027575790097",
 
-    // https://golang.org/issue/638
+    /* https://golang.org/issue/638 */
     "18699199384836356663",
 
     "98920366548084643601728869055592650835572950"
@@ -4114,7 +4187,7 @@ run_primes_test(void) {
     "94560208308847015747498523884063394671606671"
     "904944666360068158221458669711639",
 
-    // https://primes.utm.edu/lists/small/small3.html
+    /* https://primes.utm.edu/lists/small/small3.html */
     "44941799905544149399470929709310851301537378"
     "70495584992054923478717299275731182628115083"
     "86655998299074566974373711472560655026288668"
@@ -4141,84 +4214,84 @@ run_primes_test(void) {
     "83376326512083574821647933992961249917319836"
     "219304274280243803104015000563790123",
 
-    // ECC primes: https://tools.ietf.org/html/draft-ladd-safecurves-02
-    // Curve1174: 2^251-9
+    /* ECC primes: https://tools.ietf.org/html/draft-ladd-safecurves-02 */
+    /* Curve1174: 2^251-9 */
 
     "36185027886661311069865932815214971204146870"
     "20801267626233049500247285301239",
 
-    // Curve25519: 2^255-19
+    /* Curve25519: 2^255-19 */
 
     "57896044618658097711785492504343953926634992"
     "332820282019728792003956564819949",
 
-    // E-382: 2^382-105
+    /* E-382: 2^382-105 */
 
     "98505015490986198030697600250359034512699348"
     "17616361666987073351061430442874302652853566"
     "563721228910201656997576599",
 
-    // Curve41417: 2^414-17
+    /* Curve41417: 2^414-17 */
 
     "42307582002575910332922579714097346549017899"
     "70971399803421752289756197063912392613281210"
     "9468141778230245837569601494931472367",
 
-    // E-521: 2^521-1
+    /* E-521: 2^521-1 */
 
     "68647976601306097149819007990813932172694353"
     "00143305409394463459185543183397656052122559"
     "64066145455497729631139148085803712198799971"
     "6643812574028291115057151",
 
-    // P-112
+    /* P-112 */
 
     "4451685225093714772084598273548427",
 
-    // P-192
+    /* P-192 */
 
     "62771017353866807638357894232076664160839087"
     "00390324961279",
 
-    // P-224
+    /* P-224 */
 
     "26959946667150639794667015087019630673557916"
     "260026308143510066298881",
 
-    // P-256
+    /* P-256 */
 
     "11579208921035624876269744694940757353008614"
     "3415290314195533631308867097853951",
 
-    // P-384
+    /* P-384 */
 
     "39402006196394479212279040100143613805079739"
     "27046544666794829340424572177149687032904726"
     "6088258938001861606973112319",
 
-    // P-521 (again)
+    /* P-521 (again) */
 
     "68647976601306097149819007990813932172694353"
     "00143305409394463459185543183397656052122559"
     "64066145455497729631139148085803712198799971"
     "6643812574028291115057151",
 
-    // K-256
+    /* K-256 */
 
     "11579208923731619542357098500868790785326998"
     "4665640564039457584007908834671663",
 
-    // K-256 Order
+    /* K-256 Order */
 
     "11579208923731619542357098500868790785283756"
     "4279074904382605163141518161494337",
 
-    // P-25519 (again)
+    /* P-25519 (again) */
 
     "57896044618658097711785492504343953926634992"
     "332820282019728792003956564819949",
 
-    // P-448
+    /* P-448 */
 
     "72683872429560689054932380788800453435364136"
     "06873180602814901991806123281667307726863963"
@@ -4237,13 +4310,13 @@ run_primes_test(void) {
     "7940675652888030554255915464401",
     "82793403787388584738507275144194252681",
 
-    // Arnault, "Rabin-Miller Primality Test: Composite Numbers Which Pass It",
-    // Mathematics of Computation, 64(209) (January 1995), pp. 335-361.
+    /* Arnault, "Rabin-Miller Primality Test: Composite Numbers Which Pass It", */
+    /* Mathematics of Computation, 64(209) (January 1995), pp. 335-361. */
 
-    // Strong pseudoprime to prime bases 2 through 29.
+    /* Strong pseudoprime to prime bases 2 through 29. */
     "1195068768795265792518361315725116351898245581",
 
-    // Strong pseudoprime to all prime bases up to 200.
+    /* Strong pseudoprime to all prime bases up to 200. */
     "8038374574536394912570796143419421081388376882"
     "8755814583748891752229742737653336521865023361"
     "6396004545791504202360320876656996676098728404"
@@ -4253,8 +4326,8 @@ run_primes_test(void) {
     "1685404326457534018329786111298960644845216191"
     "652872597534901",
 
-    // Extra-strong Lucas pseudoprimes.
-    // https://oeis.org/A217719
+    /* Extra-strong Lucas pseudoprimes. */
+    /* https://oeis.org/A217719 */
     "989",
     "3239",
     "5777",
@@ -4308,7 +4381,7 @@ run_primes_test(void) {
   };
 
   static const unsigned long mr_pseudos[] = {
-    // https://oeis.org/A001262
+    /* https://oeis.org/A001262 */
     2047,
     3277,
     4033,
@@ -4328,7 +4401,7 @@ run_primes_test(void) {
   };
 
   static const unsigned long lucas_pseudos[] = {
-    // https://oeis.org/A217719
+    /* https://oeis.org/A217719 */
     989,
     3239,
     5777,
@@ -4345,6 +4418,7 @@ run_primes_test(void) {
 
   unsigned char key[32];
   unsigned char zero[32];
+  unsigned long i;
 
   assert(goo_random(key, 32));
 
@@ -4354,7 +4428,7 @@ run_primes_test(void) {
 
   assert(GOO_ARRAY_SIZE(primes) > 0);
 
-  for (int i = 0; i < (int)GOO_ARRAY_SIZE(primes); i++) {
+  for (i = 0; i < GOO_ARRAY_SIZE(primes); i++) {
     mpz_t p;
     mpz_init(p);
 
@@ -4374,7 +4448,7 @@ run_primes_test(void) {
 
   assert(GOO_ARRAY_SIZE(composites) > 0);
 
-  for (int i = 0; i < (int)GOO_ARRAY_SIZE(composites); i++) {
+  for (i = 0; i < GOO_ARRAY_SIZE(composites); i++) {
     mpz_t p;
     mpz_init(p);
 
@@ -4383,25 +4457,25 @@ run_primes_test(void) {
     if (i == 6 || i == 7 || (i >= 43 && i <= 49) || i == 54) {
       assert(goo_is_prime_div(p));
     } else {
-      // We actually catch a surpising
-      // number of composites here.
+      /* We actually catch a surpising */
+      /* number of composites here. */
       assert(!goo_is_prime_div(p));
     }
 
-    // MR with a deterministic key.
+    /* MR with a deterministic key. */
     assert(!goo_is_prime_mr(p, zero, 16 + 1, 1));
     assert(!goo_is_prime_mr(p, zero, 4, 1));
     assert(!goo_is_prime_mr(p, zero, 4, 0));
 
     if (i >= 8 && i <= 42) {
-      // Lucas pseudoprime.
+      /* Lucas pseudoprime. */
       assert(goo_is_prime_lucas(p));
     } else {
       assert(!goo_is_prime_lucas(p));
     }
 
-    // No composite should ever pass
-    // Baillie-PSW, random or otherwise.
+    /* No composite should ever pass */
+    /* Baillie-PSW, random or otherwise. */
     assert(!goo_is_prime(p, zero));
     assert(!goo_is_prime(p, key));
 
@@ -4414,15 +4488,18 @@ run_primes_test(void) {
     const unsigned long *want = &mr_pseudos[0];
     size_t len = GOO_ARRAY_SIZE(mr_pseudos);
     mpz_t n;
+
     mpz_init(n);
 
     assert(len > 0);
 
-    for (unsigned long i = 3; i < 100000; i += 2) {
+    for (i = 3; i < 100000; i += 2) {
+      int pseudo;
+
       mpz_set_ui(n, i);
 
-      int pseudo = goo_is_prime_mr(n, zero, 1, 1)
-                && !goo_is_prime_lucas(n);
+      pseudo = goo_is_prime_mr(n, zero, 1, 1)
+            && !goo_is_prime_lucas(n);
 
       if (pseudo && (len == 0 || i != want[0]))
         assert(0 && "miller-rabin: want false");
@@ -4446,15 +4523,18 @@ run_primes_test(void) {
     const unsigned long *want = &lucas_pseudos[0];
     size_t len = GOO_ARRAY_SIZE(lucas_pseudos);
     mpz_t n;
+
     mpz_init(n);
 
     assert(len > 0);
 
-    for (unsigned long i = 3; i < 100000; i += 2) {
+    for (i = 3; i < 100000; i += 2) {
+      int pseudo;
+
       mpz_set_ui(n, i);
 
-      int pseudo = goo_is_prime_lucas(n)
-                && !goo_is_prime_mr(n, zero, 1, 1);
+      pseudo = goo_is_prime_lucas(n)
+           && !goo_is_prime_mr(n, zero, 1, 1);
 
       if (pseudo && (len == 0 || i != want[0]))
         assert(0 && "lucas: want false");
@@ -4474,11 +4554,12 @@ run_primes_test(void) {
 
 #undef GOO_ARRAY_SIZE
 
-  // test next_prime
+  /* test next_prime */
   {
+    mpz_t n;
+
     printf("Testing next_prime...\n");
 
-    mpz_t n;
     mpz_init(n);
     mpz_set_ui(n, 4);
 
@@ -4503,10 +4584,10 @@ run_ops_test(void) {
     "16a4d9d373d8721f24a3fc0f1b3131f55615172866bccc30f95054c824e7"
     "33a5eb6817f7bc16399d48c6361cc7e5";
 
-  printf("Testing group ops...\n");
-
   mpz_t n;
   goo_group_t *goo;
+
+  printf("Testing group ops...\n");
 
   mpz_init(n);
   goo = goo_malloc(sizeof(goo_group_t));
@@ -4533,21 +4614,21 @@ run_ops_test(void) {
     assert(goo->combs[0].h.points_per_subcomb == 255);
     assert(goo->combs[0].h.size == 510);
 
-    // assert(goo->combs[1].g.points_per_add == 7);
-    // assert(goo->combs[1].g.adds_per_shift == 4);
-    // assert(goo->combs[1].g.shifts == 151);
-    // assert(goo->combs[1].g.bits_per_window == 604);
-    // assert(goo->combs[1].g.bits == 4228);
-    // assert(goo->combs[1].g.points_per_subcomb == 127);
-    // assert(goo->combs[1].g.size == 508);
+    /* assert(goo->combs[1].g.points_per_add == 7); */
+    /* assert(goo->combs[1].g.adds_per_shift == 4); */
+    /* assert(goo->combs[1].g.shifts == 151); */
+    /* assert(goo->combs[1].g.bits_per_window == 604); */
+    /* assert(goo->combs[1].g.bits == 4228); */
+    /* assert(goo->combs[1].g.points_per_subcomb == 127); */
+    /* assert(goo->combs[1].g.size == 508); */
 
-    // assert(goo->combs[1].h.points_per_add == 7);
-    // assert(goo->combs[1].h.adds_per_shift == 4);
-    // assert(goo->combs[1].h.shifts == 151);
-    // assert(goo->combs[1].h.bits_per_window == 604);
-    // assert(goo->combs[1].h.bits == 4228);
-    // assert(goo->combs[1].h.points_per_subcomb == 127);
-    // assert(goo->combs[1].h.size == 508);
+    /* assert(goo->combs[1].h.points_per_add == 7); */
+    /* assert(goo->combs[1].h.adds_per_shift == 4); */
+    /* assert(goo->combs[1].h.shifts == 151); */
+    /* assert(goo->combs[1].h.bits_per_window == 604); */
+    /* assert(goo->combs[1].h.bits == 4228); */
+    /* assert(goo->combs[1].h.points_per_subcomb == 127); */
+    /* assert(goo->combs[1].h.size == 508); */
 
     assert(goo->combs[1].g.points_per_add == 8);
     assert(goo->combs[1].g.adds_per_shift == 2);
@@ -4566,13 +4647,13 @@ run_ops_test(void) {
     assert(goo->combs[1].h.size == 510);
   }
 
-  // test pow2
+  /* test pow2 */
   {
-    printf("Testing pow2...\n");
-
     mpz_t b1, b2, e1, e2;
     mpz_t b1_inv, b2_inv;
     mpz_t r1, r2;
+
+    printf("Testing pow2...\n");
 
     mpz_init(b1);
     mpz_init(b2);
@@ -4607,12 +4688,12 @@ run_ops_test(void) {
     mpz_clear(r2);
   }
 
-  // test powgh
+  /* test powgh */
   {
-    printf("Testing powgh...\n");
-
     mpz_t e1, e2;
     mpz_t r1, r2;
+
+    printf("Testing powgh...\n");
 
     mpz_init(e1);
     mpz_init(e2);
@@ -4634,14 +4715,14 @@ run_ops_test(void) {
     mpz_clear(r2);
   }
 
-  // test inv2
+  /* test inv2 */
   {
-    printf("Testing inv2...\n");
-
     mpz_t e1, e2;
     mpz_t e1_s, e2_s;
     mpz_t e1_si, e2_si;
     mpz_t r1, r2;
+
+    printf("Testing inv2...\n");
 
     mpz_init(e1);
     mpz_init(e2);
@@ -4683,14 +4764,15 @@ run_ops_test(void) {
     mpz_clear(r2);
   }
 
-  // test inv7
+  /* test inv7 */
   {
-    printf("Testing inv7...\n");
-
     mpz_t evals[7];
     mpz_t einvs[7];
+    int i;
 
-    for (int i = 0; i < 7; i++) {
+    printf("Testing inv7...\n");
+
+    for (i = 0; i < 7; i++) {
       mpz_init(evals[i]);
       mpz_init(einvs[i]);
 
@@ -4701,7 +4783,7 @@ run_ops_test(void) {
       einvs[0], einvs[1], einvs[2], einvs[3], einvs[4], einvs[5], einvs[6],
       evals[0], evals[1], evals[2], evals[3], evals[4], evals[5], evals[6]));
 
-    for (int i = 0; i < 7; i++) {
+    for (i = 0; i < 7; i++) {
       mpz_mul(evals[i], evals[i], einvs[i]);
       mpz_mod(evals[i], evals[i], goo->n);
 
@@ -4722,21 +4804,9 @@ run_ops_test(void) {
 static void
 run_combspec_test(void) {
   goo_combspec_t spec;
-
-  printf("Testing combspec...\n");
-
-  assert(goo_combspec_init(&spec, GOO_CHAL_BITS, GOO_MAX_COMB_SIZE));
-
-  long bits = spec.bits_per_window * spec.points_per_add;
-  long points_per_subcomb = (1 << spec.points_per_add) - 1;
-
-  assert(spec.points_per_add == 8);
-  assert(spec.adds_per_shift == 2);
-  assert(spec.shifts == 8);
-  assert(spec.bits_per_window == 16);
-  assert(bits == 128);
-  assert(points_per_subcomb == 255);
-  assert(spec.size == 510);
+  long bits, points_per_subcomb;
+  mpz_t n;
+  goo_group_t *goo;
 
   static const char mod_hex[] = ""
     "c7970ceedcc3b0754490201a7aa613cd73911081c790f5f1a8726f463550"
@@ -4749,8 +4819,20 @@ run_combspec_test(void) {
     "16a4d9d373d8721f24a3fc0f1b3131f55615172866bccc30f95054c824e7"
     "33a5eb6817f7bc16399d48c6361cc7e5";
 
-  mpz_t n;
-  goo_group_t *goo;
+  printf("Testing combspec...\n");
+
+  assert(goo_combspec_init(&spec, GOO_CHAL_BITS, GOO_MAX_COMB_SIZE));
+
+  bits = spec.bits_per_window * spec.points_per_add;
+  points_per_subcomb = (1 << spec.points_per_add) - 1;
+
+  assert(spec.points_per_add == 8);
+  assert(spec.adds_per_shift == 2);
+  assert(spec.shifts == 8);
+  assert(spec.bits_per_window == 16);
+  assert(bits == 128);
+  assert(points_per_subcomb == 255);
+  assert(spec.size == 510);
 
   mpz_init(n);
   goo = goo_malloc(sizeof(goo_group_t));
@@ -4758,21 +4840,21 @@ run_combspec_test(void) {
   assert(mpz_set_str(n, mod_hex, 16) == 0);
   assert(goo_group_init(goo, n, 2, 3, 0));
 
-  // assert(goo->combs[0].g.points_per_add == 8);
-  // assert(goo->combs[0].g.adds_per_shift == 2);
-  // assert(goo->combs[0].g.shifts == 8);
-  // assert(goo->combs[0].g.bits_per_window == 16);
-  // assert(goo->combs[0].g.bits == 128);
-  // assert(goo->combs[0].g.points_per_subcomb == 255);
-  // assert(goo->combs[0].g.size == 510);
+  /* assert(goo->combs[0].g.points_per_add == 8); */
+  /* assert(goo->combs[0].g.adds_per_shift == 2); */
+  /* assert(goo->combs[0].g.shifts == 8); */
+  /* assert(goo->combs[0].g.bits_per_window == 16); */
+  /* assert(goo->combs[0].g.bits == 128); */
+  /* assert(goo->combs[0].g.points_per_subcomb == 255); */
+  /* assert(goo->combs[0].g.size == 510); */
 
-  // assert(goo->combs[0].h.points_per_add == 8);
-  // assert(goo->combs[0].h.adds_per_shift == 2);
-  // assert(goo->combs[0].h.shifts == 8);
-  // assert(goo->combs[0].h.bits_per_window == 16);
-  // assert(goo->combs[0].h.bits == 128);
-  // assert(goo->combs[0].h.points_per_subcomb == 255);
-  // assert(goo->combs[0].h.size == 510);
+  /* assert(goo->combs[0].h.points_per_add == 8); */
+  /* assert(goo->combs[0].h.adds_per_shift == 2); */
+  /* assert(goo->combs[0].h.shifts == 8); */
+  /* assert(goo->combs[0].h.bits_per_window == 16); */
+  /* assert(goo->combs[0].h.bits == 128); */
+  /* assert(goo->combs[0].h.points_per_subcomb == 255); */
+  /* assert(goo->combs[0].h.size == 510); */
 
   assert(goo->combs[0].g.points_per_add == 7);
   assert(goo->combs[0].g.adds_per_shift == 4);
@@ -4853,8 +4935,6 @@ run_sig_test(void) {
 
 static void
 run_goo_test(void) {
-  printf("Testing signing/verifying...\n");
-
   static const char p_hex[] = ""
     "ccbf79ad1f5e47086062274ea9815042fd938149a5557c8cb3b0c33d"
     "dcd87c58a53760826a99d196852460762e16a715e40bee5847324aa1"
@@ -4896,6 +4976,8 @@ run_goo_test(void) {
   mpz_t s_prime, C1;
   unsigned char msg[32];
   goo_sig_t sig;
+
+  printf("Testing signing/verifying...\n");
 
   mpz_init(p);
   mpz_init(q);

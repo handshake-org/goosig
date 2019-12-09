@@ -16,7 +16,12 @@
       "-O3"
     ],
     "cflags_c": [
-      "-std=c99"
+      "-std=c89",
+      "-pedantic",
+      "-Wcast-align",
+      "-Wshadow",
+      "-Wno-long-long",
+      "-Wno-overlength-strings"
     ],
     "cflags_cc+": [
       "-std=c++0x",
