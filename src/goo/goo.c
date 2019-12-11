@@ -4646,6 +4646,7 @@ run_sig_test(void) {
   mpz_set_ui(sig1.Bq, 0x06);
   mpz_set_ui(sig1.Cq, 0x07);
   mpz_set_ui(sig1.Dq, 0x08);
+  mpz_set_ui(sig1.Eq, 0x100);
   mpz_set_ui(sig1.z_w, 0x09);
   mpz_set_ui(sig1.z_w2, 0x0a);
   mpz_set_ui(sig1.z_s1, 0x0b);
@@ -4658,7 +4659,6 @@ run_sig_test(void) {
   data = goo_malloc(size);
 
   assert(goo_sig_export(data, &sig1, 2048));
-
   assert(goo_sig_import(&sig2, data, size, 2048));
 
   assert(mpz_cmp_ui(sig2.C2, 0x01) == 0);
@@ -4669,6 +4669,31 @@ run_sig_test(void) {
   assert(mpz_cmp_ui(sig2.Bq, 0x06) == 0);
   assert(mpz_cmp_ui(sig2.Cq, 0x07) == 0);
   assert(mpz_cmp_ui(sig2.Dq, 0x08) == 0);
+  assert(mpz_sgn(sig2.Eq) > 0);
+  assert(mpz_cmp_ui(sig2.Eq, 0x100) == 0);
+  assert(mpz_cmp_ui(sig2.z_w, 0x09) == 0);
+  assert(mpz_cmp_ui(sig2.z_w2, 0x0a) == 0);
+  assert(mpz_cmp_ui(sig2.z_s1, 0x0b) == 0);
+  assert(mpz_cmp_ui(sig2.z_a, 0x0c) == 0);
+  assert(mpz_cmp_ui(sig2.z_an, 0x0d) == 0);
+  assert(mpz_cmp_ui(sig2.z_s1w, 0x0e) == 0);
+  assert(mpz_cmp_ui(sig2.z_sa, 0x0f) == 0);
+
+  mpz_set_si(sig1.Eq, -0x100);
+
+  assert(goo_sig_export(data, &sig1, 2048));
+  assert(goo_sig_import(&sig2, data, size, 2048));
+
+  assert(mpz_cmp_ui(sig2.C2, 0x01) == 0);
+  assert(mpz_cmp_ui(sig2.t, 0x02) == 0);
+  assert(mpz_cmp_ui(sig2.chal, 0x03) == 0);
+  assert(mpz_cmp_ui(sig2.ell, 0x04) == 0);
+  assert(mpz_cmp_ui(sig2.Aq, 0x05) == 0);
+  assert(mpz_cmp_ui(sig2.Bq, 0x06) == 0);
+  assert(mpz_cmp_ui(sig2.Cq, 0x07) == 0);
+  assert(mpz_cmp_ui(sig2.Dq, 0x08) == 0);
+  assert(mpz_sgn(sig2.Eq) < 0);
+  assert(mpz_cmp_si(sig2.Eq, -0x100) == 0);
   assert(mpz_cmp_ui(sig2.z_w, 0x09) == 0);
   assert(mpz_cmp_ui(sig2.z_w2, 0x0a) == 0);
   assert(mpz_cmp_ui(sig2.z_s1, 0x0b) == 0);

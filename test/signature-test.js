@@ -21,7 +21,7 @@ describe('Signature', function() {
     sig1.Bq = new BN(0x06);
     sig1.Cq = new BN(0x07);
     sig1.Dq = new BN(0x08);
-    sig1.Eq = new BN(0x08);
+    sig1.Eq = new BN(0x100);
     sig1.z_w = new BN(0x09);
     sig1.z_w2 = new BN(0x0a);
     sig1.z_s1 = new BN(0x0b);
@@ -42,7 +42,7 @@ describe('Signature', function() {
     assert.strictEqual(sig2.Bq.toString(), new BN(0x06).toString());
     assert.strictEqual(sig2.Cq.toString(), new BN(0x07).toString());
     assert.strictEqual(sig2.Dq.toString(), new BN(0x08).toString());
-    assert.strictEqual(sig2.Eq.toString(), new BN(0x08).toString());
+    assert.strictEqual(sig2.Eq.toString(), new BN(0x100).toString());
     assert.strictEqual(sig2.z_w.toString(), new BN(0x09).toString());
     assert.strictEqual(sig2.z_w2.toString(), new BN(0x0a).toString());
     assert.strictEqual(sig2.z_s1.toString(), new BN(0x0b).toString());
@@ -64,7 +64,7 @@ describe('Signature', function() {
       Bq: new BN(0x06),
       Cq: new BN(0x07),
       Dq: new BN(0x08),
-      Eq: new BN(0x08),
+      Eq: new BN(0x100),
       z_w: new BN(0x09),
       z_w2: new BN(0x0a),
       z_s1: new BN(0x0b),
@@ -86,7 +86,7 @@ describe('Signature', function() {
     assert.strictEqual(sig2.Bq.toString(), new BN(0x06).toString());
     assert.strictEqual(sig2.Cq.toString(), new BN(0x07).toString());
     assert.strictEqual(sig2.Dq.toString(), new BN(0x08).toString());
-    assert.strictEqual(sig2.Eq.toString(), new BN(0x08).toString());
+    assert.strictEqual(sig2.Eq.toString(), new BN(0x100).toString());
     assert.strictEqual(sig2.z_w.toString(), new BN(0x09).toString());
     assert.strictEqual(sig2.z_w2.toString(), new BN(0x0a).toString());
     assert.strictEqual(sig2.z_s1.toString(), new BN(0x0b).toString());
@@ -108,7 +108,7 @@ describe('Signature', function() {
       Bq: new BN(0x06),
       Cq: new BN(0x07),
       Dq: new BN(0x08),
-      Eq: new BN(0x08),
+      Eq: new BN(0x100),
       z_w: new BN(0x09),
       z_w2: new BN(0x0a),
       z_s1: new BN(0x0b),
@@ -130,7 +130,7 @@ describe('Signature', function() {
     assert.strictEqual(sig2.Bq.toString(), new BN(0x06).toString());
     assert.strictEqual(sig2.Cq.toString(), new BN(0x07).toString());
     assert.strictEqual(sig2.Dq.toString(), new BN(0x08).toString());
-    assert.strictEqual(sig2.Eq.toString(), new BN(0x08).toString());
+    assert.strictEqual(sig2.Eq.toString(), new BN(0x100).toString());
     assert.strictEqual(sig2.z_w.toString(), new BN(0x09).toString());
     assert.strictEqual(sig2.z_w2.toString(), new BN(0x0a).toString());
     assert.strictEqual(sig2.z_s1.toString(), new BN(0x0b).toString());
@@ -152,7 +152,7 @@ describe('Signature', function() {
       Bq: new BN(0x06),
       Cq: new BN(0x07),
       Dq: new BN(0x08),
-      Eq: new BN(-0x08),
+      Eq: new BN(-0x100),
       z_w: new BN(0x09),
       z_w2: new BN(0x0a),
       z_s1: new BN(0x0b),
@@ -174,7 +174,7 @@ describe('Signature', function() {
     assert.strictEqual(sig2.Bq.toString(), new BN(0x06).toString());
     assert.strictEqual(sig2.Cq.toString(), new BN(0x07).toString());
     assert.strictEqual(sig2.Dq.toString(), new BN(0x08).toString());
-    assert.strictEqual(sig2.Eq.toString(), new BN(-0x08).toString());
+    assert.strictEqual(sig2.Eq.toString(), new BN(-0x100).toString());
     assert.strictEqual(sig2.z_w.toString(), new BN(0x09).toString());
     assert.strictEqual(sig2.z_w2.toString(), new BN(0x0a).toString());
     assert.strictEqual(sig2.z_s1.toString(), new BN(0x0b).toString());
