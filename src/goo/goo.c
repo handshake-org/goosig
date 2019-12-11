@@ -3219,31 +3219,6 @@ rng_clear(goo_prng_t *prng) {
 }
 
 static void
-run_rng_test(void) {
-  goo_prng_t rng;
-  mpz_t x, y;
-
-  printf("Testing RNG...\n");
-
-  rng_init(&rng);
-  mpz_init(x);
-  mpz_init(y);
-
-  goo_prng_random_bits(&rng, x, 256);
-  assert(mpz_sgn(x) > 0);
-  assert(goo_mpz_bitlen(x) <= 256);
-
-  goo_prng_random_int(&rng, y, x);
-  assert(mpz_sgn(y) > 0);
-  assert(goo_mpz_bitlen(y) <= 256);
-  assert(mpz_cmp(y, x) < 0);
-
-  rng_clear(&rng);
-  mpz_clear(x);
-  mpz_clear(y);
-}
-
-static void
 run_prng_test(void) {
   goo_prng_t prng;
   unsigned char key[32];
@@ -4803,7 +4778,6 @@ void
 goo_test(void) {
   run_hmac_test();
   run_drbg_test();
-  run_rng_test();
   run_prng_test();
   run_util_test();
   run_primes_test();
