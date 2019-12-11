@@ -4,12 +4,12 @@
 
 const assert = require('bsert');
 const rsa = require('bcrypto/lib/rsa');
-const random = require('bcrypto/lib/random');
+const rng = require('bcrypto/lib/random');
 const Goo = require('../lib/goo');
 const Signature = require('../lib/js/signature');
 
-const SIG_LENGTH = new Signature().encode(2048).length; // 1963
-assert.strictEqual(SIG_LENGTH, 1963);
+const SIG_LENGTH = new Signature().encode(2048).length; // 1964
+assert.strictEqual(SIG_LENGTH, 1964);
 
 const EQ_START = 1571;
 const EQ_PAD = 16;
@@ -22,7 +22,7 @@ const key = rsa.privateKeyGenerate(2048);
 const pub = rsa.publicKeyCreate(key);
 
 function rand(num) {
-  return (Math.random() * num) >>> 0;
+  return rng.randomRange(0, num);
 }
 
 function concat(data, side) {
@@ -37,7 +37,7 @@ function concat(data, side) {
 
 console.log('Fuzzing with random bytes.');
 
-for (let i = 0; i < 10000000; i++) {
+for (let i = 0; i < 1000000; i++) {
   let msg, sig, C1;
 
   if (i % 100000 === 0)
@@ -45,25 +45,25 @@ for (let i = 0; i < 10000000; i++) {
 
   switch (rand(4)) {
     case 0:
-      msg = random.randomBytes(32);
-      sig = random.randomBytes(SIG_LENGTH);
-      C1 = random.randomBytes(goo.bits / 8);
+      msg = rng.randomBytes(32);
+      sig = rng.randomBytes(SIG_LENGTH);
+      C1 = rng.randomBytes(goo.size);
       break;
     case 1:
-      msg = random.randomBytes(32);
-      sig = random.randomBytes(SIG_LENGTH + 1);
-      C1 = random.randomBytes(goo.bits / 8 + 1);
+      msg = rng.randomBytes(32);
+      sig = rng.randomBytes(SIG_LENGTH + 1);
+      C1 = rng.randomBytes(goo.size + 1);
       break;
     case 2:
-      msg = random.randomBytes(32);
-      sig = random.randomBytes(SIG_LENGTH - 1);
-      C1 = random.randomBytes(goo.bits / 8 - 1);
+      msg = rng.randomBytes(32);
+      sig = rng.randomBytes(SIG_LENGTH - 1);
+      C1 = rng.randomBytes(goo.size - 1);
       break;
     case 3:
-      msg = random.randomBytes(32);
-      sig = random.randomBytes(SIG_LENGTH);
-      C1 = random.randomBytes(goo.bits / 8);
-      switch (rand(3)) {
+      msg = rng.randomBytes(32);
+      sig = rng.randomBytes(SIG_LENGTH);
+      C1 = rng.randomBytes(goo.size);
+      switch (rand(4)) {
         case 0:
           msg = Buffer.alloc(0);
           break;
@@ -106,37 +106,52 @@ for (let i = 0; i < Infinity; i++) {
 
   assert.bufferEqual(pt, s_prime);
 
-  // Generate the proof.
   assert(goo.validate(s_prime, C1, key));
-  const msg = random.randomBytes(32);
+
+  // Generate the proof.
+  const msg = rng.randomBytes(32);
   const sig = goo.sign(msg, s_prime, key);
 
   // Verify the proof.
   assert(ver.verify(msg, sig, C1));
 
   for (let i = 0; i < 100; i++) {
-    const msg2 = Buffer.from(msg);
-    let sig2 = Buffer.from(sig);
-    const C12 = Buffer.from(C1);
+    const msg0 = Buffer.from(msg);
+    const C10 = Buffer.from(C1);
+
+    let sig0 = Buffer.from(sig);
 
     switch (rand(20)) {
       case 0:
-        sig2 = sig2.slice(0, -1);
+        sig0 = sig0.slice(0, -1);
         break;
       case 1:
-        sig2 = sig2.slice(1);
+        sig0 = sig0.slice(1);
         break;
       case 2:
-        sig2 = concat(sig2, 0);
+        sig0 = concat(sig0, 0);
         break;
       case 3:
-        sig2 = concat(sig2, 1);
+        sig0 = concat(sig0, 1);
+        break;
+      case 4:
+        sig0[sig0.length - 1] ^= 1;
         break;
       default:
-        sig2[rand(sig2.length)] ^= 1;
+        switch (rand(3)) {
+          case 0:
+            msg0[rand(msg0.length)] ^= 1 << rand(8);
+            break;
+          case 1:
+            C10[rand(C10.length)] ^= 1 << rand(8);
+            break;
+          case 2:
+            sig0[rand(sig0.length)] ^= 1 << rand(8);
+            break;
+        }
         break;
     }
 
-    assert(!ver.verify(msg2, sig2, C12));
+    assert(!ver.verify(msg0, sig0, C10));
   }
 }
