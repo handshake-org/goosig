@@ -31,16 +31,12 @@ extern "C" {
 #define GOO_ELL_BITS 136
 #define GOO_ELLDIFF_MAX 512
 
-/* SHA512("Goo Signature") */
-static const unsigned char GOO_HASH_PREFIX[64] = {
-  0xf6, 0xbc, 0x59, 0x30, 0x0d, 0x29, 0xa5, 0xc4,
-  0x37, 0x4d, 0x8d, 0xb9, 0x41, 0xe9, 0x98, 0xfb,
-  0x3d, 0x9c, 0xaa, 0x6f, 0xf5, 0x78, 0xf2, 0x60,
-  0x20, 0x44, 0x72, 0xc0, 0xe0, 0xfa, 0xa1, 0xb7,
-  0xc5, 0xff, 0xe6, 0xc0, 0xed, 0xcf, 0x4d, 0xc4,
-  0x4c, 0x98, 0xff, 0x05, 0xfe, 0x4f, 0x24, 0xfa,
-  0x13, 0x0b, 0xe9, 0x67, 0xc2, 0xd7, 0xaa, 0xd7,
-  0xca, 0x2e, 0x1e, 0x00, 0x26, 0x79, 0xc7, 0x9d
+/* SHA256("Goo Signature") */
+static const unsigned char GOO_HASH_PREFIX[32] = {
+  0xc8, 0x30, 0xd5, 0xfd, 0xdc, 0xb2, 0x23, 0xcd,
+  0x86, 0x00, 0x7a, 0xbf, 0x91, 0xc4, 0x40, 0x27,
+  0x6b, 0x00, 0x80, 0x66, 0xbc, 0xb6, 0x45, 0x91,
+  0xef, 0x80, 0x61, 0xc8, 0x9c, 0x1c, 0x58, 0x82
 };
 
 /* SHA512("Goo PRNG") */
@@ -128,12 +124,12 @@ typedef struct goo_group_s {
   goo_comb_item_t combs[2];
 
   /* WNAF */
-  mpz_t pctab_p1[GOO_TABLEN];
-  mpz_t pctab_n1[GOO_TABLEN];
-  mpz_t pctab_n2[GOO_TABLEN];
-  mpz_t pctab_p2[GOO_TABLEN];
-  long e1bits[GOO_ELL_BITS + 1];
-  long e2bits[GOO_ELL_BITS + 1];
+  mpz_t table_p1[GOO_TABLEN];
+  mpz_t table_n1[GOO_TABLEN];
+  mpz_t table_n2[GOO_TABLEN];
+  mpz_t table_p2[GOO_TABLEN];
+  long wnaf1[GOO_ELL_BITS + 1];
+  long wnaf2[GOO_ELL_BITS + 1];
 
   goo_prng_t prng;
   goo_sha256_t sha;
@@ -143,13 +139,13 @@ typedef struct goo_group_s {
   mpz_t msg;
   goo_sig_t sig;
   mpz_t C1;
-  mpz_t C1_inv;
-  mpz_t C2_inv;
-  mpz_t C3_inv;
-  mpz_t Aq_inv;
-  mpz_t Bq_inv;
-  mpz_t Cq_inv;
-  mpz_t Dq_inv;
+  mpz_t C1i;
+  mpz_t C2i;
+  mpz_t C3i;
+  mpz_t Aqi;
+  mpz_t Bqi;
+  mpz_t Cqi;
+  mpz_t Dqi;
   mpz_t A;
   mpz_t B;
   mpz_t C;
@@ -157,9 +153,9 @@ typedef struct goo_group_s {
   mpz_t E;
   mpz_t z_w2_m_an;
   mpz_t tmp;
-  mpz_t chal_out;
-  mpz_t ell_r_out;
-  mpz_t elldiff;
+  mpz_t chal0;
+  mpz_t ell0;
+  mpz_t ell1;
 
   /* goo_group_wnaf() */
   mpz_t e;
@@ -174,74 +170,57 @@ typedef struct goo_group_s {
 typedef struct goo_group_s goo_ctx_t;
 
 int
-goo_init(
-  goo_ctx_t *ctx,
-  const unsigned char *n,
-  size_t n_len,
-  unsigned long g,
-  unsigned long h,
-  unsigned long modbits
-);
+goo_init(goo_ctx_t *ctx,
+         const unsigned char *n,
+         size_t n_len,
+         unsigned long g,
+         unsigned long h,
+         unsigned long modbits);
 
 void
 goo_uninit(goo_ctx_t *ctx);
 
 int
-goo_generate(
-  goo_ctx_t *ctx,
-  unsigned char **s_prime,
-  size_t *s_prime_len
-);
+goo_generate(goo_ctx_t *ctx, unsigned char *s_prime);
 
 int
-goo_challenge(
-  goo_ctx_t *ctx,
-  unsigned char **C1,
-  size_t *C1_len,
-  const unsigned char *s_prime,
-  size_t s_prime_len,
-  const unsigned char *n,
-  size_t n_len
-);
+goo_challenge(goo_ctx_t *ctx,
+              unsigned char **C1,
+              size_t *C1_len,
+              const unsigned char *s_prime,
+              const unsigned char *n,
+              size_t n_len);
 
 int
-goo_validate(
-  goo_ctx_t *ctx,
-  const unsigned char *s_prime,
-  size_t s_prime_len,
-  const unsigned char *C1,
-  size_t C1_len,
-  const unsigned char *p,
-  size_t p_len,
-  const unsigned char *q,
-  size_t q_len
-);
+goo_validate(goo_ctx_t *ctx,
+             const unsigned char *s_prime,
+             const unsigned char *C1,
+             size_t C1_len,
+             const unsigned char *p,
+             size_t p_len,
+             const unsigned char *q,
+             size_t q_len);
 
 int
-goo_sign(
-  goo_ctx_t *ctx,
-  unsigned char **out,
-  size_t *out_len,
-  const unsigned char *msg,
-  size_t msg_len,
-  const unsigned char *s_prime,
-  size_t s_prime_len,
-  const unsigned char *p,
-  size_t p_len,
-  const unsigned char *q,
-  size_t q_len
-);
+goo_sign(goo_ctx_t *ctx,
+         unsigned char **out,
+         size_t *out_len,
+         const unsigned char *msg,
+         size_t msg_len,
+         const unsigned char *s_prime,
+         const unsigned char *p,
+         size_t p_len,
+         const unsigned char *q,
+         size_t q_len);
 
 int
-goo_verify(
-  goo_ctx_t *ctx,
-  const unsigned char *msg,
-  size_t msg_len,
-  const unsigned char *sig,
-  size_t sig_len,
-  const unsigned char *C1,
-  size_t C1_len
-);
+goo_verify(goo_ctx_t *ctx,
+           const unsigned char *msg,
+           size_t msg_len,
+           const unsigned char *sig,
+           size_t sig_len,
+           const unsigned char *C1,
+           size_t C1_len);
 
 #ifdef GOO_TEST
 void

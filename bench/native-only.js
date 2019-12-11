@@ -30,7 +30,7 @@ const start = performance.now();
 
 let i;
 
-for (i = 0; i < 100000; i++) {
+for (i = 0; i < 1000; i++) {
   const result = verifier.verify(msg, sig, C1);
   assert.strictEqual(result, true);
 }

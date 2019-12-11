@@ -93,14 +93,13 @@ NAN_METHOD(Goo::New) {
 NAN_METHOD(Goo::Generate) {
   Goo *goo = ObjectWrap::Unwrap<Goo>(info.Holder());
 
-  unsigned char *s_prime;
-  size_t s_prime_len;
+  unsigned char s_prime[32];
 
-  if (!goo_generate(&goo->ctx, &s_prime, &s_prime_len))
+  if (!goo_generate(&goo->ctx, s_prime))
     return Nan::ThrowError("Could create challenge.");
 
   info.GetReturnValue().Set(
-    Nan::NewBuffer((char *)s_prime, s_prime_len).ToLocalChecked());
+    Nan::CopyBuffer((char *)s_prime, 32).ToLocalChecked());
 }
 
 NAN_METHOD(Goo::Challenge) {
@@ -128,11 +127,11 @@ NAN_METHOD(Goo::Challenge) {
   unsigned char *C1;
   size_t C1_len;
 
-  if (!goo_challenge(&goo->ctx, &C1, &C1_len,
-                     s_prime, s_prime_len,
-                     n, n_len)) {
+  if (s_prime_len != 32)
+    return Nan::ThrowRangeError("s_prime must be 32 bytes.");
+
+  if (!goo_challenge(&goo->ctx, &C1, &C1_len, s_prime, n, n_len))
     return Nan::ThrowError("Could create challenge.");
-  }
 
   info.GetReturnValue().Set(
     Nan::NewBuffer((char *)C1, C1_len).ToLocalChecked());
@@ -176,10 +175,12 @@ NAN_METHOD(Goo::Validate) {
   const uint8_t *q = (const uint8_t *)node::Buffer::Data(q_buf);
   size_t q_len = node::Buffer::Length(q_buf);
 
-  int result = goo_validate(&goo->ctx, s_prime, s_prime_len,
-                            C1, C1_len, p, p_len, q, q_len);
+  if (s_prime_len != 32)
+    return Nan::ThrowRangeError("s_prime must be 32 bytes.");
 
-  return info.GetReturnValue().Set(Nan::New<v8::Boolean>(result == 1));
+  int result = goo_validate(&goo->ctx, s_prime, C1, C1_len, p, p_len, q, q_len);
+
+  return info.GetReturnValue().Set(Nan::New<v8::Boolean>(result));
 }
 
 NAN_METHOD(Goo::Sign) {
@@ -223,10 +224,13 @@ NAN_METHOD(Goo::Sign) {
   unsigned char *sig;
   size_t sig_len;
 
+  if (s_prime_len != 32)
+    return Nan::ThrowRangeError("s_prime must be 32 bytes.");
+
   if (!goo_sign(&goo->ctx,
                 &sig, &sig_len,
                 msg, msg_len,
-                s_prime, s_prime_len,
+                s_prime,
                 p, p_len,
                 q, q_len)) {
     return Nan::ThrowError("Could create signature.");
@@ -269,7 +273,7 @@ NAN_METHOD(Goo::Verify) {
   int result = goo_verify(&goo->ctx, msg, msg_len,
                           sig, sig_len, C1, C1_len);
 
-  return info.GetReturnValue().Set(Nan::New<v8::Boolean>(result == 1));
+  return info.GetReturnValue().Set(Nan::New<v8::Boolean>(result));
 }
 
 #ifdef GOO_TEST

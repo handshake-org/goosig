@@ -71,6 +71,8 @@
 /* Note: violates strict aliasing. */
 #define goo_mpz_unconst(n) *((mpz_t *)&(n))
 
+#define VERIFY_POS(x) if (mpz_sgn((x)) < 0) goto fail
+
 static size_t
 goo_mpz_bitlen(const mpz_t n) {
   if (mpz_sgn(n) == 0)
@@ -135,7 +137,9 @@ goo_mpz_zerobits(const mpz_t n) {
 }
 
 static void
-goo_mpz_mask(mpz_t r, const mpz_t n, unsigned long bit, mpz_t mask) {
+goo_mpz_mask(mpz_t r, const mpz_t n, unsigned long bit, mpz_t tmp) {
+  mpz_ptr mask = tmp;
+
   if (bit == 0) {
     mpz_set_ui(r, 0);
     return;
@@ -352,18 +356,6 @@ fail:
 }
 
 static int
-goo_random_bits_nz(mpz_t ret, unsigned long bits) {
-  assert(bits != 0);
-
-  do {
-    if (!goo_random_bits(ret, bits))
-      return 0;
-  } while (mpz_sgn(ret) == 0);
-
-  return 1;
-}
-
-static int
 goo_random_int(mpz_t ret, const mpz_t max) {
   size_t bits;
 
@@ -476,15 +468,6 @@ goo_prng_random_bits(goo_prng_t *prng, mpz_t ret, unsigned long bits) {
 
   /* ret >>= left; */
   mpz_tdiv_q_2exp(ret, ret, left);
-}
-
-static void
-goo_prng_random_bits_nz(goo_prng_t *prng, mpz_t ret, unsigned long bits) {
-  assert(bits != 0);
-
-  do {
-    goo_prng_random_bits(prng, ret, bits);
-  } while (mpz_sgn(ret) == 0);
 }
 
 static void
@@ -601,17 +584,18 @@ goo_mpz_sqrtm(mpz_t ret, const mpz_t num, const mpz_t p) {
     /* a = t^e mod p */
     mpz_powm(a, t, e, p);
     /* b = a^2 mod p */
-    mpz_powm_ui(b, a, 2, p);
-    /* b = (b * t) mod p */
+    mpz_mul(b, a, a);
+    mpz_mod(b, b, p);
+    /* b = b * t mod p */
     mpz_mul(b, b, t);
     mpz_mod(b, b, p);
     /* b = (b - 1) mod p */
     mpz_sub_ui(b, b, 1);
     mpz_mod(b, b, p);
-    /* b = (b * x) mod p */
+    /* b = b * x mod p */
     mpz_mul(b, b, x);
     mpz_mod(b, b, p);
-    /* b = (b * a) mod p */
+    /* b = b * a mod p */
     mpz_mul(b, b, a);
     mpz_mod(b, b, p);
     /* ret = b */
@@ -631,7 +615,7 @@ goo_mpz_sqrtm(mpz_t ret, const mpz_t num, const mpz_t p) {
   /* n = 2 */
   mpz_set_ui(n, 2);
 
-  /* while jacobi(n, p) != -1 */
+  /* while (n^((p - 1) / 2) mod p) != -1 */
   while (mpz_jacobi(n, p) != -1) {
     /* n = n + 1 */
     mpz_add_ui(n, n, 1);
@@ -660,7 +644,8 @@ goo_mpz_sqrtm(mpz_t ret, const mpz_t num, const mpz_t p) {
     /* while t != 1 */
     while (mpz_cmp_ui(t, 1) != 0) {
       /* t = t^2 mod p */
-      mpz_powm_ui(t, t, 2, p);
+      mpz_mul(t, t, t);
+      mpz_mod(t, t, p);
       m += 1;
     }
 
@@ -678,11 +663,12 @@ goo_mpz_sqrtm(mpz_t ret, const mpz_t num, const mpz_t p) {
     /* t = g^t mod p */
     mpz_powm(t, g, t, p);
     /* g = t^2 mod p */
-    mpz_powm_ui(g, t, 2, p);
-    /* y = (y * t) mod p */
+    mpz_mul(g, t, t);
+    mpz_mod(g, g, p);
+    /* y = y * t mod p */
     mpz_mul(y, y, t);
     mpz_mod(y, y, p);
-    /* b = (b * g) mod p */
+    /* b = b * g mod p */
     mpz_mul(b, b, g);
     mpz_mod(b, b, p);
     /* k = m */
@@ -710,6 +696,7 @@ fail:
 
 static int
 goo_mpz_sqrtpq(mpz_t ret, const mpz_t x, const mpz_t p, const mpz_t q) {
+  /* ret = x^(1 / 2) mod (p * q) */
   int r = 0;
   mpz_t sp, sq, mp, mq, xx, yy;
 
@@ -720,14 +707,14 @@ goo_mpz_sqrtpq(mpz_t ret, const mpz_t x, const mpz_t p, const mpz_t q) {
   mpz_init(xx);
   mpz_init(yy);
 
-  /* sp = mod_sqrtm(x, p) */
-  /* sq = mod_sqrtm(x, q) */
+  /* sp = x^(1 / 2) mod p */
+  /* sq = x^(1 / 2) mod q */
   if (!goo_mpz_sqrtm(sp, x, p)
       || !goo_mpz_sqrtm(sq, x, q)) {
     goto fail;
   }
 
-  /* [mp, mq] = euclid_lr(p, q) */
+  /* [mp, mq] = bezout(p, q) */
   mpz_gcdext(ret, mp, mq, p, q);
 
   /* xx = sq * mp * p */
@@ -850,7 +837,8 @@ goo_is_prime_mr(
 
     for (j = 1; j < k; j++) {
       /* y = y^2 mod n */
-      mpz_powm_ui(y, y, 2, n);
+      mpz_mul(y, y, y);
+      mpz_mod(y, y, n);
 
       /* if y == nm1 */
       if (mpz_cmp(y, nm1) == 0)
@@ -1263,12 +1251,10 @@ goo_sig_export(unsigned char *out, const goo_sig_t *sig, size_t bits) {
 } while (0)                                \
 
 static int
-goo_sig_import(
-  goo_sig_t *sig,
-  const unsigned char *data,
-  size_t data_len,
-  size_t bits
-) {
+goo_sig_import(goo_sig_t *sig,
+               const unsigned char *data,
+               size_t data_len,
+               size_t bits) {
   size_t mod_bytes = (bits + 7) / 8;
   size_t exp_bytes = (GOO_EXPONENT_SIZE + 7) / 8;
   size_t chal_bytes = (GOO_CHAL_BITS + 7) / 8;
@@ -1338,14 +1324,12 @@ combspec_size(long bits) {
 }
 
 static void
-combspec_result(
-  goo_combspec_t *combs,
-  size_t map_size,
-  long shifts,
-  long aps,
-  long ppa,
-  long bps
-) {
+combspec_result(goo_combspec_t *combs,
+                size_t map_size,
+                long shifts,
+                long aps,
+                long ppa,
+                long bps) {
   long ops = shifts * (aps + 1) - 1;
   long size = ((1 << ppa) - 1) * aps;
   goo_combspec_t *best;
@@ -1366,12 +1350,8 @@ combspec_result(
   }
 }
 
-int
-goo_combspec_init(
-  goo_combspec_t *combspec,
-  long bits,
-  long maxsize
-) {
+static int
+goo_combspec_init(goo_combspec_t *combspec, long bits, long maxsize) {
   size_t map_size, i;
   goo_combspec_t *combs, *ret;
   long ppa, bpw, sqrt, aps, shifts, sm;
@@ -1436,24 +1416,20 @@ goo_combspec_init(
  */
 
 static void
-goo_group_pow(
-  goo_group_t *group,
-  mpz_t ret,
-  const mpz_t b,
-  const mpz_t b_inv,
-  const mpz_t e
-);
+goo_group_pow(goo_group_t *group,
+              mpz_t ret,
+              const mpz_t b,
+              const mpz_t bi,
+              const mpz_t e);
 
 static void
 goo_group_mul(goo_group_t *group, mpz_t ret, const mpz_t m1, const mpz_t m2);
 
 static void
-goo_comb_init(
-  goo_comb_t *comb,
-  goo_group_t *group,
-  mpz_t base,
-  goo_combspec_t *spec
-) {
+goo_comb_init(goo_comb_t *comb,
+              goo_group_t *group,
+              mpz_t base,
+              goo_combspec_t *spec) {
   long skip, i, j;
   mpz_t *it;
   mpz_t win;
@@ -1534,7 +1510,7 @@ goo_comb_uninit(goo_comb_t *comb) {
 }
 
 static int
-goo_to_comb_exp(goo_comb_t *comb, const mpz_t e) {
+goo_comb_recode(goo_comb_t *comb, const mpz_t e) {
   long len = (long)goo_mpz_bitlen(e);
   long i, j, k, ret, b;
 
@@ -1563,21 +1539,17 @@ goo_to_comb_exp(goo_comb_t *comb, const mpz_t e) {
  */
 
 static int
-goo_hash_item(
-  goo_sha256_t *ctx,
-  const mpz_t n,
-  size_t size,
-  unsigned char *buf
-);
+goo_hash_int(goo_sha256_t *ctx,
+             const mpz_t n,
+             size_t size,
+             unsigned char *buf);
 
 static int
-goo_group_init(
-  goo_group_t *group,
-  const mpz_t n,
-  unsigned long g,
-  unsigned long h,
-  unsigned long modbits
-) {
+goo_group_init(goo_group_t *group,
+               const mpz_t n,
+               unsigned long g,
+               unsigned long h,
+               unsigned long modbits) {
   long i;
 
   if (modbits != 0) {
@@ -1636,29 +1608,33 @@ goo_group_init(
   }
 
   for (i = 0; i < GOO_TABLEN; i++) {
-    mpz_init(group->pctab_p1[i]);
-    mpz_init(group->pctab_n1[i]);
-    mpz_init(group->pctab_p2[i]);
-    mpz_init(group->pctab_n2[i]);
+    mpz_init(group->table_p1[i]);
+    mpz_init(group->table_n1[i]);
+    mpz_init(group->table_p2[i]);
+    mpz_init(group->table_n2[i]);
   }
 
   goo_prng_init(&group->prng);
 
   goo_sha256_init(&group->sha);
-  goo_sha256_update(&group->sha, (void *)GOO_HASH_PREFIX, 64);
-  assert(goo_hash_item(&group->sha, group->n, group->size, group->slab));
-  assert(goo_hash_item(&group->sha, group->g, 4, group->slab));
-  assert(goo_hash_item(&group->sha, group->h, 4, group->slab));
+  assert(goo_hash_int(&group->sha, group->g, 4, group->slab));
+  assert(goo_hash_int(&group->sha, group->h, 4, group->slab));
+  assert(goo_hash_int(&group->sha, group->n, group->size, group->slab));
+  goo_sha256_final(&group->sha, group->slab);
+
+  goo_sha256_init(&group->sha);
+  goo_sha256_update(&group->sha, GOO_HASH_PREFIX, 32);
+  goo_sha256_update(&group->sha, group->slab, 32);
 
   goo_sig_init(&group->sig);
   mpz_init(group->C1);
-  mpz_init(group->C1_inv);
-  mpz_init(group->C2_inv);
-  mpz_init(group->C3_inv);
-  mpz_init(group->Aq_inv);
-  mpz_init(group->Bq_inv);
-  mpz_init(group->Cq_inv);
-  mpz_init(group->Dq_inv);
+  mpz_init(group->C1i);
+  mpz_init(group->C2i);
+  mpz_init(group->C3i);
+  mpz_init(group->Aqi);
+  mpz_init(group->Bqi);
+  mpz_init(group->Cqi);
+  mpz_init(group->Dqi);
   mpz_init(group->A);
   mpz_init(group->B);
   mpz_init(group->C);
@@ -1666,9 +1642,9 @@ goo_group_init(
   mpz_init(group->E);
   mpz_init(group->z_w2_m_an);
   mpz_init(group->tmp);
-  mpz_init(group->chal_out);
-  mpz_init(group->ell_r_out);
-  mpz_init(group->elldiff);
+  mpz_init(group->chal0);
+  mpz_init(group->ell0);
+  mpz_init(group->ell1);
 
   mpz_init(group->e);
 
@@ -1694,23 +1670,23 @@ goo_group_uninit(goo_group_t *group) {
   group->combs_len = 0;
 
   for (i = 0; i < GOO_TABLEN; i++) {
-    mpz_clear(group->pctab_p1[i]);
-    mpz_clear(group->pctab_n1[i]);
-    mpz_clear(group->pctab_p2[i]);
-    mpz_clear(group->pctab_n2[i]);
+    mpz_clear(group->table_p1[i]);
+    mpz_clear(group->table_n1[i]);
+    mpz_clear(group->table_p2[i]);
+    mpz_clear(group->table_n2[i]);
   }
 
   goo_prng_uninit(&group->prng);
 
   goo_sig_uninit(&group->sig);
   mpz_clear(group->C1);
-  mpz_clear(group->C1_inv);
-  mpz_clear(group->C2_inv);
-  mpz_clear(group->C3_inv);
-  mpz_clear(group->Aq_inv);
-  mpz_clear(group->Bq_inv);
-  mpz_clear(group->Cq_inv);
-  mpz_clear(group->Dq_inv);
+  mpz_clear(group->C1i);
+  mpz_clear(group->C2i);
+  mpz_clear(group->C3i);
+  mpz_clear(group->Aqi);
+  mpz_clear(group->Bqi);
+  mpz_clear(group->Cqi);
+  mpz_clear(group->Dqi);
   mpz_clear(group->A);
   mpz_clear(group->B);
   mpz_clear(group->C);
@@ -1718,9 +1694,9 @@ goo_group_uninit(goo_group_t *group) {
   mpz_clear(group->E);
   mpz_clear(group->z_w2_m_an);
   mpz_clear(group->tmp);
-  mpz_clear(group->chal_out);
-  mpz_clear(group->ell_r_out);
-  mpz_clear(group->elldiff);
+  mpz_clear(group->chal0);
+  mpz_clear(group->ell0);
+  mpz_clear(group->ell1);
 
   mpz_clear(group->e);
 
@@ -1739,61 +1715,61 @@ goo_group_reduce(goo_group_t *group, mpz_t ret, const mpz_t b) {
 static int
 goo_group_is_reduced(goo_group_t *group, const mpz_t b) {
   /* b <= nh */
-  return mpz_cmp(b, group->nh) <= 0 ? 1 : 0;
+  return mpz_cmp(b, group->nh) <= 0;
 }
 
 static void
 goo_group_sqr(goo_group_t *group, mpz_t ret, const mpz_t b) {
   /* ret = b^2 mod n */
-  mpz_powm_ui(ret, b, 2, group->n);
+  mpz_mul(ret, b, b);
+  mpz_mod(ret, ret, group->n);
 }
 
 static void
-goo_group_pow(
-  goo_group_t *group,
-  mpz_t ret,
-  const mpz_t b,
-  const mpz_t b_inv,
-  const mpz_t e
-) {
+goo_group_pow(goo_group_t *group,
+              mpz_t ret,
+              const mpz_t b,
+              const mpz_t bi,
+              const mpz_t e) {
   /* ret = b^e mod n */
   mpz_powm(ret, b, e, group->n);
 }
 
 static void
 goo_group_mul(goo_group_t *group, mpz_t ret, const mpz_t m1, const mpz_t m2) {
-  /* ret = (m1 * m2) mod n */
+  /* ret = m1 * m2 mod n */
   mpz_mul(ret, m1, m2);
   mpz_mod(ret, ret, group->n);
 }
 
 static int
 goo_group_inv(goo_group_t *group, mpz_t ret, const mpz_t b) {
+  if (mpz_sgn(b) < 0)
+    return 0;
+
   /* ret = b^-1 mod n */
   return mpz_invert(ret, b, group->n);
 }
 
 static int
-goo_group_inv2(
-  goo_group_t *group,
-  mpz_t r1,
-  mpz_t r2,
-  const mpz_t b1,
-  const mpz_t b2
-) {
+goo_group_inv2(goo_group_t *group,
+               mpz_t r1,
+               mpz_t r2,
+               const mpz_t b1,
+               const mpz_t b2) {
   int r = 0;
-  mpz_ptr b12_inv = r2;
+  mpz_ptr b12i = r2;
 
-  /* b12_inv = (b1 * b2)^-1 mod n */
-  mpz_mul(b12_inv, b1, b2);
+  /* b12i = (b1 * b2)^-1 mod n */
+  mpz_mul(b12i, b1, b2);
 
-  if (!goo_group_inv(group, b12_inv, b12_inv))
+  if (!goo_group_inv(group, b12i, b12i))
     goto fail;
 
-  /* r1 = (b2 * b12_inv) mod n */
-  goo_group_mul(group, r1, b2, b12_inv);
-  /* r2 = (b1 * b12_inv) mod n */
-  goo_group_mul(group, r2, b1, b12_inv);
+  /* r1 = b2 * b12i mod n */
+  goo_group_mul(group, r1, b2, b12i);
+  /* r2 = b1 * b12i mod n */
+  goo_group_mul(group, r2, b1, b12i);
 
   r = 1;
 fail:
@@ -1801,23 +1777,21 @@ fail:
 }
 
 static int
-goo_group_inv7(
-  goo_group_t *group,
-  mpz_t r1,
-  mpz_t r2,
-  mpz_t r3,
-  mpz_t r4,
-  mpz_t r5,
-  mpz_t r6,
-  mpz_t r7,
-  const mpz_t b1,
-  const mpz_t b2,
-  const mpz_t b3,
-  const mpz_t b4,
-  const mpz_t b5,
-  const mpz_t b6,
-  const mpz_t b7
-) {
+goo_group_inv7(goo_group_t *group,
+               mpz_t r1,
+               mpz_t r2,
+               mpz_t r3,
+               mpz_t r4,
+               mpz_t r5,
+               mpz_t r6,
+               mpz_t r7,
+               const mpz_t b1,
+               const mpz_t b2,
+               const mpz_t b3,
+               const mpz_t b4,
+               const mpz_t b5,
+               const mpz_t b6,
+               const mpz_t b7) {
   int r = 0;
 
   /* Tricky memory management */
@@ -1828,55 +1802,55 @@ goo_group_inv7(
   mpz_ptr b1234 = r1;
   mpz_ptr b123456 = r5;
   mpz_ptr b1234567 = r7;
-  mpz_ptr b1234567_inv = r7;
-  mpz_ptr b123456_inv = r6;
-  mpz_ptr b1234_inv = r3;
-  mpz_ptr b56_inv = r1;
-  mpz_ptr b34_inv = r4;
-  mpz_ptr b12_inv = r2;
+  mpz_ptr b1234567i = r7;
+  mpz_ptr b123456i = r6;
+  mpz_ptr b1234i = r3;
+  mpz_ptr b56i = r1;
+  mpz_ptr b34i = r4;
+  mpz_ptr b12i = r2;
 
-  /* b12 = (b1 * b2) mod n */
+  /* b12 = b1 * b2 mod n */
   goo_group_mul(group, b12, b1, b2);
-  /* b34 = (b3 * b4) mod n */
+  /* b34 = b3 * b4 mod n */
   goo_group_mul(group, b34, b3, b4);
-  /* b56 = (b5 * b6) mod n */
+  /* b56 = b5 * b6 mod n */
   goo_group_mul(group, b56, b5, b6);
-  /* b1234 = (b12 * b34) mod n */
+  /* b1234 = b12 * b34 mod n */
   goo_group_mul(group, b1234, b12, b34);
-  /* b123456 = (b1234 * b56) mod n */
+  /* b123456 = b1234 * b56 mod n */
   goo_group_mul(group, b123456, b1234, b56);
-  /* b1234567 = (b123456 * b7) mod n */
+  /* b1234567 = b123456 * b7 mod n */
   goo_group_mul(group, b1234567, b123456, b7);
 
-  /* b1234567_inv = b1234567^-1 mod n */
-  if (!goo_group_inv(group, b1234567_inv, b1234567))
+  /* b1234567i = b1234567^-1 mod n */
+  if (!goo_group_inv(group, b1234567i, b1234567))
     goto fail;
 
-  /* b123456_inv = (b1234567_inv * b7) mod n */
-  goo_group_mul(group, b123456_inv, b1234567_inv, b7);
-  /* b1234_inv = (b123456_inv * b56) mod n */
-  goo_group_mul(group, b1234_inv, b123456_inv, b56);
-  /* b56_inv = (b123456_inv * b1234) mod n */
-  goo_group_mul(group, b56_inv, b123456_inv, b1234);
-  /* b34_inv = (b1234_inv * b12) mod n */
-  goo_group_mul(group, b34_inv, b1234_inv, b12);
-  /* b12_inv = (b1234_inv * b34) mod n */
-  goo_group_mul(group, b12_inv, b1234_inv, b34);
+  /* b123456i = b1234567i * b7 mod n */
+  goo_group_mul(group, b123456i, b1234567i, b7);
+  /* b1234i = b123456i * b56 mod n */
+  goo_group_mul(group, b1234i, b123456i, b56);
+  /* b56i = b123456i * b1234 mod n */
+  goo_group_mul(group, b56i, b123456i, b1234);
+  /* b34i = b1234i * b12 mod n */
+  goo_group_mul(group, b34i, b1234i, b12);
+  /* b12i = b1234i * b34 mod n */
+  goo_group_mul(group, b12i, b1234i, b34);
 
-  /* r7 = (b1234567_inv * b123456) mod n */
-  goo_group_mul(group, r7, b1234567_inv, b123456);
-  /* r5 = (b56_inv * b6) mod n */
-  goo_group_mul(group, r5, b56_inv, b6);
-  /* r6 = (b56_inv * b5) mod n */
-  goo_group_mul(group, r6, b56_inv, b5);
-  /* r1 = (b12_inv * b2) mod n */
-  goo_group_mul(group, r1, b12_inv, b2);
-  /* r2 = (b12_inv * b1) mod n */
-  goo_group_mul(group, r2, b12_inv, b1);
-  /* r3 = (b34_inv * b4) mod n */
-  goo_group_mul(group, r3, b34_inv, b4);
-  /* r4 = (b34_inv * b3) mod n */
-  goo_group_mul(group, r4, b34_inv, b3);
+  /* r7 = b1234567i * b123456 mod n */
+  goo_group_mul(group, r7, b1234567i, b123456);
+  /* r5 = b56i * b6 mod n */
+  goo_group_mul(group, r5, b56i, b6);
+  /* r6 = b56i * b5 mod n */
+  goo_group_mul(group, r6, b56i, b5);
+  /* r1 = b12i * b2 mod n */
+  goo_group_mul(group, r1, b12i, b2);
+  /* r2 = b12i * b1 mod n */
+  goo_group_mul(group, r2, b12i, b1);
+  /* r3 = b34i * b4 mod n */
+  goo_group_mul(group, r3, b34i, b4);
+  /* r4 = b34i * b3 mod n */
+  goo_group_mul(group, r4, b34i, b3);
 
   r = 1;
 fail:
@@ -1885,6 +1859,7 @@ fail:
 
 static int
 goo_group_powgh(goo_group_t *group, mpz_t ret, const mpz_t e1, const mpz_t e2) {
+  /* Compute g^e1 * h*e2 mod n. */
   long e1bits = (long)goo_mpz_bitlen(e1);
   long e2bits = (long)goo_mpz_bitlen(e2);
   long loge = e1bits > e2bits ? e1bits : e2bits;
@@ -1904,18 +1879,18 @@ goo_group_powgh(goo_group_t *group, mpz_t ret, const mpz_t e1, const mpz_t e2) {
   if (!gcomb || !hcomb)
     return 0;
 
-  if (!goo_to_comb_exp(gcomb, e1))
+  if (!goo_comb_recode(gcomb, e1))
     return 0;
 
-  if (!goo_to_comb_exp(hcomb, e2))
+  if (!goo_comb_recode(hcomb, e2))
     return 0;
 
   /* ret = 1 */
   mpz_set_ui(ret, 1);
 
   for (i = 0; i < gcomb->shifts; i++) {
-    long *e1vs = gcomb->wins[i];
-    long *e2vs = hcomb->wins[i];
+    long *us = gcomb->wins[i];
+    long *vs = hcomb->wins[i];
     long j;
 
     /* if ret != 1 */
@@ -1923,16 +1898,16 @@ goo_group_powgh(goo_group_t *group, mpz_t ret, const mpz_t e1, const mpz_t e2) {
       goo_group_sqr(group, ret, ret);
 
     for (j = 0; j < gcomb->adds_per_shift; j++) {
-      long e1v = e1vs[j];
-      long e2v = e2vs[j];
+      long u = us[j];
+      long v = vs[j];
 
-      if (e1v != 0) {
-        mpz_t *g = &gcomb->items[j * gcomb->points_per_subcomb + e1v - 1];
+      if (u != 0) {
+        mpz_t *g = &gcomb->items[j * gcomb->points_per_subcomb + u - 1];
         goo_group_mul(group, ret, ret, *g);
       }
 
-      if (e2v != 0) {
-        mpz_t *h = &hcomb->items[j * hcomb->points_per_subcomb + e2v - 1];
+      if (v != 0) {
+        mpz_t *h = &hcomb->items[j * hcomb->points_per_subcomb + v - 1];
         goo_group_mul(group, ret, ret, *h);
       }
     }
@@ -1948,23 +1923,30 @@ goo_group_powgh_slow(
   const mpz_t e1,
   const mpz_t e2
 ) {
+  /* Compute g^e1 * h*e2 mod n (slowly). */
   mpz_t q1, q2;
+
   mpz_init(q1);
   mpz_init(q2);
+
   /* q1 = g^e1 mod n */
   mpz_powm(q1, group->g, e1, group->n);
+
   /* q2 = h^e2 mod n */
   mpz_powm(q2, group->h, e2, group->n);
-  /* ret = (q1 * q2) mod n */
+
+  /* ret = q1 * q2 mod n */
   mpz_mul(ret, q1, q2);
   mpz_mod(ret, ret, group->n);
+
   mpz_clear(q1);
   mpz_clear(q2);
+
   return 1;
 }
 
 static void
-goo_group_wnaf_pc_help(goo_group_t *group, const mpz_t b, mpz_t *out) {
+goo_group_precomp_table(goo_group_t *group, mpz_t *out, const mpz_t b) {
   mpz_t *bsq = &out[GOO_TABLEN - 1];
   long i;
 
@@ -1981,15 +1963,13 @@ goo_group_wnaf_pc_help(goo_group_t *group, const mpz_t b, mpz_t *out) {
 }
 
 static void
-goo_group_precomp_wnaf(
-  goo_group_t *group,
-  const mpz_t b,
-  const mpz_t b_inv,
-  mpz_t *p,
-  mpz_t *n
-) {
-  goo_group_wnaf_pc_help(group, b, p);
-  goo_group_wnaf_pc_help(group, b_inv, n);
+goo_group_precomp_wnaf(goo_group_t *group,
+                       mpz_t *p,
+                       mpz_t *n,
+                       const mpz_t b,
+                       const mpz_t bi) {
+  goo_group_precomp_table(group, p, b);
+  goo_group_precomp_table(group, n, bi);
 }
 
 static long *
@@ -2007,7 +1987,7 @@ goo_group_wnaf(goo_group_t *group, const mpz_t exp, long *out, long bitlen) {
 
     /* if e & 1 */
     if (mpz_odd_p(*e)) {
-      /* val = e & mask; */
+      /* val = e & mask */
       val = (long)mpz_tdiv_ui(*e, mask + 1);
 
       if (val & (1 << (w - 1)))
@@ -2034,13 +2014,7 @@ goo_group_wnaf(goo_group_t *group, const mpz_t exp, long *out, long bitlen) {
 }
 
 static void
-goo_group_one_mul(
-  goo_group_t *group,
-  mpz_t ret,
-  long w,
-  mpz_t *p,
-  mpz_t *n
-) {
+goo_group_one_mul(goo_group_t *group, mpz_t ret, long w, mpz_t *p, mpz_t *n) {
   if (w > 0)
     goo_group_mul(group, ret, ret, p[(w - 1) >> 1]);
   else if (w < 0)
@@ -2048,38 +2022,36 @@ goo_group_one_mul(
 }
 
 static void
-goo_group_pow_wnaf(
-  goo_group_t *group,
-  mpz_t ret,
-  const mpz_t b,
-  const mpz_t b_inv,
-  const mpz_t e
-) {
+goo_group_pow_wnaf(goo_group_t *group,
+                   mpz_t ret,
+                   const mpz_t b,
+                   const mpz_t bi,
+                   const mpz_t e) {
   mpz_t *p, *n;
-  size_t totlen, i;
-  long *ebits;
+  size_t bits, i;
+  long *wnaf0;
 
-  if (b_inv == NULL) {
-    goo_group_pow(group, ret, b, b_inv, e);
+  if (bi == NULL) {
+    goo_group_pow(group, ret, b, bi, e);
     return;
   }
 
-  p = &group->pctab_p1[0];
-  n = &group->pctab_n1[0];
+  p = &group->table_p1[0];
+  n = &group->table_n1[0];
 
-  goo_group_precomp_wnaf(group, b, b_inv, p, n);
+  goo_group_precomp_wnaf(group, p, n, b, bi);
 
-  totlen = goo_mpz_bitlen(e) + 1;
+  bits = goo_mpz_bitlen(e) + 1;
 
-  assert(totlen <= GOO_ELL_BITS + 1);
+  assert(bits <= GOO_ELL_BITS + 1);
 
-  ebits = goo_group_wnaf(group, e, &group->e1bits[0], totlen);
+  wnaf0 = goo_group_wnaf(group, e, &group->wnaf1[0], bits);
 
   /* ret = 1 */
   mpz_set_ui(ret, 1);
 
-  for (i = 0; i < totlen; i++) {
-    long w = ebits[i];
+  for (i = 0; i < bits; i++) {
+    long w = wnaf0[i];
 
     /* if ret != 1 */
     if (mpz_cmp_ui(ret, 1) != 0)
@@ -2090,42 +2062,41 @@ goo_group_pow_wnaf(
 }
 
 static int
-goo_group_pow2(
-  goo_group_t *group,
-  mpz_t ret,
-  const mpz_t b1,
-  const mpz_t b1_inv,
-  const mpz_t e1,
-  const mpz_t b2,
-  const mpz_t b2_inv,
-  const mpz_t e2
-) {
-  mpz_t *p1 = &group->pctab_p1[0];
-  mpz_t *n1 = &group->pctab_n1[0];
-  mpz_t *p2 = &group->pctab_p2[0];
-  mpz_t *n2 = &group->pctab_n2[0];
-  size_t e1len, e2len, totlen, i;
-  long *e1bits, *e2bits;
+goo_group_pow2(goo_group_t *group,
+               mpz_t ret,
+               const mpz_t b1,
+               const mpz_t b1i,
+               const mpz_t e1,
+               const mpz_t b2,
+               const mpz_t b2i,
+               const mpz_t e2) {
+  /* Compute b1^e1 * b2^e2 mod n. */
+  mpz_t *p1 = &group->table_p1[0];
+  mpz_t *n1 = &group->table_n1[0];
+  mpz_t *p2 = &group->table_p2[0];
+  mpz_t *n2 = &group->table_n2[0];
+  size_t e1len, e2len, bits, i;
+  long *wnaf1, *wnaf2;
 
-  goo_group_precomp_wnaf(group, b1, b1_inv, p1, n1);
-  goo_group_precomp_wnaf(group, b2, b2_inv, p2, n2);
+  goo_group_precomp_wnaf(group, p1, n1, b1, b1i);
+  goo_group_precomp_wnaf(group, p2, n2, b2, b2i);
 
   e1len = goo_mpz_bitlen(e1);
   e2len = goo_mpz_bitlen(e2);
-  totlen = (e1len > e2len ? e1len : e2len) + 1;
+  bits = (e1len > e2len ? e1len : e2len) + 1;
 
-  if (totlen > GOO_ELL_BITS + 1)
+  if (bits > GOO_ELL_BITS + 1)
     return 0;
 
-  e1bits = goo_group_wnaf(group, e1, &group->e1bits[0], totlen);
-  e2bits = goo_group_wnaf(group, e2, &group->e2bits[0], totlen);
+  wnaf1 = goo_group_wnaf(group, e1, &group->wnaf1[0], bits);
+  wnaf2 = goo_group_wnaf(group, e2, &group->wnaf2[0], bits);
 
   /* ret = 1 */
   mpz_set_ui(ret, 1);
 
-  for (i = 0; i < totlen; i++) {
-    long w1 = e1bits[i];
-    long w2 = e2bits[i];
+  for (i = 0; i < bits; i++) {
+    long w1 = wnaf1[i];
+    long w2 = wnaf2[i];
 
     /* if ret != 1 */
     if (mpz_cmp_ui(ret, 1) != 0)
@@ -2139,58 +2110,61 @@ goo_group_pow2(
 }
 
 static int
-goo_group_pow2_slow(
-  goo_group_t *group,
-  mpz_t ret,
-  const mpz_t b1,
-  const mpz_t b1_inv,
-  const mpz_t e1,
-  const mpz_t b2,
-  const mpz_t b2_inv,
-  const mpz_t e2
-) {
+goo_group_pow2_slow(goo_group_t *group,
+                    mpz_t ret,
+                    const mpz_t b1,
+                    const mpz_t b1i,
+                    const mpz_t e1,
+                    const mpz_t b2,
+                    const mpz_t b2i,
+                    const mpz_t e2) {
+  /* Compute b1^e1 * b2^e2 mod n (slowly). */
   mpz_t q1, q2;
   mpz_init(q1);
   mpz_init(q2);
+
   /* q1 = b1^e2 mod n */
   mpz_powm(q1, b1, e1, group->n);
+
   /* q2 = b2^e2 mod n */
   mpz_powm(q2, b2, e2, group->n);
-  /* ret = (q1 * q2) mod n */
+
+  /* ret = q1 * q2 mod n */
   mpz_mul(ret, q1, q2);
   mpz_mod(ret, ret, group->n);
+
   mpz_clear(q1);
   mpz_clear(q2);
+
   return 1;
 }
 
 static int
-goo_group_recon(
-  goo_group_t *group,
-  mpz_t ret,
-  const mpz_t b1,
-  const mpz_t b1_inv,
-  const mpz_t e1,
-  const mpz_t b2,
-  const mpz_t b2_inv,
-  const mpz_t e2,
-  const mpz_t e3,
-  const mpz_t e4
-) {
+goo_group_recover(goo_group_t *group,
+                  mpz_t ret,
+                  const mpz_t b1,
+                  const mpz_t b1i,
+                  const mpz_t e1,
+                  const mpz_t b2,
+                  const mpz_t b2i,
+                  const mpz_t e2,
+                  const mpz_t e3,
+                  const mpz_t e4) {
+  /* Compute b1^e1 * g^e3 * h^e4 / b2^e2 mod n. */
   int r = 0;
-  mpz_ptr pow = ret;
-  mpz_t *gh = &group->gh;
+  mpz_ptr a = ret;
+  mpz_t *b = &group->gh;
 
-  /* pow = pow2(b1, b1_inv, e1, b2, b2_inv, e2) */
-  if (!goo_group_pow2(group, pow, b1, b1_inv, e1, b2, b2_inv, e2))
+  /* a = b1^e1 / b2^e2 mod n */
+  if (!goo_group_pow2(group, a, b1, b1i, e1, b2i, b2, e2))
     goto fail;
 
-  /* gh = powgh(e3, e4) */
-  if (!goo_group_powgh(group, *gh, e3, e4))
+  /* b = g^e3 * h^e4 mod n */
+  if (!goo_group_powgh(group, *b, e3, e4))
     goto fail;
 
-  /* ret = pow * gh */
-  goo_group_mul(group, ret, pow, *gh);
+  /* ret = a * b mod n */
+  goo_group_mul(group, ret, a, *b);
 
   /* ret = reduce(ret) */
   goo_group_reduce(group, ret, ret);
@@ -2201,12 +2175,10 @@ fail:
 }
 
 static int
-goo_hash_item(
-  goo_sha256_t *ctx,
-  const mpz_t n,
-  size_t size,
-  unsigned char *buf
-) {
+goo_hash_int(goo_sha256_t *ctx,
+             const mpz_t n,
+             size_t size,
+             unsigned char *buf) {
   size_t len, pos;
 
   if (mpz_sgn(n) < 0)
@@ -2233,40 +2205,38 @@ goo_hash_item(
 }
 
 static int
-goo_hash_all(
-  unsigned char *out,
-  goo_group_t *group,
-  const mpz_t C1,
-  const mpz_t C2,
-  const mpz_t C3,
-  const mpz_t t,
-  const mpz_t A,
-  const mpz_t B,
-  const mpz_t C,
-  const mpz_t D,
-  const mpz_t E,
-  const unsigned char *msg,
-  size_t msg_len
-) {
+goo_hash_all(unsigned char *out,
+             goo_group_t *group,
+             const mpz_t C1,
+             const mpz_t C2,
+             const mpz_t C3,
+             const mpz_t t,
+             const mpz_t A,
+             const mpz_t B,
+             const mpz_t C,
+             const mpz_t D,
+             const mpz_t E,
+             const unsigned char *msg,
+             size_t msg_len) {
   unsigned char *buf = &group->slab[0];
   size_t mod_bytes = group->size;
   size_t exp_bytes = (GOO_EXPONENT_SIZE + 7) / 8;
 
   goo_sha256_t ctx;
 
-  /* Copy the state of SHA256(prefix || n || g || h). */
-  /* This gives us a very minor speedup. */
+  /* Copy the state of SHA256(prefix || SHA256(g || h || n)). */
+  /* This gives us a minor speedup. */
   memcpy(&ctx, &group->sha, sizeof(goo_sha256_t));
 
-  if (!goo_hash_item(&ctx, C1, mod_bytes, buf)
-      || !goo_hash_item(&ctx, C2, mod_bytes, buf)
-      || !goo_hash_item(&ctx, C3, mod_bytes, buf)
-      || !goo_hash_item(&ctx, t, 4, buf)
-      || !goo_hash_item(&ctx, A, mod_bytes, buf)
-      || !goo_hash_item(&ctx, B, mod_bytes, buf)
-      || !goo_hash_item(&ctx, C, mod_bytes, buf)
-      || !goo_hash_item(&ctx, D, mod_bytes, buf)
-      || !goo_hash_item(&ctx, E, exp_bytes, buf)) {
+  if (!goo_hash_int(&ctx, C1, mod_bytes, buf)
+      || !goo_hash_int(&ctx, C2, mod_bytes, buf)
+      || !goo_hash_int(&ctx, C3, mod_bytes, buf)
+      || !goo_hash_int(&ctx, t, 4, buf)
+      || !goo_hash_int(&ctx, A, mod_bytes, buf)
+      || !goo_hash_int(&ctx, B, mod_bytes, buf)
+      || !goo_hash_int(&ctx, C, mod_bytes, buf)
+      || !goo_hash_int(&ctx, D, mod_bytes, buf)
+      || !goo_hash_int(&ctx, E, exp_bytes, buf)) {
     return 0;
   }
 
@@ -2277,65 +2247,36 @@ goo_hash_all(
 }
 
 static int
-goo_group_fs_chal(
-  goo_group_t *group,
-  mpz_t chal,
-  mpz_t ell,
-  unsigned char *k,
-  const mpz_t C1,
-  const mpz_t C2,
-  const mpz_t C3,
-  const mpz_t t,
-  const mpz_t A,
-  const mpz_t B,
-  const mpz_t C,
-  const mpz_t D,
-  const mpz_t E,
-  const unsigned char *msg,
-  size_t msg_len,
-  int verify
-) {
-  unsigned char key[32];
-
-  if (!goo_hash_all(&key[0], group, C1, C2, C3, t, A, B, C, D, E, msg, msg_len))
+goo_group_derive(goo_group_t *group,
+                 mpz_t chal,
+                 mpz_t ell,
+                 unsigned char *key,
+                 const mpz_t C1,
+                 const mpz_t C2,
+                 const mpz_t C3,
+                 const mpz_t t,
+                 const mpz_t A,
+                 const mpz_t B,
+                 const mpz_t C,
+                 const mpz_t D,
+                 const mpz_t E,
+                 const unsigned char *msg,
+                 size_t msg_len) {
+  if (!goo_hash_all(key, group, C1, C2, C3, t, A, B, C, D, E, msg, msg_len))
     return 0;
 
-  goo_prng_seed(&group->prng, &key[0]);
-  goo_prng_random_bits_nz(&group->prng, chal, GOO_CHAL_BITS);
-  goo_prng_random_bits_nz(&group->prng, ell, GOO_ELL_BITS);
-
-  if (k != NULL)
-    memcpy(k, key, 32);
-
-  if (!verify) {
-    /* For prover, call next_prime on ell_r to get ell. */
-    if (!goo_next_prime(ell, ell, key, GOO_ELLDIFF_MAX)) {
-      mpz_set_ui(chal, 0);
-      mpz_set_ui(ell, 0);
-      return 1;
-    }
-  }
+  goo_prng_seed(&group->prng, key);
+  goo_prng_random_bits(&group->prng, chal, GOO_CHAL_BITS);
+  goo_prng_random_bits(&group->prng, ell, GOO_ELL_BITS);
 
   return 1;
 }
 
 static int
-goo_group_expand_sprime(goo_group_t *group, mpz_t s, const mpz_t s_prime) {
-  unsigned char key[32];
-  size_t bytes = goo_mpz_bytelen(s_prime);
-  size_t pos;
-
-  if (bytes > 32)
-    return 0;
-
-  pos = 32 - bytes;
-
-  memset(&key[0], 0x00, pos);
-  goo_mpz_export(&key[pos], NULL, s_prime);
-
-  goo_prng_seed(&group->prng, &key[0]);
-  goo_prng_random_bits_nz(&group->prng, s, GOO_EXPONENT_SIZE);
-
+goo_group_expand_sprime(goo_group_t *group, mpz_t s,
+                        const unsigned char *s_prime) {
+  goo_prng_seed(&group->prng, s_prime);
+  goo_prng_random_bits(&group->prng, s, GOO_EXPONENT_SIZE);
   return 1;
 }
 
@@ -2346,7 +2287,7 @@ goo_group_random_scalar(goo_group_t *group, mpz_t ret) {
   if (bits > GOO_EXPONENT_SIZE)
     bits = GOO_EXPONENT_SIZE;
 
-  return goo_random_bits_nz(ret, bits);
+  return goo_random_bits(ret, bits);
 }
 
 static int
@@ -2384,52 +2325,38 @@ goo_is_valid_rsa(const mpz_t n) {
 }
 
 static int
-goo_group_generate(goo_group_t *group, mpz_t s_prime) {
-  /* s_prime = randbits(256) */
-  if (!goo_random_bits_nz(s_prime, 256))
-    return 0;
-
-  return 1;
+goo_group_generate(goo_group_t *group, unsigned char *s_prime) {
+  return goo_random(s_prime, 32);
 }
 
 static int
-goo_group_challenge(
-  goo_group_t *group,
-  mpz_t C1,
-  const mpz_t s_prime,
-  const mpz_t n
-) {
+goo_group_challenge(goo_group_t *group,
+                    mpz_t C1,
+                    const unsigned char *s_prime,
+                    const mpz_t n) {
   int r = 0;
-
   mpz_t s;
+
   mpz_init(s);
 
-  if (mpz_sgn(s_prime) <= 0) {
-    /* Invalid seed length. */
-    goto fail;
-  }
+  VERIFY_POS(n);
 
-  /* if n < 2^1023 or n > 2^4096 - 1 */
   if (!goo_is_valid_rsa(n)) {
     /* Invalid RSA public key. */
     goto fail;
   }
 
-  /* s = expand_sprime(s_prime) */
   if (!goo_group_expand_sprime(group, s, s_prime))
     goto fail;
 
-  /* The challenge: a commitment to the RSA modulus. */
-  /* C1 = powgh(n, s) */
+  /* Commit to the RSA modulus:
+   *
+   *   C1 = g^n * h^s in G
+   */
   if (!goo_group_powgh(group, C1, n, s))
     goto fail;
 
-  /* C1 = reduce(C1) */
   goo_group_reduce(group, C1, C1);
-
-  /* if C1 <= 0 */
-  if (mpz_sgn(C1) <= 0)
-    goto fail;
 
   r = 1;
 fail:
@@ -2438,13 +2365,11 @@ fail:
 }
 
 static int
-goo_group_validate(
-  goo_group_t *group,
-  const mpz_t s_prime,
-  const mpz_t C1,
-  const mpz_t p,
-  const mpz_t q
-) {
+goo_group_validate(goo_group_t *group,
+                   const unsigned char *s_prime,
+                   const mpz_t C1,
+                   const mpz_t p,
+                   const mpz_t q) {
   int r = 0;
   mpz_t n, s, x;
 
@@ -2452,45 +2377,35 @@ goo_group_validate(
   mpz_init(s);
   mpz_init(x);
 
-  /* if s_prime <= 0 or C1 <= 0 or p <= 0 or q <= 0 */
-  if (mpz_sgn(s_prime) <= 0
-      || mpz_sgn(C1) <= 0
-      || mpz_sgn(p) <= 0
-      || mpz_sgn(q) <= 0) {
-    /* Invalid parameters. */
-    goto fail;
-  }
+  VERIFY_POS(C1);
+  VERIFY_POS(p);
+  VERIFY_POS(q);
 
-  /* if p > 2^4096 - 1 or q > 2^4096 - 1 */
   if (!goo_is_valid_prime(p) || !goo_is_valid_prime(q))
     goto fail;
 
-  /* n = p * q */
+  if (!goo_group_is_reduced(group, C1))
+    goto fail;
+
+  /* Validate the private key with:
+   *
+   *   n = p * q
+   *   C1' = g^n * h^s in G
+   *   C1 == C1'
+   */
   mpz_mul(n, p, q);
 
-  /* if n < 2^1023 or n > 2^4096 - 1 */
-  if (!goo_is_valid_rsa(n)) {
-    /* Invalid RSA private key. */
+  if (!goo_is_valid_rsa(n))
     goto fail;
-  }
 
-  /* s = expand_sprime(s_prime) */
   if (!goo_group_expand_sprime(group, s, s_prime))
     goto fail;
 
-  /* The challenge: a commitment to the RSA modulus. */
-  /* x = powgh(n, s) */
   if (!goo_group_powgh(group, x, n, s))
     goto fail;
 
-  /* x = reduce(x) */
   goo_group_reduce(group, x, x);
 
-  /* if x <= 0 */
-  if (mpz_sgn(x) <= 0)
-    goto fail;
-
-  /* if C1 != x */
   if (mpz_cmp(C1, x) != 0)
     goto fail;
 
@@ -2503,18 +2418,17 @@ fail:
 }
 
 static int
-goo_group_sign(
-  goo_group_t *group,
-  goo_sig_t *sig,
-  const unsigned char *msg,
-  size_t msg_len,
-  const mpz_t s_prime,
-  const mpz_t p,
-  const mpz_t q
-) {
+goo_group_sign(goo_group_t *group,
+               goo_sig_t *sig,
+               const unsigned char *msg,
+               size_t msg_len,
+               const unsigned char *s_prime,
+               const mpz_t p,
+               const mpz_t q) {
   int r = 0;
   int found;
   unsigned long primes[GOO_PRIMES_LEN];
+  unsigned char key[32];
   long i;
 
   mpz_t *C2 = &sig->C2;
@@ -2537,8 +2451,8 @@ goo_group_sign(
   mpz_t *z_s2 = &sig->z_s2;
 
   mpz_t n, s, C1, w, a, s1, s2;
-  mpz_t x, y, z, xx, yy;
-  mpz_t C1_inv, C2_inv;
+  mpz_t t1, t2, t3, t4, t5;
+  mpz_t C1i, C2i;
   mpz_t r_w, r_w2, r_s1, r_a, r_an, r_s1w, r_sa, r_s2;
   mpz_t A, B, C, D, E;
 
@@ -2549,13 +2463,13 @@ goo_group_sign(
   mpz_init(a);
   mpz_init(s1);
   mpz_init(s2);
-  mpz_init(x);
-  mpz_init(y);
-  mpz_init(z);
-  mpz_init(xx);
-  mpz_init(yy);
-  mpz_init(C1_inv);
-  mpz_init(C2_inv);
+  mpz_init(t1);
+  mpz_init(t2);
+  mpz_init(t3);
+  mpz_init(t4);
+  mpz_init(t5);
+  mpz_init(C1i);
+  mpz_init(C2i);
   mpz_init(r_w);
   mpz_init(r_w2);
   mpz_init(r_s1);
@@ -2570,35 +2484,26 @@ goo_group_sign(
   mpz_init(D);
   mpz_init(E);
 
-  /* if s_prime <= 0 or p <= 0 or q <= 0 */
-  if (mpz_sgn(s_prime) <= 0
-      || mpz_sgn(p) <= 0
-      || mpz_sgn(q) <= 0) {
-    goto fail;
-  }
+  VERIFY_POS(p);
+  VERIFY_POS(q);
 
-  /* if p > 2^4096 - 1 or q > 2^4096 - 1 */
   if (!goo_is_valid_prime(p) || !goo_is_valid_prime(q))
     goto fail;
 
-  /* n = p * q */
   mpz_mul(n, p, q);
 
-  /* if n < 2^1023 or n > 2^4096 - 1 */
   if (!goo_is_valid_rsa(n)) {
     /* Invalid RSA public key. */
     goto fail;
   }
 
-  /* Preliminaries: compute values P needs to run the ZKPOK. */
-  /* Find `t`. */
+  /* Find a small quadratic residue prime `t`. */
   found = 0;
 
   memcpy(&primes[0], &goo_primes[0], sizeof(goo_primes));
 
   for (i = 0; i < GOO_PRIMES_LEN; i++) {
     /* Partial in-place Fisher-Yates shuffle to choose random t. */
-    /* Note: goo_random_num() is _exclusive_ of endpoints! */
     unsigned long j = goo_random_num(GOO_PRIMES_LEN - i);
     unsigned long u = primes[i];
     unsigned long v = primes[i + j];
@@ -2606,10 +2511,9 @@ goo_group_sign(
     primes[i] = v;
     primes[i + j] = u;
 
-    /* t = small_primes[i] */
     mpz_set_ui(*t, primes[i]);
 
-    /* w = mod_sqrtn(t, p, q) */
+    /* w = t^(1 / 2) mod (p * q) */
     if (goo_mpz_sqrtpq(w, *t, p, q)) {
       found = 1;
       break;
@@ -2621,47 +2525,42 @@ goo_group_sign(
     goto fail;
   }
 
-  /* assert w > 0 */
   assert(mpz_sgn(w) > 0);
 
-  /* a = w^2 - t */
+  /* a = (w^2 - t) / n */
   mpz_pow_ui(a, w, 2);
   mpz_sub(a, a, *t);
-
-  /* a = a / n */
   mpz_fdiv_q(a, a, n);
 
-  /* assert a >= 0 */
   assert(mpz_sgn(a) >= 0);
 
-  /* x = a * n */
-  mpz_mul(x, a, n);
+  /* `w` and `a` must satisfy `w^2 = t + a * n`. */
+  mpz_mul(t1, a, n);
+  mpz_pow_ui(t2, w, 2);
+  mpz_sub(t2, t2, *t);
 
-  /* y = w^2 - t */
-  mpz_pow_ui(y, w, 2);
-  mpz_sub(y, y, *t);
-
-  /* if x != y */
-  if (mpz_cmp(x, y) != 0) {
+  if (mpz_cmp(t1, t2) != 0) {
     /* w^2 - t was not divisible by N! */
     goto fail;
   }
 
-  /* Commitment to `n`. */
-  /* s = expand_sprime(s_prime) */
+  /* Commit to `n`, `w`, and `a` with:
+   *
+   *   C1 = g^n * h^s in G
+   *   C2 = g^w * h^s1 in G
+   *   C3 = g^a * h^s2 in G
+   *
+   * Where `s`, `s1`, and `s2` are
+   * random 2048-bit integers.
+   */
   if (!goo_group_expand_sprime(group, s, s_prime))
     goto fail;
 
-  /* C1 = powgh(n, s) */
   if (!goo_group_powgh(group, C1, n, s))
     goto fail;
 
-  /* C1 = reduce(C1) */
   goo_group_reduce(group, C1, C1);
 
-  /* Commitment to `w`. */
-  /* s1 = rand_scalar() */
-  /* C2 = powgh(w, s1) */
   if (!goo_group_random_scalar(group, s1)
       || !goo_group_powgh(group, *C2, w, s1)) {
     goto fail;
@@ -2669,9 +2568,6 @@ goo_group_sign(
 
   goo_group_reduce(group, *C2, *C2);
 
-  /* Commitment to `a`. */
-  /* s2 = rand_scalar() */
-  /* C3 = powgh(a, s2) */
   if (!goo_group_random_scalar(group, s2)
       || !goo_group_powgh(group, *C3, a, s2)) {
     goto fail;
@@ -2680,13 +2576,11 @@ goo_group_sign(
   goo_group_reduce(group, *C3, *C3);
 
   /* Inverses of `C1` and `C2`. */
-  /* [C1_inv, C2_inv] = inv2(C1, C2) */
-  if (!goo_group_inv2(group, C1_inv, C2_inv, C1, *C2))
+  if (!goo_group_inv2(group, C1i, C2i, C1, *C2))
     goto fail;
 
-  /* P's first message: commit to randomness. */
-  /* P's randomness (except for r_s1; see "V's message", below). */
-  /* [r_w, r_w2, r_a, r_an, r_s1w, r_sa, r_s2] = rand_scalar(7) */
+  /* Eight random 2048-bit integers: */
+  /*   r_w, r_w2, r_s1, r_a, r_an, r_s1w, r_sa, r_s2 */
   if (!goo_group_random_scalar(group, r_w)
       || !goo_group_random_scalar(group, r_w2)
       || !goo_group_random_scalar(group, r_a)
@@ -2697,56 +2591,49 @@ goo_group_sign(
     goto fail;
   }
 
-  /* Prevent E from being negative. */
-  if (mpz_cmp(r_w2, r_an) < 0) {
-    /* [r_w2, r_an] = [r_an, r_w2] */
+  /* Prevent `E` from being negative. */
+  if (mpz_cmp(r_w2, r_an) < 0)
     mpz_swap(r_w2, r_an);
-  }
 
-  /* P's first message (except for A; see "V's message", below). */
-  /* B = powgh(r_a, r_s2) */
+  /* Compute:
+   *
+   *   A = g^r_w * h^r_s1 in G
+   *   B = g^r_a * h^r_s2 in G
+   *   C = g^r_w2 * h^r_s1w / C2^r_w in G
+   *   D = g^r_an * h^r_sa / C1^r_a in G
+   *   E = r_w2 - r_an
+   *
+   * `A` must be recomputed until a prime
+   * `ell` is found within range.
+   */
   if (!goo_group_powgh(group, B, r_a, r_s2))
     goto fail;
 
   goo_group_reduce(group, B, B);
 
-  /* C = pow(C2_inv, C2, r_w) * powgh(r_w2, r_s1w) */
-  goo_group_pow(group, x, C2_inv, *C2, r_w);
+  goo_group_pow(group, t1, C2i, *C2, r_w);
 
-  if (!goo_group_powgh(group, y, r_w2, r_s1w))
+  if (!goo_group_powgh(group, t2, r_w2, r_s1w))
     goto fail;
 
-  goo_group_mul(group, C, x, y);
+  goo_group_mul(group, C, t1, t2);
   goo_group_reduce(group, C, C);
 
-  /* D = pow(C1_inv, C1, r_a) * powgh(r_an, r_sa) */
-  goo_group_pow(group, x, C1_inv, C1, r_a);
+  goo_group_pow(group, t1, C1i, C1, r_a);
 
-  if (!goo_group_powgh(group, y, r_an, r_sa))
+  if (!goo_group_powgh(group, t2, r_an, r_sa))
     goto fail;
 
-  goo_group_mul(group, D, x, y);
+  goo_group_mul(group, D, t1, t2);
   goo_group_reduce(group, D, D);
 
-  /* E = r_w2 - r_an */
   mpz_sub(E, r_w2, r_an);
 
-  /* assert E >= 0 */
   assert(mpz_sgn(E) >= 0);
 
-  /* ell = 0 */
   mpz_set_ui(*ell, 0);
 
-  /* V's message: random challenge and random prime. */
-  /* while bitlen(ell) != ELL_BITS */
   while (goo_mpz_bitlen(*ell) != GOO_ELL_BITS) {
-    /* Randomize the signature until Fiat-Shamir */
-    /* returns an admissable ell. Note that it's */
-    /* not necessary to re-start the whole */
-    /* signature! Just pick a new r_s1, which */
-    /* only requires re-computing A. */
-    /* r_s1 = rand_scalar() */
-    /* A = powgh(r_w, r_s1) */
     if (!goo_group_random_scalar(group, r_s1)
         || !goo_group_powgh(group, A, r_w, r_s1)) {
       goto fail;
@@ -2754,98 +2641,108 @@ goo_group_sign(
 
     goo_group_reduce(group, A, A);
 
-    /* [chal, ell] = fs_chal(C1, C2, C3, t, A, B, C, D, E, msg) */
-    if (!goo_group_fs_chal(group,
-                           *chal, *ell, NULL, C1, *C2, *C3,
-                           *t, A, B, C, D, E, msg, msg_len, 0)) {
+    if (!goo_group_derive(group,
+                          *chal, *ell, &key[0], C1, *C2, *C3,
+                          *t, A, B, C, D, E, msg, msg_len)) {
       goto fail;
     }
+
+    if (!goo_next_prime(*ell, *ell, key, GOO_ELLDIFF_MAX))
+      mpz_set_ui(*ell, 0);
   }
 
-  /* P's second message: compute quotient message. */
-  /* Compute z' = c*(w, w2, s1, a, an, s1w, sa, s2) */
-  /*            + (r_w, r_w2, r_s1, r_a, r_an, r_s1w, r_sa, r_s2) */
-  /* z_w = chal * w + r_w */
+  /* Compute the integer vector `z`:
+   *
+   *   z_w = chal * w + r_w
+   *   z_w2 = chal * w^2 + r_w2
+   *   z_s1 = chal * s1 + r_s1
+   *   z_a = chal * a + r_a
+   *   z_an = chal * a * n + r_an
+   *   z_s1w = chal * s1 * w + r_s1w
+   *   z_sa = chal * s * a + r_sa
+   *   z_s2 = chal * s2 + r_s2
+   */
   mpz_mul(*z_w, *chal, w);
   mpz_add(*z_w, *z_w, r_w);
-  /* z_w2 = chal * w * w + r_w2 */
+
   mpz_mul(*z_w2, *chal, w);
   mpz_mul(*z_w2, *z_w2, w);
   mpz_add(*z_w2, *z_w2, r_w2);
-  /* z_s1 = chal * s1 + r_s1 */
+
   mpz_mul(*z_s1, *chal, s1);
   mpz_add(*z_s1, *z_s1, r_s1);
-  /* z_a = chal * a + r_a */
+
   mpz_mul(*z_a, *chal, a);
   mpz_add(*z_a, *z_a, r_a);
-  /* z_an = chal * a * n + r_an */
+
   mpz_mul(*z_an, *chal, a);
   mpz_mul(*z_an, *z_an, n);
   mpz_add(*z_an, *z_an, r_an);
-  /* z_s1w = chal * s1 * w + r_s1w */
+
   mpz_mul(*z_s1w, *chal, s1);
   mpz_mul(*z_s1w, *z_s1w, w);
   mpz_add(*z_s1w, *z_s1w, r_s1w);
-  /* z_sa = chal * s * a + r_sa */
+
   mpz_mul(*z_sa, *chal, s);
   mpz_mul(*z_sa, *z_sa, a);
   mpz_add(*z_sa, *z_sa, r_sa);
-  /* z_s2 = chal * s2 + r_s2 */
+
   mpz_mul(*z_s2, *chal, s2);
   mpz_add(*z_s2, *z_s2, r_s2);
 
-  /* Compute quotient commitments. */
+  /* Compute quotient commitments:
+   *
+   *   Aq = g^(z_w / ell) * h^(z_s1  / ell) in G
+   *   Bq = g^(z_a / ell) * h^(z_s2  / ell) in G
+   *   Cq = g^(z_w2 / ell) * h^(z_s1w / ell) / C2^(z_w / ell) in G
+   *   Dq = g^(z_an / ell) * h^(z_sa  / ell) / C1^(z_a / ell) in G
+   *   Eq = (z_w2 - z_an) / ell
+   */
+  mpz_fdiv_q(t1, *z_w, *ell);
+  mpz_fdiv_q(t2, *z_s1, *ell);
 
-  /* Aq = powgh(z_w / ell, z_s1 / ell) */
-  mpz_fdiv_q(x, *z_w, *ell);
-  mpz_fdiv_q(y, *z_s1, *ell);
-
-  if (!goo_group_powgh(group, *Aq, x, y))
+  if (!goo_group_powgh(group, *Aq, t1, t2))
     goto fail;
 
   goo_group_reduce(group, *Aq, *Aq);
 
-  /* Bq = powgh(z_a / ell, z_s2 / ell) */
-  mpz_fdiv_q(x, *z_a, *ell);
-  mpz_fdiv_q(y, *z_s2, *ell);
+  mpz_fdiv_q(t1, *z_a, *ell);
+  mpz_fdiv_q(t2, *z_s2, *ell);
 
-  if (!goo_group_powgh(group, *Bq, x, y))
+  if (!goo_group_powgh(group, *Bq, t1, t2))
     goto fail;
 
   goo_group_reduce(group, *Bq, *Bq);
 
-  /* Cq = pow(C2_inv, C2, z_w / ell) * powgh(z_w2 / ell, z_s1w / ell) */
-  mpz_fdiv_q(x, *z_w, *ell);
-  mpz_fdiv_q(y, *z_w2, *ell);
-  mpz_fdiv_q(z, *z_s1w, *ell);
-  goo_group_pow(group, xx, C2_inv, *C2, x);
+  mpz_fdiv_q(t1, *z_w, *ell);
+  mpz_fdiv_q(t2, *z_w2, *ell);
+  mpz_fdiv_q(t3, *z_s1w, *ell);
+  goo_group_pow(group, t4, C2i, *C2, t1);
 
-  if (!goo_group_powgh(group, yy, y, z))
+  if (!goo_group_powgh(group, t5, t2, t3))
     goto fail;
 
-  goo_group_mul(group, *Cq, xx, yy);
+  goo_group_mul(group, *Cq, t4, t5);
   goo_group_reduce(group, *Cq, *Cq);
 
-  /* Dq = pow(C1_inv, C2, z_a / ell) * powgh(z_an / ell, z_sa / ell) */
-  mpz_fdiv_q(x, *z_a, *ell);
-  mpz_fdiv_q(y, *z_an, *ell);
-  mpz_fdiv_q(z, *z_sa, *ell);
-  goo_group_pow(group, xx, C1_inv, C1, x);
+  mpz_fdiv_q(t1, *z_a, *ell);
+  mpz_fdiv_q(t2, *z_an, *ell);
+  mpz_fdiv_q(t3, *z_sa, *ell);
+  goo_group_pow(group, t4, C1i, C1, t1);
 
-  if (!goo_group_powgh(group, yy, y, z))
+  if (!goo_group_powgh(group, t5, t2, t3))
     goto fail;
 
-  goo_group_mul(group, *Dq, xx, yy);
+  goo_group_mul(group, *Dq, t4, t5);
   goo_group_reduce(group, *Dq, *Dq);
 
-  /* Eq = (z_w2 - z_an) / ell */
   mpz_sub(*Eq, *z_w2, *z_an);
   mpz_fdiv_q(*Eq, *Eq, *ell);
 
-  /* assert Eq >= 0 */
   assert(mpz_sgn(*Eq) >= 0);
   assert(goo_mpz_bitlen(*Eq) <= GOO_EXPONENT_SIZE);
 
+  /* Compute `z' = (z mod ell)`. */
   mpz_mod(*z_w, *z_w, *ell);
   mpz_mod(*z_w2, *z_w2, *ell);
   mpz_mod(*z_s1, *z_s1, *ell);
@@ -2855,37 +2752,7 @@ goo_group_sign(
   mpz_mod(*z_sa, *z_sa, *ell);
   mpz_mod(*z_s2, *z_s2, *ell);
 
-  /* Check for zero. Should almost never happen. */
-  if (mpz_sgn(*chal) == 0
-      || mpz_sgn(C1) == 0
-      || mpz_sgn(*C2) == 0
-      || mpz_sgn(*C3) == 0
-      || mpz_sgn(A) == 0
-      || mpz_sgn(B) == 0
-      || mpz_sgn(C) == 0
-      || mpz_sgn(D) == 0
-      || mpz_sgn(E) == 0
-      || mpz_sgn(*Aq) == 0
-      || mpz_sgn(*Bq) == 0
-      || mpz_sgn(*Cq) == 0
-      || mpz_sgn(*Dq) == 0
-      || mpz_sgn(*Eq) == 0
-      || mpz_sgn(*z_w) == 0
-      || mpz_sgn(*z_w2) == 0
-      || mpz_sgn(*z_s1) == 0
-      || mpz_sgn(*z_a) == 0
-      || mpz_sgn(*z_an) == 0
-      || mpz_sgn(*z_s1w) == 0
-      || mpz_sgn(*z_sa) == 0
-      || mpz_sgn(*z_s2) == 0) {
-    /* Try again. */
-    r = 2;
-    goto fail;
-  }
-
-  /* z_prime: (z_w, z_w2, z_s1, z_a, z_an, z_s1w, z_sa, z_s2). */
-  /* Signature: (chal, ell, Aq, Bq, Cq, Dq, Eq, z_prime). */
-
+  /* S = (C2, C3, t, chal, ell, Aq, Bq, Cq, Dq, Eq, z') */
   r = 1;
 fail:
   mpz_clear(n);
@@ -2895,13 +2762,13 @@ fail:
   mpz_clear(a);
   mpz_clear(s1);
   mpz_clear(s2);
-  mpz_clear(x);
-  mpz_clear(y);
-  mpz_clear(z);
-  mpz_clear(xx);
-  mpz_clear(yy);
-  mpz_clear(C1_inv);
-  mpz_clear(C2_inv);
+  mpz_clear(t1);
+  mpz_clear(t2);
+  mpz_clear(t3);
+  mpz_clear(t4);
+  mpz_clear(t5);
+  mpz_clear(C1i);
+  mpz_clear(C2i);
   mpz_clear(r_w);
   mpz_clear(r_w2);
   mpz_clear(r_s1);
@@ -2916,20 +2783,15 @@ fail:
   mpz_clear(D);
   mpz_clear(E);
 
-  if (r == 2)
-    return goo_group_sign(group, sig, msg, msg_len, s_prime, p, q);
-
   return r;
 }
 
 static int
-goo_group_verify(
-  goo_group_t *group,
-  const unsigned char *msg,
-  size_t msg_len,
-  const goo_sig_t *sig,
-  const mpz_t C1
-) {
+goo_group_verify(goo_group_t *group,
+                 const unsigned char *msg,
+                 size_t msg_len,
+                 const goo_sig_t *sig,
+                 const mpz_t C1) {
   const mpz_t *C2 = &sig->C2;
   const mpz_t *C3 = &sig->C3;
   const mpz_t *t = &sig->t;
@@ -2949,13 +2811,13 @@ goo_group_verify(
   const mpz_t *z_sa = &sig->z_sa;
   const mpz_t *z_s2 = &sig->z_s2;
 
-  mpz_t *C1_inv = &group->C1_inv;
-  mpz_t *C2_inv = &group->C2_inv;
-  mpz_t *C3_inv = &group->C3_inv;
-  mpz_t *Aq_inv = &group->Aq_inv;
-  mpz_t *Bq_inv = &group->Bq_inv;
-  mpz_t *Cq_inv = &group->Cq_inv;
-  mpz_t *Dq_inv = &group->Dq_inv;
+  mpz_t *C1i = &group->C1i;
+  mpz_t *C2i = &group->C2i;
+  mpz_t *C3i = &group->C3i;
+  mpz_t *Aqi = &group->Aqi;
+  mpz_t *Bqi = &group->Bqi;
+  mpz_t *Cqi = &group->Cqi;
+  mpz_t *Dqi = &group->Dqi;
   mpz_t *A = &group->A;
   mpz_t *B = &group->B;
   mpz_t *C = &group->C;
@@ -2963,22 +2825,37 @@ goo_group_verify(
   mpz_t *E = &group->E;
   mpz_t *z_w2_m_an = &group->z_w2_m_an;
   mpz_t *tmp = &group->tmp;
-  mpz_t *chal_out = &group->chal_out;
-  mpz_t *ell_r_out = &group->ell_r_out;
-  mpz_t *elldiff = &group->elldiff;
+  mpz_t *chal0 = &group->chal0;
+  mpz_t *ell0 = &group->ell0;
+  mpz_t *ell1 = &group->ell1;
 
   unsigned char key[32];
   int found, i;
 
-  /* if t <= 0 */
-  if (mpz_sgn(*t) <= 0)
-    return 0;
+  VERIFY_POS(C1);
+  VERIFY_POS(*C2);
+  VERIFY_POS(*C3);
+  VERIFY_POS(*t);
+  VERIFY_POS(*chal);
+  VERIFY_POS(*ell);
+  VERIFY_POS(*Aq);
+  VERIFY_POS(*Bq);
+  VERIFY_POS(*Cq);
+  VERIFY_POS(*Dq);
+  VERIFY_POS(*Eq);
+  VERIFY_POS(*z_w);
+  VERIFY_POS(*z_w2);
+  VERIFY_POS(*z_s1);
+  VERIFY_POS(*z_a);
+  VERIFY_POS(*z_an);
+  VERIFY_POS(*z_s1w);
+  VERIFY_POS(*z_sa);
+  VERIFY_POS(*z_s2);
 
   /* `t` must be one of the small primes in our list. */
   found = 0;
 
   for (i = 0; i < GOO_PRIMES_LEN; i++) {
-    /* if t == primes[i] */
     if (mpz_cmp_ui(*t, goo_primes[i]) == 0) {
       found = 1;
       break;
@@ -2988,127 +2865,113 @@ goo_group_verify(
   if (!found)
     return 0;
 
-  /* if chal <= 0 || bitlen(chal) > CHAL_BITS */
-  if (mpz_sgn(*chal) <= 0 || goo_mpz_bitlen(*chal) > GOO_CHAL_BITS)
+  /* `chal` must be in range. */
+  if (goo_mpz_bitlen(*chal) > GOO_CHAL_BITS)
     return 0;
 
-  /* if ell <= 0 || bitlen(ell) > ELL_BITS */
-  if (mpz_sgn(*ell) <= 0 || goo_mpz_bitlen(*ell) > GOO_ELL_BITS)
+  /* `ell` must be in range. */
+  if (goo_mpz_bitlen(*ell) > GOO_ELL_BITS)
     return 0;
 
-  /* if ell & 1 == 0 */
-  if (!mpz_odd_p(*ell))
-    return 0;
-
-  /* All group elements must be the "canonical" */
+  /* All group elements must be the canonical */
   /* element of the quotient group (Z/n)/{1,-1}. */
-  if (mpz_sgn(C1) <= 0 || !goo_group_is_reduced(group, C1)
-      || mpz_sgn(*C2) <= 0 || !goo_group_is_reduced(group, *C2)
-      || mpz_sgn(*C3) <= 0 || !goo_group_is_reduced(group, *C3)
-      || mpz_sgn(*Aq) <= 0 || !goo_group_is_reduced(group, *Aq)
-      || mpz_sgn(*Bq) <= 0 || !goo_group_is_reduced(group, *Bq)
-      || mpz_sgn(*Cq) <= 0 || !goo_group_is_reduced(group, *Cq)
-      || mpz_sgn(*Dq) <= 0 || !goo_group_is_reduced(group, *Dq)) {
+  if (!goo_group_is_reduced(group, C1)
+      || !goo_group_is_reduced(group, *C2)
+      || !goo_group_is_reduced(group, *C3)
+      || !goo_group_is_reduced(group, *Aq)
+      || !goo_group_is_reduced(group, *Bq)
+      || !goo_group_is_reduced(group, *Cq)
+      || !goo_group_is_reduced(group, *Dq)) {
     return 0;
   }
 
-  /* if Eq <= 0 || bitlen(Eq) > EXPONENT_SIZE */
-  if (mpz_sgn(*Eq) <= 0 || goo_mpz_bitlen(*Eq) > GOO_EXPONENT_SIZE)
+  /* `Eq` must be in range. */
+  if (goo_mpz_bitlen(*Eq) > GOO_EXPONENT_SIZE)
     return 0;
 
-  /* z_prime must be within range. */
-  if (mpz_sgn(*z_w) <= 0 || mpz_cmp(*z_w, *ell) >= 0
-      || mpz_sgn(*z_w2) <= 0 || mpz_cmp(*z_w2, *ell) >= 0
-      || mpz_sgn(*z_s1) <= 0 || mpz_cmp(*z_s1, *ell) >= 0
-      || mpz_sgn(*z_a) <= 0 || mpz_cmp(*z_a, *ell) >= 0
-      || mpz_sgn(*z_an) <= 0 || mpz_cmp(*z_an, *ell) >= 0
-      || mpz_sgn(*z_s1w) <= 0 || mpz_cmp(*z_s1w, *ell) >= 0
-      || mpz_sgn(*z_sa) <= 0 || mpz_cmp(*z_sa, *ell) >= 0
-      || mpz_sgn(*z_s2) <= 0 || mpz_cmp(*z_s2, *ell) >= 0) {
+  /* `z'` must be within range. */
+  if (mpz_cmp(*z_w, *ell) >= 0
+      || mpz_cmp(*z_w2, *ell) >= 0
+      || mpz_cmp(*z_s1, *ell) >= 0
+      || mpz_cmp(*z_a, *ell) >= 0
+      || mpz_cmp(*z_an, *ell) >= 0
+      || mpz_cmp(*z_s1w, *ell) >= 0
+      || mpz_cmp(*z_sa, *ell) >= 0
+      || mpz_cmp(*z_s2, *ell) >= 0) {
     return 0;
   }
 
   /* Compute inverses of C1, C2, C3, Aq, Bq, Cq, Dq. */
-  /* [C1_inv, C2_inv, C3_inv, */
-  /*  Aq_inv, Bq_inv, Cq_inv, Dq_inv] = inv7(C1, C2, C3, Aq, Bq, Cq, Dq) */
-  if (!goo_group_inv7(group, *C1_inv, *C2_inv, *C3_inv,
-                             *Aq_inv, *Bq_inv, *Cq_inv, *Dq_inv,
-                              C1, *C2, *C3, *Aq, *Bq, *Cq, *Dq)) {
+  if (!goo_group_inv7(group, *C1i, *C2i, *C3i, *Aqi, *Bqi, *Cqi, *Dqi,
+                              C1,  *C2,  *C3,  *Aq,  *Bq,  *Cq,  *Dq)) {
     return 0;
   }
 
-  /* Step 1: reconstruct A, B, C, D, and E from signature. */
-  /* A = recon(Aq, Aq_inv, ell, C2_inv, C2, chal, z_w, z_s1) */
-  if (!goo_group_recon(group, *A, *Aq, *Aq_inv, *ell,
-                       *C2_inv, *C2, *chal, *z_w, *z_s1)) {
+  /* Reconstruct A, B, C, D, and E from signature:
+   *
+   *   A = Aq^ell * g^z_w * h^z_s1 / C2^chal in G
+   *   B = Bq^ell * g^z_a * h^z_s2 / C3^chal in G
+   *   C = Cq^ell * g^z_w2 * h^z_s1w / C2^z_w in G
+   *   D = Dq^ell * g^z_an * h^z_sa / C1^z_a in G
+   *   E = Eq * ell + ((z_w2 - z_an) mod ell) - t * chal
+   */
+  if (!goo_group_recover(group, *A, *Aq, *Aqi, *ell,
+                         *C2, *C2i, *chal, *z_w, *z_s1)) {
     return 0;
   }
 
-  /* B = recon(Bq, Bq_inv, ell, C3_inv, C3, chal, z_a, z_s2) */
-  if (!goo_group_recon(group, *B, *Bq, *Bq_inv, *ell,
-                       *C3_inv, *C3, *chal, *z_a, *z_s2)) {
+  if (!goo_group_recover(group, *B, *Bq, *Bqi, *ell,
+                         *C3, *C3i, *chal, *z_a, *z_s2)) {
     return 0;
   }
 
-  /* C = recon(Cq, Cq_inv, ell, C2_inv, C2, z_w, z_w2, z_s1w) */
-  if (!goo_group_recon(group, *C, *Cq, *Cq_inv, *ell,
-                       *C2_inv, *C2, *z_w, *z_w2, *z_s1w)) {
+  if (!goo_group_recover(group, *C, *Cq, *Cqi, *ell,
+                         *C2, *C2i, *z_w, *z_w2, *z_s1w)) {
     return 0;
   }
 
-  /* D = recon(Dq, Dq_inv, ell, C1_inv, C1, z_a, z_an, z_sa) */
-  if (!goo_group_recon(group, *D, *Dq, *Dq_inv, *ell,
-                       *C1_inv, C1, *z_a, *z_an, *z_sa)) {
+  if (!goo_group_recover(group, *D, *Dq, *Dqi, *ell,
+                         C1, *C1i, *z_a, *z_an, *z_sa)) {
     return 0;
   }
 
-  /* Make sure sign of (z_w2 - z_an) is positive. */
-  /* z_w2_m_an = z_w2 - z_an */
   mpz_sub(*z_w2_m_an, *z_w2, *z_an);
-
-  /* E = Eq * ell + z_w2_m_an - t * chal */
   mpz_mul(*E, *Eq, *ell);
   mpz_add(*E, *E, *z_w2_m_an);
   mpz_mul(*tmp, *t, *chal);
   mpz_sub(*E, *E, *tmp);
 
-  /* if z_w2_m_an < 0 */
-  if (mpz_sgn(*z_w2_m_an) < 0) {
-    /* E += ell */
+  if (mpz_sgn(*z_w2_m_an) < 0)
     mpz_add(*E, *E, *ell);
-  }
 
-  /* if E < 0 */
+  /* `E` must be positive. */
   if (mpz_sgn(*E) < 0)
     return 0;
 
-  /* Step 2: recompute implicitly claimed V message, viz., chal and ell. */
-  /* [chal_out, ell_r_out, key] = fs_chal(C1, C2, t, A, B, C, D, msg) */
-  if (!goo_group_fs_chal(group, *chal_out, *ell_r_out, &key[0],
-                         C1, *C2, *C3, *t, *A, *B, *C, *D, *E,
-                         msg, msg_len, 1)) {
+  /* Recompute `chal` and `ell`. */
+  if (!goo_group_derive(group, *chal0, *ell0, &key[0],
+                        C1, *C2, *C3, *t, *A, *B, *C, *D, *E,
+                        msg, msg_len)) {
     return 0;
   }
 
-  /* Final checks. */
-  /* chal has to match */
-  /* AND 0 <= (ell_r_out - ell) <= elldiff_max */
-  /* AND ell is prime */
-  /* elldiff = ell - ell_r_out */
-  mpz_sub(*elldiff, *ell, *ell_r_out);
-
-  /* if chal != chal_out */
-  /*   or elldiff < 0 */
-  /*   or elldiff > ELLDIFF_MAX */
-  /*   or !is_prime(ell) */
-  if (mpz_cmp(*chal, *chal_out) != 0
-      || mpz_cmp_ui(*elldiff, 0) < 0
-      || mpz_cmp_ui(*elldiff, GOO_ELLDIFF_MAX) > 0
-      || !goo_is_prime(*ell, &key[0])) {
+  /* `chal` must be equal to the computed value. */
+  if (mpz_cmp(*chal, *chal0) != 0)
     return 0;
-  }
+
+  /* `ell` must be in the interval [ell',ell'+512]. */
+  mpz_add_ui(*ell1, *ell0, GOO_ELLDIFF_MAX);
+
+  if (mpz_cmp(*ell, *ell0) < 0 || mpz_cmp(*ell, *ell1) > 0)
+    return 0;
+
+  /* `ell` must be prime. */
+  if (!goo_is_prime(*ell, &key[0]))
+    return 0;
 
   return 1;
+fail:
+  return 0;
 }
 
 /*
@@ -3116,14 +2979,12 @@ goo_group_verify(
  */
 
 int
-goo_init(
-  goo_ctx_t *ctx,
-  const unsigned char *n,
-  size_t n_len,
-  unsigned long g,
-  unsigned long h,
-  unsigned long modbits
-) {
+goo_init(goo_ctx_t *ctx,
+         const unsigned char *n,
+         size_t n_len,
+         unsigned long g,
+         unsigned long h,
+         unsigned long modbits) {
   int r = 0;
   mpz_t n_n;
 
@@ -3150,49 +3011,22 @@ goo_uninit(goo_ctx_t *ctx) {
 }
 
 int
-goo_generate(
-  goo_ctx_t *ctx,
-  unsigned char **s_prime,
-  size_t *s_prime_len
-) {
-  int r = 0;
-  mpz_t s_prime_n;
-
-  if (ctx == NULL
-      || s_prime == NULL
-      || s_prime_len == NULL) {
+goo_generate(goo_ctx_t *ctx, unsigned char *s_prime) {
+  if (ctx == NULL || s_prime == NULL)
     return 0;
-  }
 
-  mpz_init(s_prime_n);
-
-  if (!goo_group_generate(ctx, s_prime_n))
-    goto fail;
-
-  *s_prime_len = 32;
-  *s_prime = goo_mpz_pad(NULL, *s_prime_len, s_prime_n);
-
-  if (*s_prime == NULL)
-    goto fail;
-
-  r = 1;
-fail:
-  mpz_clear(s_prime_n);
-  return r;
+  return goo_group_generate(ctx, s_prime);
 }
 
 int
-goo_challenge(
-  goo_ctx_t *ctx,
-  unsigned char **C1,
-  size_t *C1_len,
-  const unsigned char *s_prime,
-  size_t s_prime_len,
-  const unsigned char *n,
-  size_t n_len
-) {
+goo_challenge(goo_ctx_t *ctx,
+              unsigned char **C1,
+              size_t *C1_len,
+              const unsigned char *s_prime,
+              const unsigned char *n,
+              size_t n_len) {
   int r = 0;
-  mpz_t C1_n, s_prime_n, n_n;
+  mpz_t C1_n, n_n;
 
   if (ctx == NULL
       || s_prime == NULL
@@ -3202,17 +3036,12 @@ goo_challenge(
     return 0;
   }
 
-  if (s_prime_len != 32)
-    return 0;
-
   mpz_init(C1_n);
-  mpz_init(s_prime_n);
   mpz_init(n_n);
 
-  goo_mpz_import(s_prime_n, s_prime, s_prime_len);
   goo_mpz_import(n_n, n, n_len);
 
-  if (!goo_group_challenge(ctx, C1_n, s_prime_n, n_n))
+  if (!goo_group_challenge(ctx, C1_n, s_prime, n_n))
     goto fail;
 
   *C1_len = goo_mpz_bytelen(ctx->n);
@@ -3224,25 +3053,21 @@ goo_challenge(
   r = 1;
 fail:
   mpz_clear(C1_n);
-  mpz_clear(s_prime_n);
   mpz_clear(n_n);
   return r;
 }
 
 int
-goo_validate(
-  goo_ctx_t *ctx,
-  const unsigned char *s_prime,
-  size_t s_prime_len,
-  const unsigned char *C1,
-  size_t C1_len,
-  const unsigned char *p,
-  size_t p_len,
-  const unsigned char *q,
-  size_t q_len
-) {
+goo_validate(goo_ctx_t *ctx,
+             const unsigned char *s_prime,
+             const unsigned char *C1,
+             size_t C1_len,
+             const unsigned char *p,
+             size_t p_len,
+             const unsigned char *q,
+             size_t q_len) {
   int r = 0;
-  mpz_t s_prime_n, C1_n, p_n, q_n;
+  mpz_t C1_n, p_n, q_n;
 
   if (ctx == NULL
       || s_prime == NULL
@@ -3252,51 +3077,41 @@ goo_validate(
     return 0;
   }
 
-  if (s_prime_len != 32)
-    return 0;
-
   if (C1_len != ctx->size)
     return 0;
 
-  mpz_init(s_prime_n);
   mpz_init(C1_n);
   mpz_init(p_n);
   mpz_init(q_n);
 
-  goo_mpz_import(s_prime_n, s_prime, s_prime_len);
   goo_mpz_import(C1_n, C1, C1_len);
   goo_mpz_import(p_n, p, p_len);
   goo_mpz_import(q_n, q, q_len);
 
-  if (!goo_group_validate(ctx, s_prime_n, C1_n, p_n, q_n))
+  if (!goo_group_validate(ctx, s_prime, C1_n, p_n, q_n))
     goto fail;
 
   r = 1;
 fail:
-  mpz_clear(s_prime_n);
   mpz_clear(C1_n);
   mpz_clear(p_n);
   mpz_clear(q_n);
-
   return r;
 }
 
 int
-goo_sign(
-  goo_ctx_t *ctx,
-  unsigned char **out,
-  size_t *out_len,
-  const unsigned char *msg,
-  size_t msg_len,
-  const unsigned char *s_prime,
-  size_t s_prime_len,
-  const unsigned char *p,
-  size_t p_len,
-  const unsigned char *q,
-  size_t q_len
-) {
+goo_sign(goo_ctx_t *ctx,
+         unsigned char **out,
+         size_t *out_len,
+         const unsigned char *msg,
+         size_t msg_len,
+         const unsigned char *s_prime,
+         const unsigned char *p,
+         size_t p_len,
+         const unsigned char *q,
+         size_t q_len) {
   int r = 0;
-  mpz_t msg_n, s_prime_n, p_n, q_n;
+  mpz_t msg_n, p_n, q_n;
   goo_sig_t sig;
   size_t size;
   unsigned char *data = NULL;
@@ -3304,31 +3119,22 @@ goo_sign(
   if (ctx == NULL
       || out == NULL
       || out_len == NULL
-      || msg == NULL
       || s_prime == NULL
       || p == NULL
       || q == NULL) {
     return 0;
   }
 
-  if (msg_len < 20 || msg_len > 64)
-    return 0;
-
-  if (s_prime_len != 32)
-    return 0;
-
   mpz_init(msg_n);
-  mpz_init(s_prime_n);
   mpz_init(p_n);
   mpz_init(q_n);
 
   goo_sig_init(&sig);
 
-  goo_mpz_import(s_prime_n, s_prime, s_prime_len);
   goo_mpz_import(p_n, p, p_len);
   goo_mpz_import(q_n, q, q_len);
 
-  if (!goo_group_sign(ctx, &sig, msg, msg_len, s_prime_n, p_n, q_n))
+  if (!goo_group_sign(ctx, &sig, msg, msg_len, s_prime, p_n, q_n))
     goto fail;
 
   size = goo_sig_size(&sig, ctx->bits);
@@ -3346,31 +3152,25 @@ goo_sign(
   r = 1;
 fail:
   mpz_clear(msg_n);
-  mpz_clear(s_prime_n);
   mpz_clear(p_n);
   mpz_clear(q_n);
   goo_sig_uninit(&sig);
 
-  if (r == 0)
-    goo_free(data);
+  if (r == 0 && data != NULL)
+    free(data);
 
   return r;
 }
 
 int
-goo_verify(
-  goo_ctx_t *ctx,
-  const unsigned char *msg,
-  size_t msg_len,
-  const unsigned char *sig,
-  size_t sig_len,
-  const unsigned char *C1,
-  size_t C1_len
-) {
-  if (ctx == NULL || msg == NULL || sig == NULL || C1 == NULL)
-    return 0;
-
-  if (msg_len < 20 || msg_len > 64)
+goo_verify(goo_ctx_t *ctx,
+           const unsigned char *msg,
+           size_t msg_len,
+           const unsigned char *sig,
+           size_t sig_len,
+           const unsigned char *C1,
+           size_t C1_len) {
+  if (ctx == NULL || sig == NULL || C1 == NULL)
     return 0;
 
   if (C1_len != ctx->size)
@@ -4650,7 +4450,7 @@ run_ops_test(void) {
   /* test pow2 */
   {
     mpz_t b1, b2, e1, e2;
-    mpz_t b1_inv, b2_inv;
+    mpz_t b1i, b2i;
     mpz_t r1, r2;
 
     printf("Testing pow2...\n");
@@ -4660,8 +4460,8 @@ run_ops_test(void) {
     mpz_init(e1);
     mpz_init(e2);
 
-    mpz_init(b1_inv);
-    mpz_init(b2_inv);
+    mpz_init(b1i);
+    mpz_init(b2i);
 
     mpz_init(r1);
     mpz_init(r2);
@@ -4671,10 +4471,10 @@ run_ops_test(void) {
     assert(goo_random_bits(e1, 128));
     assert(goo_random_bits(e2, 128));
 
-    assert(goo_group_inv2(goo, b1_inv, b2_inv, b1, b2));
+    assert(goo_group_inv2(goo, b1i, b2i, b1, b2));
 
-    assert(goo_group_pow2_slow(goo, r1, b1, b1_inv, e1, b2, b2_inv, e2));
-    assert(goo_group_pow2(goo, r2, b1, b1_inv, e1, b2, b2_inv, e2));
+    assert(goo_group_pow2_slow(goo, r1, b1, b1i, e1, b2, b2i, e2));
+    assert(goo_group_pow2(goo, r2, b1, b1i, e1, b2, b2i, e2));
 
     assert(mpz_cmp(r1, r2) == 0);
 
@@ -4682,8 +4482,8 @@ run_ops_test(void) {
     mpz_clear(b2);
     mpz_clear(e1);
     mpz_clear(e2);
-    mpz_clear(b1_inv);
-    mpz_clear(b2_inv);
+    mpz_clear(b1i);
+    mpz_clear(b2i);
     mpz_clear(r1);
     mpz_clear(r2);
   }
@@ -4973,7 +4773,8 @@ run_goo_test(void) {
   mpz_t p, q, n;
   mpz_t mod_n;
   goo_group_t *goo;
-  mpz_t s_prime, C1;
+  mpz_t C1;
+  unsigned char s_prime[32];
   unsigned char msg[32];
   goo_sig_t sig;
 
@@ -4986,7 +4787,6 @@ run_goo_test(void) {
 
   goo = goo_malloc(sizeof(goo_group_t));
 
-  mpz_init(s_prime);
   mpz_init(C1);
   goo_sig_init(&sig);
 
@@ -5012,7 +4812,6 @@ run_goo_test(void) {
   mpz_clear(q);
   mpz_clear(n);
   mpz_clear(mod_n);
-  mpz_clear(s_prime);
   mpz_clear(C1);
   goo_sig_uninit(&sig);
   goo_group_uninit(goo);

@@ -29,13 +29,11 @@ void
 goo_hmac_final(goo_hmac_t *hmac, unsigned char *out);
 
 void
-goo_hmac(
-  unsigned char *out,
-  const unsigned char *in,
-  size_t len,
-  const unsigned char *key,
-  size_t klen
-);
+goo_hmac(unsigned char *out,
+         const unsigned char *in,
+         size_t len,
+         const unsigned char *key,
+         size_t klen);
 
 #if defined(__cplusplus)
 }
