@@ -21,7 +21,7 @@
     "test": "bmocha -S --file test/native 'test/*-test.js'"
   },
   "dependencies": {
-    "bcrypto": "~4.2.3",
+    "bcrypto": "~4.3.0",
     "bsert": "~0.0.10",
     "loady": "~0.0.1",
     "nan": "^2.14.0"
