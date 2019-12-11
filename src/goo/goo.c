@@ -2741,7 +2741,7 @@ goo_group_verify(goo_group_t *group,
 
   mpz_t C1i, C2i, C3i, Aqi, Bqi, Cqi, Dqi;
   mpz_t A, B, C, D, E;
-  mpz_t z_w2_m_an, tmp, chal0, ell0, ell1;
+  mpz_t tmp, chal0, ell0, ell1;
 
   unsigned char key[32];
   int found, i;
@@ -2758,7 +2758,6 @@ goo_group_verify(goo_group_t *group,
   mpz_init(C);
   mpz_init(D);
   mpz_init(E);
-  mpz_init(z_w2_m_an);
   mpz_init(tmp);
   mpz_init(chal0);
   mpz_init(ell0);
@@ -2866,10 +2865,10 @@ goo_group_verify(goo_group_t *group,
     goto fail;
   }
 
-  mpz_sub(z_w2_m_an, *z_w2, *z_an);
-  mpz_mod(z_w2_m_an, z_w2_m_an, *ell);
+  mpz_sub(tmp, *z_w2, *z_an);
+  mpz_mod(tmp, tmp, *ell);
   mpz_mul(E, *Eq, *ell);
-  mpz_add(E, E, z_w2_m_an);
+  mpz_add(E, E, tmp);
   mpz_mul(tmp, *t, *chal);
   mpz_sub(E, E, tmp);
 
@@ -2908,7 +2907,6 @@ fail:
   mpz_clear(C);
   mpz_clear(D);
   mpz_clear(E);
-  mpz_clear(z_w2_m_an);
   mpz_clear(tmp);
   mpz_clear(chal0);
   mpz_clear(ell0);
