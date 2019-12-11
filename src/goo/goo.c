@@ -473,7 +473,86 @@ goo_mpz_sqrtm(mpz_t ret, const mpz_t num, const mpz_t p) {
   /* x = num */
   mpz_set(x, num);
 
-  if (mpz_sgn(p) <= 0 || mpz_even_p(p))
+  if (mpz_sgn(p) <= 0 || !mpz_odd_p(p))
+    goto fail;
+
+  /* if x < 0 || x >= p */
+  if (mpz_sgn(x) < 0 || mpz_cmp(x, p) >= 0) {
+    /* x = x mod p */
+    mpz_mod(x, x, p);
+  }
+
+  /* if p mod 4 == 3 */
+  if ((mpz_getlimbn(p, 0) & 3) == 3) {
+    /* e = (p + 1) / 4 */
+    mpz_add_ui(e, p, 1);
+    mpz_tdiv_q_2exp(e, e, 2);
+
+    /* b = x^e mod p */
+    mpz_powm(b, x, e, p);
+
+    /* g = b^2 mod p */
+    mpz_mul(g, b, b);
+    mpz_mod(g, g, p);
+
+    /* g != x */
+    if (mpz_cmp(g, x) != 0)
+      goto fail;
+
+    /* ret = b */
+    mpz_set(ret, b);
+
+    goto success;
+  }
+
+  /* if p mod 8 == 5 */
+  if ((mpz_getlimbn(p, 0) & 7) == 5) {
+    /* e = (p - 5) / 8 */
+    mpz_tdiv_q_2exp(e, p, 3);
+
+    /* t = x * 2 mod p */
+    mpz_mul_2exp(t, x, 1);
+    mpz_mod(t, t, p);
+
+    /* a = t^e mod p */
+    mpz_powm(a, t, e, p);
+
+    /* b = a^2 mod p */
+    mpz_mul(b, a, a);
+    mpz_mod(b, b, p);
+
+    /* b = b * t mod p */
+    mpz_mul(b, b, t);
+    mpz_mod(b, b, p);
+
+    /* b = (b - 1) mod p */
+    mpz_sub_ui(b, b, 1);
+    mpz_mod(b, b, p);
+
+    /* b = b * x mod p */
+    mpz_mul(b, b, x);
+    mpz_mod(b, b, p);
+
+    /* b = b * a mod p */
+    mpz_mul(b, b, a);
+    mpz_mod(b, b, p);
+
+    /* g = b^2 mod p */
+    mpz_mul(g, b, b);
+    mpz_mod(g, g, p);
+
+    /* g != x */
+    if (mpz_cmp(g, x) != 0)
+      goto fail;
+
+    /* ret = b */
+    mpz_set(ret, b);
+
+    goto success;
+  }
+
+  /* p = 1 */
+  if (mpz_cmp_ui(p, 1) == 0)
     goto fail;
 
   switch (mpz_jacobi(x, p)) {
@@ -484,50 +563,6 @@ goo_mpz_sqrtm(mpz_t ret, const mpz_t num, const mpz_t p) {
       goto success;
     case 1:
       break;
-  }
-
-  /* if x < 0 || x >= p */
-  if (mpz_sgn(x) < 0 || mpz_cmp(x, p) >= 0) {
-    /* x = x mod p */
-    mpz_mod(x, x, p);
-  }
-
-  /* if p mod 4 == 3 */
-  if ((mpz_getlimbn(p, 0) & 3) == 3) {
-    /* e = (p + 1) >> 2 */
-    mpz_add_ui(e, p, 1);
-    mpz_tdiv_q_2exp(e, e, 2);
-    /* ret = x^e mod p */
-    mpz_powm(ret, x, e, p);
-    goto success;
-  }
-
-  /* if p mod 8 == 5 */
-  if ((mpz_getlimbn(p, 0) & 7) == 5) {
-    /* e = p >> 3 */
-    mpz_tdiv_q_2exp(e, p, 3);
-    /* t = x << 1 */
-    mpz_mul_2exp(t, x, 1);
-    /* a = t^e mod p */
-    mpz_powm(a, t, e, p);
-    /* b = a^2 mod p */
-    mpz_mul(b, a, a);
-    mpz_mod(b, b, p);
-    /* b = b * t mod p */
-    mpz_mul(b, b, t);
-    mpz_mod(b, b, p);
-    /* b = (b - 1) mod p */
-    mpz_sub_ui(b, b, 1);
-    mpz_mod(b, b, p);
-    /* b = b * x mod p */
-    mpz_mul(b, b, x);
-    mpz_mod(b, b, p);
-    /* b = b * a mod p */
-    mpz_mul(b, b, a);
-    mpz_mod(b, b, p);
-    /* ret = b */
-    mpz_set(ret, b);
-    goto success;
   }
 
   /* s = p - 1 */
@@ -550,12 +585,16 @@ goo_mpz_sqrtm(mpz_t ret, const mpz_t num, const mpz_t p) {
 
   /* y = s + 1 */
   mpz_add_ui(y, s, 1);
+
   /* y = y >> 1 */
   mpz_tdiv_q_2exp(y, y, 1);
+
   /* y = x^y mod p */
   mpz_powm(y, x, y, p);
+
   /* b = x^s mod p */
   mpz_powm(b, x, s, p);
+
   /* g = n^s mod p */
   mpz_powm(g, n, s, p);
 
@@ -580,32 +619,35 @@ goo_mpz_sqrtm(mpz_t ret, const mpz_t num, const mpz_t p) {
     if (m == 0)
       break;
 
-    /* if m == k */
-    if (m == k)
+    /* if m >= k */
+    if (m >= k)
       goto fail;
 
     /* t = 1 << (k - m - 1) */
     mpz_set_ui(t, 1);
     mpz_mul_2exp(t, t, k - m - 1);
+
     /* t = g^t mod p */
     mpz_powm(t, g, t, p);
+
     /* g = t^2 mod p */
     mpz_mul(g, t, t);
     mpz_mod(g, g, p);
+
     /* y = y * t mod p */
     mpz_mul(y, y, t);
     mpz_mod(y, y, p);
+
     /* b = b * g mod p */
     mpz_mul(b, b, g);
     mpz_mod(b, b, p);
+
     /* k = m */
     k = m;
   }
 
   /* ret = y */
   mpz_set(ret, y);
-  goto success;
-
 success:
   r = 1;
 fail:
@@ -623,7 +665,7 @@ fail:
 
 static int
 goo_mpz_sqrtpq(mpz_t ret, const mpz_t x, const mpz_t p, const mpz_t q) {
-  /* ret = x^(1 / 2) mod (p * q) */
+  /* Compute x^(1 / 2) mod (p * q). */
   int r = 0;
   mpz_t sp, sq, mp, mq, xx, yy;
 
@@ -1035,6 +1077,7 @@ goo_next_prime(
   while (!goo_is_prime(ret, key)) {
     if (max != 0 && inc > max)
       break;
+
     /* ret += 2 */
     mpz_add_ui(ret, ret, 2);
     inc += 2;
