@@ -98,7 +98,7 @@ NAN_METHOD(Goo::Generate) {
     return Nan::ThrowError("Could not generate s_prime.");
 
   info.GetReturnValue().Set(
-    Nan::CopyBuffer((char *)s_prime, 32).ToLocalChecked());
+    Nan::CopyBuffer((char *)&s_prime[0], 32).ToLocalChecked());
 }
 
 NAN_METHOD(Goo::Challenge) {
