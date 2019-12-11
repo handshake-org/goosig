@@ -1337,14 +1337,14 @@ static int
 goo_combspec_init(goo_combspec_t *out, long bits, long maxsize) {
   int r = 0;
   size_t map_size, i;
-  goo_combspec_t *combs, *ret;
+  goo_combspec_t *specs, *ret;
   long ppa, bpw, sqrt, aps, shifts, sm;
 
   if (bits < 0 || maxsize < 0)
     return 0;
 
   map_size = combspec_size(bits);
-  combs = goo_calloc(map_size, sizeof(goo_combspec_t));
+  specs = goo_calloc(map_size, sizeof(goo_combspec_t));
 
   for (ppa = 2; ppa < 18; ppa++) {
     bpw = (bits + ppa - 1) / ppa;
@@ -1356,8 +1356,8 @@ goo_combspec_init(goo_combspec_t *out, long bits, long maxsize) {
 
       shifts = bpw / aps;
 
-      combspec_generate(combs, map_size, shifts, aps, ppa, bpw);
-      combspec_generate(combs, map_size, aps, shifts, ppa, bpw);
+      combspec_generate(specs, map_size, shifts, aps, ppa, bpw);
+      combspec_generate(specs, map_size, aps, shifts, ppa, bpw);
     }
   }
 
@@ -1365,18 +1365,18 @@ goo_combspec_init(goo_combspec_t *out, long bits, long maxsize) {
   ret = NULL;
 
   for (i = 0; i < map_size; i++) {
-    goo_combspec_t *comb = &combs[i];
+    goo_combspec_t *spec = &specs[i];
 
-    if (comb->exists == 0)
+    if (spec->exists == 0)
       continue;
 
-    if (sm <= comb->size)
+    if (sm <= spec->size)
       continue;
 
-    sm = comb->size;
+    sm = spec->size;
 
     if (sm <= maxsize) {
-      ret = comb;
+      ret = spec;
       break;
     }
   }
@@ -1388,7 +1388,7 @@ goo_combspec_init(goo_combspec_t *out, long bits, long maxsize) {
 
   r = 1;
 fail:
-  goo_free(combs);
+  goo_free(specs);
   return r;
 }
 
