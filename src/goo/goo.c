@@ -1307,7 +1307,7 @@ combspec_size(long bits) {
 }
 
 static void
-combspec_generate(goo_combspec_t *combs,
+combspec_generate(goo_combspec_t *specs,
                   size_t map_size,
                   long shifts,
                   long aps,
@@ -1320,7 +1320,7 @@ combspec_generate(goo_combspec_t *combs,
   assert(ops >= 0);
   assert((size_t)ops < map_size);
 
-  best = &combs[ops];
+  best = &specs[ops];
 
   if (best->exists == 0 || best->size > size) {
     best->exists = 1;
