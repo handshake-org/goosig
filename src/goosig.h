@@ -1,6 +1,6 @@
 /*!
- * goosig.cc - groups of unknown order for C
- * Copyright (c) 2018, Christopher Jeffrey (MIT License).
+ * goosig.cc - groups of unknown order
+ * Copyright (c) 2018-2019, Christopher Jeffrey (MIT License).
  * https://github.com/handshake-org/goosig
  */
 
