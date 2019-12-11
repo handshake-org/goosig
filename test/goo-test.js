@@ -127,5 +127,5 @@ function runTests(name, Goo, Other) {
 
 if (Native)
   runTests('Goo (Native)', Native, JS);
-
-runTests('Goo', JS, Native);
+else
+  runTests('Goo', JS, Native);
