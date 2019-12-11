@@ -1448,13 +1448,13 @@ goo_comb_init(goo_comb_t *comb,
   mpz_mul_2exp(win, win, comb->bits_per_window);
 
   for (i = 1; i < comb->points_per_add; i++) {
-    long oval = 1 << i;
-    long ival = oval >> 1;
+    long x = 1 << i;
+    long y = x >> 1;
 
-    goo_group_pow(group, it[oval - 1], it[ival - 1], NULL, win);
+    goo_group_pow(group, it[x - 1], it[y - 1], NULL, win);
 
-    for (j = oval + 1; j < 2 * oval; j++)
-      goo_group_mul(group, it[j - 1], it[j - oval - 1], it[oval - 1]);
+    for (j = x + 1; j < 2 * x; j++)
+      goo_group_mul(group, it[j - 1], it[j - x - 1], it[x - 1]);
   }
 
   /* win = 1 << shifts */
@@ -1548,18 +1548,14 @@ goo_group_init(goo_group_t *group,
   mpz_init(group->g);
   mpz_init(group->h);
 
-  /* n = n */
   mpz_set(group->n, n);
 
   group->bits = goo_mpz_bitlen(group->n);
   group->size = (group->bits + 7) / 8;
 
-  /* nh = n >> 1 */
   mpz_tdiv_q_2exp(group->nh, group->n, 1);
 
-  /* g = g */
   mpz_set_ui(group->g, g);
-  /* h = h */
   mpz_set_ui(group->h, h);
 
   group->rand_bits = goo_mpz_bitlen(group->n) - 1;
@@ -1870,19 +1866,15 @@ goo_group_powgh(goo_group_t *group, mpz_t ret, const mpz_t e1, const mpz_t e2) {
 
 static void
 goo_group_precomp_table(goo_group_t *group, mpz_t *out, const mpz_t b) {
-  mpz_t *bsq = &out[GOO_TABLEN - 1];
+  mpz_t *b2 = &out[GOO_TABLEN - 1];
   long i;
 
-  /* bsq = b * b */
-  goo_group_sqr(group, *bsq, b);
+  goo_group_sqr(group, *b2, b);
 
-  /* out[0] = b */
   mpz_set(out[0], b);
 
-  for (i = 1; i < GOO_TABLEN; i++) {
-    /* out[i] = out[i - 1] * bsq */
-    goo_group_mul(group, out[i], out[i - 1], *bsq);
-  }
+  for (i = 1; i < GOO_TABLEN; i++)
+    goo_group_mul(group, out[i], out[i - 1], *b2);
 }
 
 static void
@@ -4401,22 +4393,6 @@ run_ops_test(void) {
     assert(goo->combs[0].h.points_per_subcomb == 255);
     assert(goo->combs[0].h.size == 510);
 
-    /* assert(goo->combs[1].g.points_per_add == 7); */
-    /* assert(goo->combs[1].g.adds_per_shift == 4); */
-    /* assert(goo->combs[1].g.shifts == 151); */
-    /* assert(goo->combs[1].g.bits_per_window == 604); */
-    /* assert(goo->combs[1].g.bits == 4228); */
-    /* assert(goo->combs[1].g.points_per_subcomb == 127); */
-    /* assert(goo->combs[1].g.size == 508); */
-
-    /* assert(goo->combs[1].h.points_per_add == 7); */
-    /* assert(goo->combs[1].h.adds_per_shift == 4); */
-    /* assert(goo->combs[1].h.shifts == 151); */
-    /* assert(goo->combs[1].h.bits_per_window == 604); */
-    /* assert(goo->combs[1].h.bits == 4228); */
-    /* assert(goo->combs[1].h.points_per_subcomb == 127); */
-    /* assert(goo->combs[1].h.size == 508); */
-
     assert(goo->combs[1].g.points_per_add == 8);
     assert(goo->combs[1].g.adds_per_shift == 2);
     assert(goo->combs[1].g.shifts == 265);
@@ -4655,22 +4631,6 @@ run_combspec_test(void) {
 
   assert(mpz_set_str(n, mod_hex, 16) == 0);
   assert(goo_group_init(goo, n, 2, 3, 0));
-
-  /* assert(goo->combs[0].g.points_per_add == 8); */
-  /* assert(goo->combs[0].g.adds_per_shift == 2); */
-  /* assert(goo->combs[0].g.shifts == 8); */
-  /* assert(goo->combs[0].g.bits_per_window == 16); */
-  /* assert(goo->combs[0].g.bits == 128); */
-  /* assert(goo->combs[0].g.points_per_subcomb == 255); */
-  /* assert(goo->combs[0].g.size == 510); */
-
-  /* assert(goo->combs[0].h.points_per_add == 8); */
-  /* assert(goo->combs[0].h.adds_per_shift == 2); */
-  /* assert(goo->combs[0].h.shifts == 8); */
-  /* assert(goo->combs[0].h.bits_per_window == 16); */
-  /* assert(goo->combs[0].h.bits == 128); */
-  /* assert(goo->combs[0].h.points_per_subcomb == 255); */
-  /* assert(goo->combs[0].h.size == 510); */
 
   assert(goo->combs[0].g.points_per_add == 7);
   assert(goo->combs[0].g.adds_per_shift == 4);

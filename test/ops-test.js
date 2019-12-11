@@ -12,14 +12,106 @@ const constants = require('../lib/internal/constants');
 const Goo = require('../lib/js/goo');
 
 describe('Group Ops', function() {
+  let t0 = null;
   let t1 = null;
   let t2 = null;
 
-  it('open contexts', () => {
+  it('should open contexts', () => {
     const {n} = testUtil.genKey(2048);
 
+    t0 = new Goo(Goo.RSA2048, 2, 3, 0);
     t1 = new Goo(Goo.RSA2048, 2, 3, 2048);
     t2 = new Goo(n, 5, 7, 2048);
+  });
+
+  it('should have computed combs (t0)', () => {
+    assert.strictEqual(t0.combs.length, 1);
+
+    const g0 = t0.combs[0].g.toJSON();
+    const h0 = t0.combs[0].h.toJSON();
+
+    delete g0.items;
+    delete h0.items;
+
+    assert.deepStrictEqual(g0, {
+      base: '02',
+      pointsPerAdd: 7,
+      addsPerShift: 4,
+      shifts: 5,
+      bitsPerWindow: 20,
+      bits: 140,
+      pointsPerSubcomb: 127,
+      size: 508
+    });
+
+    assert.deepStrictEqual(h0, {
+      base: '03',
+      pointsPerAdd: 7,
+      addsPerShift: 4,
+      shifts: 5,
+      bitsPerWindow: 20,
+      bits: 140,
+      pointsPerSubcomb: 127,
+      size: 508
+    });
+  });
+
+  it('should have computed combs (t1)', () => {
+    assert.strictEqual(t1.combs.length, 2);
+
+    const g0 = t1.combs[0].g.toJSON();
+    const h0 = t1.combs[0].h.toJSON();
+    const g1 = t1.combs[1].g.toJSON();
+    const h1 = t1.combs[1].h.toJSON();
+
+    delete g0.items;
+    delete h0.items;
+    delete g1.items;
+    delete h1.items;
+
+    assert.deepStrictEqual(g0, {
+      base: '02',
+      pointsPerAdd: 8,
+      addsPerShift: 2,
+      shifts: 128,
+      bitsPerWindow: 256,
+      bits: 2048,
+      pointsPerSubcomb: 255,
+      size: 510
+    });
+
+    assert.deepStrictEqual(h0, {
+      base: '03',
+      pointsPerAdd: 8,
+      addsPerShift: 2,
+      shifts: 128,
+      bitsPerWindow: 256,
+      bits: 2048,
+      pointsPerSubcomb: 255,
+      size: 510
+    });
+
+    assert.deepStrictEqual(g1, {
+      base: '02',
+      pointsPerAdd: 8,
+      addsPerShift: 2,
+      shifts: 265,
+      bitsPerWindow: 530,
+      bits: 4240,
+      pointsPerSubcomb: 255,
+      size: 510
+    });
+
+    assert.deepStrictEqual(h1, {
+      base: '03',
+      pointsPerAdd: 8,
+      addsPerShift: 2,
+      shifts: 265,
+      bitsPerWindow: 530,
+      bits: 4240,
+      pointsPerSubcomb: 255,
+      size: 510
+    });
   });
 
   it('should compute pow_wnaf (t1)', () => {
