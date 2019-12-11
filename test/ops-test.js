@@ -139,11 +139,9 @@ describe('Group Ops', function() {
     const b2 = BN.randomBits(rng, 2048).toRed(t1.red);
     const e1 = BN.randomBits(rng, 128);
     const e2 = BN.randomBits(rng, 128);
-
     const p1 = b1.redPow(e1);
     const p2 = b2.redPow(e2);
     const r1 = p1.redMul(p2);
-
     const [b1i, b2i] = t1.inv2(b1, b2);
     const r2 = t1.pow2(b1, b1i, e1, b2, b2i, e2);
 
@@ -155,11 +153,9 @@ describe('Group Ops', function() {
     const b2 = BN.randomBits(rng, 2048).toRed(t2.red);
     const e1 = BN.randomBits(rng, 128);
     const e2 = BN.randomBits(rng, 128);
-
     const p1 = b1.redPow(e1);
     const p2 = b2.redPow(e2);
     const r1 = p1.redMul(p2);
-
     const [b1i, b2i] = t2.inv2(b1, b2);
     const r2 = t2.pow2(b1, b1i, e1, b2, b2i, e2);
 
@@ -167,30 +163,23 @@ describe('Group Ops', function() {
   });
 
   it('should compute powgh (t1)', () => {
-    const e1 = BN.randomBits(rng, 2 * 2048 + constants.ELL_BITS + 2 - 1); // -1
-    const e2 = BN.randomBits(rng, 2 * 2048 + constants.ELL_BITS + 2 - 1); // -1
-
+    const e1 = BN.randomBits(rng, 2 * 2048 + constants.ELL_BITS + 1);
+    const e2 = BN.randomBits(rng, 2 * 2048 + constants.ELL_BITS + 1);
     const p1 = new BN(2).powm(e1, t1.n);
     const p2 = new BN(3).powm(e2, t1.n);
     const r1 = p1.mul(p2).mod(t1.n);
-
     const r2 = t1.powgh(e1, e2);
 
     assert.strictEqual(r1.toString(), r2.fromRed().toString());
   });
 
   it('should compute powgh (t2)', () => {
-    const e1 = BN.randomBits(rng, 2 * 2048 + constants.ELL_BITS + 2 - 1); // -1
-    const e2 = BN.randomBits(rng, 2 * 2048 + constants.ELL_BITS + 2 - 1); // -1
-
-    const e1_s = e1.ushrn(2048 + constants.ELL_BITS);
-    const e2_s = e2.ushrn(2048 + constants.ELL_BITS);
-
-    const p1 = new BN(5).powm(e1_s, t2.n);
-    const p2 = new BN(7).powm(e2_s, t2.n);
+    const e1 = BN.randomBits(rng, 2049);
+    const e2 = BN.randomBits(rng, 2049);
+    const p1 = new BN(5).powm(e1, t2.n);
+    const p2 = new BN(7).powm(e2, t2.n);
     const r1 = p1.mul(p2).mod(t2.n);
-
-    const r2 = t2.powgh(e1_s, e2_s);
+    const r2 = t2.powgh(e1, e2);
 
     assert.strictEqual(r1.toString(), r2.fromRed().toString());
   });
@@ -198,7 +187,6 @@ describe('Group Ops', function() {
   it('should compute inv2 (t1)', () => {
     const e1 = BN.randomBits(rng, 2048).toRed(t1.red);
     const e2 = BN.randomBits(rng, 2048).toRed(t1.red);
-
     const [e1i, e2i] = t1.inv2(e1, e2);
     const r1 = e1.redMul(e1i);
     const r2 = e2.redMul(e2i);
@@ -208,15 +196,11 @@ describe('Group Ops', function() {
   });
 
   it('should compute inv2 (t2)', () => {
-    const e1 = BN.randomBits(rng, 2048).toRed(t2.red);
-    const e2 = BN.randomBits(rng, 2048).toRed(t2.red);
-
-    const e1_s = e1.ushrn(1536);
-    const e2_s = e2.ushrn(1536);
-
-    const [e1_si, e2_si] = t2.inv2(e1_s, e2_s);
-    const r1 = e1_s.redMul(e1_si);
-    const r2 = e2_s.redMul(e2_si);
+    const e1 = BN.randomBits(rng, 512).toRed(t2.red);
+    const e2 = BN.randomBits(rng, 512).toRed(t2.red);
+    const [e1_si, e2_si] = t2.inv2(e1, e2);
+    const r1 = e1.redMul(e1_si);
+    const r2 = e2.redMul(e2_si);
 
     assert.strictEqual(t2.reduce(r1).fromRed().toString(), '1');
     assert.strictEqual(t2.reduce(r2).fromRed().toString(), '1');
@@ -235,8 +219,10 @@ describe('Group Ops', function() {
 
     const invs = t1.inv7(...exps);
 
-    for (const [e, ei] of testUtil.zip(exps, invs)) {
+    for (let i = 0; i < 7; i++) {
+      const [e, ei] = [exps[i], invs[i]];
       const r = e.redMul(ei);
+
       assert.strictEqual(t1.reduce(r).fromRed().toString(), '1');
     }
   });
@@ -254,8 +240,10 @@ describe('Group Ops', function() {
 
     const invs = t2.inv7(...exps);
 
-    for (const [e, ei] of testUtil.zip(exps, invs)) {
+    for (let i = 0; i < 7; i++) {
+      const [e, ei] = [exps[i], invs[i]];
       const r = e.redMul(ei);
+
       assert.strictEqual(t2.reduce(r).fromRed().toString(), '1');
     }
   });
