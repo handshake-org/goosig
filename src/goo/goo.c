@@ -1113,6 +1113,7 @@ goo_sig_size(const goo_sig_t *sig, size_t bits) {
   len += mod_bytes; /* Dq */
   len += exp_bytes; /* Eq */
   len += ell_bytes * 8; /* z_prime */
+  len += 1;
 
   return len;
 }
@@ -1161,6 +1162,9 @@ goo_sig_export(unsigned char *out, const goo_sig_t *sig, size_t bits) {
   goo_write_int(sig->z_sa, ell_bytes);
   goo_write_int(sig->z_s2, ell_bytes);
 
+  out[pos] = mpz_sgn(sig->Eq) < 0 ? 1 : 0;
+  pos += 1;
+
   assert(goo_sig_size(sig, bits) == pos);
 
   return 1;
@@ -1169,9 +1173,6 @@ goo_sig_export(unsigned char *out, const goo_sig_t *sig, size_t bits) {
 #undef goo_write_int
 
 #define goo_read_int(n, size) do {         \
-  if (pos + (size) > data_len)             \
-    return 0;                              \
-                                           \
   goo_mpz_import((n), &data[pos], (size)); \
   pos += (size);                           \
 } while (0)                                \
@@ -1186,6 +1187,12 @@ goo_sig_import(goo_sig_t *sig,
   size_t chal_bytes = (GOO_CHAL_BITS + 7) / 8;
   size_t ell_bytes = (GOO_ELL_BITS + 7) / 8;
   size_t pos = 0;
+  unsigned char sign;
+
+  if (data_len != goo_sig_size(sig, bits)) {
+    /* Invalid signature size. */
+    return 0;
+  }
 
   goo_read_int(sig->C2, mod_bytes);
   goo_read_int(sig->C3, mod_bytes);
@@ -1208,11 +1215,18 @@ goo_sig_import(goo_sig_t *sig,
   goo_read_int(sig->z_sa, ell_bytes);
   goo_read_int(sig->z_s2, ell_bytes);
 
-  assert(pos <= data_len);
+  sign = data[pos];
+  pos += 1;
 
-  /* non-minimal serialization */
-  if (pos != data_len)
+  assert(pos == data_len);
+
+  if (sign > 1) {
+    /* Non-minimal serialization. */
     return 0;
+  }
+
+  if (sign)
+    mpz_neg(sig->Eq, sig->Eq);
 
   return 1;
 }
@@ -2058,12 +2072,8 @@ goo_hash_int(goo_sha256_t *ctx,
              const mpz_t n,
              size_t size,
              unsigned char *slab) {
-  size_t len, pos;
-
-  if (mpz_sgn(n) < 0)
-    return 0;
-
-  len = goo_mpz_bytelen(n);
+  size_t len = goo_mpz_bytelen(n);
+  size_t pos;
 
   if (len > size)
     return 0;
@@ -2100,7 +2110,17 @@ goo_group_hash(goo_group_t *group,
   unsigned char *slab = &group->slab[0];
   size_t mod_bytes = group->size;
   size_t exp_bytes = (GOO_EXPONENT_SIZE + 7) / 8;
+  unsigned char sign[1] = {mpz_sgn(E) < 0 ? 1 : 0};
   goo_sha256_t ctx;
+
+  VERIFY_POS(C1);
+  VERIFY_POS(C2);
+  VERIFY_POS(C3);
+  VERIFY_POS(t);
+  VERIFY_POS(A);
+  VERIFY_POS(B);
+  VERIFY_POS(C);
+  VERIFY_POS(D);
 
   /* Copy the state of SHA256(prefix || SHA256(g || h || n)). */
   /* This gives us a minor speedup. */
@@ -2118,10 +2138,13 @@ goo_group_hash(goo_group_t *group,
     return 0;
   }
 
+  goo_sha256_update(&ctx, &sign[0], 1);
   goo_sha256_update(&ctx, msg, msg_len);
   goo_sha256_final(&ctx, out);
 
   return 1;
+fail:
+  return 0;
 }
 
 static int
@@ -2467,10 +2490,6 @@ goo_group_sign(goo_group_t *group,
     goto fail;
   }
 
-  /* Prevent `E` from being negative. */
-  if (mpz_cmp(r_w2, r_an) < 0)
-    mpz_swap(r_w2, r_an);
-
   /* Compute:
    *
    *   A = g^r_w * h^r_s1 in G
@@ -2504,8 +2523,6 @@ goo_group_sign(goo_group_t *group,
   goo_group_reduce(group, D, D);
 
   mpz_sub(E, r_w2, r_an);
-
-  assert(mpz_sgn(E) >= 0);
 
   mpz_set_ui(*ell, 0);
 
@@ -2615,7 +2632,6 @@ goo_group_sign(goo_group_t *group,
   mpz_sub(*Eq, *z_w2, *z_an);
   mpz_fdiv_q(*Eq, *Eq, *ell);
 
-  assert(mpz_sgn(*Eq) >= 0);
   assert(goo_mpz_bitlen(*Eq) <= GOO_EXPONENT_SIZE);
 
   /* Compute `z' = (z mod ell)`. */
@@ -2723,7 +2739,6 @@ goo_group_verify(goo_group_t *group,
   VERIFY_POS(*Bq);
   VERIFY_POS(*Cq);
   VERIFY_POS(*Dq);
-  VERIFY_POS(*Eq);
   VERIFY_POS(*z_w);
   VERIFY_POS(*z_w2);
   VERIFY_POS(*z_s1);
@@ -2817,17 +2832,11 @@ goo_group_verify(goo_group_t *group,
   }
 
   mpz_sub(z_w2_m_an, *z_w2, *z_an);
+  mpz_mod(z_w2_m_an, z_w2_m_an, *ell);
   mpz_mul(E, *Eq, *ell);
   mpz_add(E, E, z_w2_m_an);
   mpz_mul(tmp, *t, *chal);
   mpz_sub(E, E, tmp);
-
-  if (mpz_sgn(z_w2_m_an) < 0)
-    mpz_add(E, E, *ell);
-
-  /* `E` must be positive. */
-  if (mpz_sgn(E) < 0)
-    goto fail;
 
   /* Recompute `chal` and `ell`. */
   if (!goo_group_derive(group, chal0, ell0, &key[0],

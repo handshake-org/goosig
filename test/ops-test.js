@@ -84,7 +84,7 @@ describe('Group Ops', function() {
 
     const r2 = t1.powgh(e1, e2);
 
-    assert.strictEqual(r1.fromRed().toString(), r2.fromRed().toString());
+    assert.strictEqual(r1.toString(), r2.fromRed().toString());
   });
 
   it('should compute powgh (t2)', () => {
@@ -100,7 +100,7 @@ describe('Group Ops', function() {
 
     const r2 = t2.powgh(e1_s, e2_s);
 
-    assert.strictEqual(r1.fromRed().toString(), r2.fromRed().toString());
+    assert.strictEqual(r1.toString(), r2.fromRed().toString());
   });
 
   it('should compute inv2 (t1)', () => {
