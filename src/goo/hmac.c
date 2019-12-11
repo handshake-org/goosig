@@ -42,7 +42,7 @@ goo_hmac_init(goo_hmac_t *hmac, const unsigned char *key, size_t len) {
 }
 
 void
-goo_hmac_update(goo_hmac_t *hmac, const unsigned char *data, size_t len) {
+goo_hmac_update(goo_hmac_t *hmac, const void *data, size_t len) {
   goo_sha256_update(&hmac->inner, data, len);
 }
 
@@ -55,12 +55,12 @@ goo_hmac_final(goo_hmac_t *hmac, unsigned char *out) {
 
 void
 goo_hmac(unsigned char *out,
-         const unsigned char *in,
+         const void *data,
          size_t len,
          const unsigned char *key,
          size_t klen) {
   goo_hmac_t hmac;
   goo_hmac_init(&hmac, key, klen);
-  goo_hmac_update(&hmac, in, len);
+  goo_hmac_update(&hmac, data, len);
   goo_hmac_final(&hmac, out);
 }

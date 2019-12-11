@@ -91,7 +91,7 @@ goo_sha256_init(goo_sha256_t *ctx) {
 
 static void
 goo_sha256_transform(goo_sha256_t *ctx, const unsigned char *chunk) {
-  uint32_t *W = ctx->msg;
+  uint32_t W[64];
   uint32_t a = ctx->state[0];
   uint32_t b = ctx->state[1];
   uint32_t c = ctx->state[2];
@@ -119,12 +119,8 @@ goo_sha256_transform(goo_sha256_t *ctx, const unsigned char *chunk) {
     W[i] = sigma1(W[i - 2]) + W[i - 7] + sigma0(W[i - 15]) + W[i - 16];
 
   for (i = 0; i < 64; i++) {
-    t1 = h + Sigma1(e);
-    t1 += Ch(e, f, g);
-    t1 += K[i] + W[i];
-
-    t2 = Sigma0(a);
-    t2 += Maj(a, b, c);
+    t1 = h + Sigma1(e) + Ch(e, f, g) + K[i] + W[i];
+    t2 = Sigma0(a) + Maj(a, b, c);
 
     h = g;
     g = f;
@@ -170,7 +166,7 @@ goo_sha256_update(goo_sha256_t *ctx, const void *data, size_t len) {
     if (want > len)
       want = len;
 
-    memcpy(ctx->block + pos, bytes + off, want);
+    memcpy(&ctx->block[pos], bytes + off, want);
 
     pos += want;
     len -= want;
@@ -179,7 +175,7 @@ goo_sha256_update(goo_sha256_t *ctx, const void *data, size_t len) {
     if (pos < 64)
       return;
 
-    goo_sha256_transform(ctx, ctx->block);
+    goo_sha256_transform(ctx, &ctx->block[0]);
   }
 
   while (len >= 64) {
@@ -189,28 +185,25 @@ goo_sha256_update(goo_sha256_t *ctx, const void *data, size_t len) {
   }
 
   if (len > 0)
-    memcpy(ctx->block, bytes + off, len);
+    memcpy(&ctx->block[0], bytes + off, len);
 }
 
 void
 goo_sha256_final(goo_sha256_t *ctx, unsigned char *out) {
   size_t pos = ctx->size & 63;
   uint64_t len = ctx->size << 3;
-  unsigned char desc[8];
+  unsigned char D[8];
   int i;
 
-  write64(&desc[0], len);
+  write64(&D[0], len);
 
-  goo_sha256_update(ctx, P, 1 + ((119 - pos) & 63));
-  goo_sha256_update(ctx, desc, 8);
+  goo_sha256_update(ctx, &P[0], 1 + ((119 - pos) & 63));
+  goo_sha256_update(ctx, &D[0], 8);
 
   for (i = 0; i < 8; i++) {
     write32(out + i * 4, ctx->state[i]);
     ctx->state[i] = 0;
   }
-
-  for (i = 0; i < 64; i++)
-    ctx->msg[i] = 0;
 
   for (i = 0; i < 64; i++)
     ctx->block[i] = 0;

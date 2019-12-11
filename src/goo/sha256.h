@@ -27,9 +27,8 @@ typedef SHA256_CTX goo_sha256_t;
 
 typedef struct goo_sha256_s {
   uint32_t state[8];
-  uint32_t msg[64];
   uint8_t block[64];
-  size_t size;
+  uint64_t size;
 } goo_sha256_t;
 
 #endif /* GOO_HAS_OPENSSL */

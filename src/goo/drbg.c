@@ -13,8 +13,8 @@
 #include <string.h>
 #include "drbg.h"
 
-static const unsigned char ZERO[1] = { 0x00 };
-static const unsigned char ONE[1] = { 0x01 };
+static const unsigned char ZERO[1] = {0x00};
+static const unsigned char ONE[1] = {0x01};
 
 static void
 goo_drbg_update(goo_drbg_t *drbg, const unsigned char *seed, size_t seed_len);
@@ -37,29 +37,29 @@ goo_drbg_init(goo_drbg_t *drbg, const unsigned char *seed, size_t seed_len) {
 
 static void
 goo_drbg_update(goo_drbg_t *drbg, const unsigned char *seed, size_t seed_len) {
-  goo_hmac_init(&drbg->kmac, drbg->K, GOO_SHA256_HASH_SIZE);
-  goo_hmac_update(&drbg->kmac, drbg->V, GOO_SHA256_HASH_SIZE);
+  goo_hmac_init(&drbg->kmac, &drbg->K[0], GOO_SHA256_HASH_SIZE);
+  goo_hmac_update(&drbg->kmac, &drbg->V[0], GOO_SHA256_HASH_SIZE);
   goo_hmac_update(&drbg->kmac, &ZERO[0], 1);
 
   if (seed)
     goo_hmac_update(&drbg->kmac, seed, seed_len);
 
-  goo_hmac_final(&drbg->kmac, drbg->K);
+  goo_hmac_final(&drbg->kmac, &drbg->K[0]);
 
-  goo_hmac_init(&drbg->kmac, drbg->K, GOO_SHA256_HASH_SIZE);
-  goo_hmac_update(&drbg->kmac, drbg->V, GOO_SHA256_HASH_SIZE);
-  goo_hmac_final(&drbg->kmac, drbg->V);
+  goo_hmac_init(&drbg->kmac, &drbg->K[0], GOO_SHA256_HASH_SIZE);
+  goo_hmac_update(&drbg->kmac, &drbg->V[0], GOO_SHA256_HASH_SIZE);
+  goo_hmac_final(&drbg->kmac, &drbg->V[0]);
 
   if (seed) {
-    goo_hmac_init(&drbg->kmac, drbg->K, GOO_SHA256_HASH_SIZE);
-    goo_hmac_update(&drbg->kmac, drbg->V, GOO_SHA256_HASH_SIZE);
+    goo_hmac_init(&drbg->kmac, &drbg->K[0], GOO_SHA256_HASH_SIZE);
+    goo_hmac_update(&drbg->kmac, &drbg->V[0], GOO_SHA256_HASH_SIZE);
     goo_hmac_update(&drbg->kmac, &ONE[0], 1);
     goo_hmac_update(&drbg->kmac, seed, seed_len);
-    goo_hmac_final(&drbg->kmac, drbg->K);
+    goo_hmac_final(&drbg->kmac, &drbg->K[0]);
 
-    goo_hmac_init(&drbg->kmac, drbg->K, GOO_SHA256_HASH_SIZE);
-    goo_hmac_update(&drbg->kmac, drbg->V, GOO_SHA256_HASH_SIZE);
-    goo_hmac_final(&drbg->kmac, drbg->V);
+    goo_hmac_init(&drbg->kmac, &drbg->K[0], GOO_SHA256_HASH_SIZE);
+    goo_hmac_update(&drbg->kmac, &drbg->V[0], GOO_SHA256_HASH_SIZE);
+    goo_hmac_final(&drbg->kmac, &drbg->V[0]);
   }
 }
 
@@ -80,14 +80,14 @@ goo_drbg_generate(goo_drbg_t *drbg, void *out, size_t len) {
   size_t outlen = GOO_SHA256_HASH_SIZE;
 
   while (pos < len) {
-    goo_hmac_init(&drbg->kmac, drbg->K, GOO_SHA256_HASH_SIZE);
-    goo_hmac_update(&drbg->kmac, drbg->V, GOO_SHA256_HASH_SIZE);
-    goo_hmac_final(&drbg->kmac, drbg->V);
+    goo_hmac_init(&drbg->kmac, &drbg->K[0], GOO_SHA256_HASH_SIZE);
+    goo_hmac_update(&drbg->kmac, &drbg->V[0], GOO_SHA256_HASH_SIZE);
+    goo_hmac_final(&drbg->kmac, &drbg->V[0]);
 
     if (outlen > left)
       outlen = left;
 
-    memcpy(&bytes[pos], &drbg->V[0], outlen);
+    memcpy(bytes + pos, &drbg->V[0], outlen);
 
     pos += outlen;
     left -= outlen;
