@@ -2470,7 +2470,7 @@ goo_group_sign(goo_group_t *group,
   assert(mpz_sgn(w) > 0);
 
   /* a = (w^2 - t) / n */
-  mpz_pow_ui(a, w, 2);
+  mpz_mul(a, w, w);
   mpz_sub(a, a, *t);
   mpz_fdiv_q(a, a, n);
 
@@ -2478,7 +2478,7 @@ goo_group_sign(goo_group_t *group,
 
   /* `w` and `a` must satisfy `w^2 = t + a * n`. */
   mpz_mul(t1, a, n);
-  mpz_pow_ui(t2, w, 2);
+  mpz_mul(t2, w, w);
   mpz_sub(t2, t2, *t);
 
   if (mpz_cmp(t1, t2) != 0) {
