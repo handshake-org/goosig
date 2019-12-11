@@ -1,6 +1,6 @@
 /*!
- * drbg.c - hmac-drbg for C
- * Copyright (c) 2018, Christopher Jeffrey (MIT License).
+ * drbg.c - hmac-drbg for C89
+ * Copyright (c) 2018-2019, Christopher Jeffrey (MIT License).
  * https://github.com/handshake-org/goosig
  *
  * Resources:
@@ -23,8 +23,8 @@ extern "C" {
 
 typedef struct goo_drbg_s {
   goo_hmac_t kmac;
-  unsigned char K[GOO_HASH_SIZE];
-  unsigned char V[GOO_HASH_SIZE];
+  unsigned char K[GOO_SHA256_HASH_SIZE];
+  unsigned char V[GOO_SHA256_HASH_SIZE];
   unsigned long long rounds;
 } goo_drbg_t;
 
@@ -34,8 +34,8 @@ goo_drbg_init(goo_drbg_t *drbg, const unsigned char *seed, size_t seed_len);
 void
 goo_drbg_reseed(goo_drbg_t *drbg, const unsigned char *seed, size_t seed_len);
 
-void
-goo_drbg_generate(goo_drbg_t *drbg, unsigned char *out, size_t len);
+int
+goo_drbg_generate(goo_drbg_t *drbg, void *out, size_t len);
 
 #if defined(__cplusplus)
 }

@@ -1,6 +1,6 @@
 /*!
  * primes.h - prime numbers
- * Copyright (c) 2018, Christopher Jeffrey (MIT License).
+ * Copyright (c) 2018-2019, Christopher Jeffrey (MIT License).
  * https://github.com/handshake-org/goosig
  *
  * Parts of this software are based on kwantam/libGooPy:

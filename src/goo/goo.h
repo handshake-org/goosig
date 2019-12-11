@@ -1,6 +1,6 @@
 /*!
- * goo.c - groups of unknown order for C
- * Copyright (c) 2018, Christopher Jeffrey (MIT License).
+ * goo.c - groups of unknown order for C89
+ * Copyright (c) 2018-2019, Christopher Jeffrey (MIT License).
  * https://github.com/handshake-org/goosig
  */
 
@@ -8,6 +8,7 @@
 #define _GOOSIG_H
 
 #include <stdlib.h>
+
 #ifdef GOO_HAS_GMP
 #include <gmp.h>
 #else
@@ -49,6 +50,14 @@ static const unsigned char GOO_DRBG_PERS[64] = {
   0xc9, 0x2f, 0x13, 0x33, 0x95, 0x0f, 0xf1, 0x24,
   0x6a, 0xc4, 0x50, 0x55, 0x22, 0x97, 0xf5, 0xd5,
   0x14, 0xdf, 0x2d, 0x05, 0xe2, 0xfb, 0xbf, 0x9b
+};
+
+/* SHA256("Goo RNG") */
+static const unsigned char GOO_DRBG_LOCAL[32] = {
+  0xbe, 0xe9, 0xc0, 0xa5, 0x17, 0x2e, 0x45, 0x61,
+  0x9d, 0xca, 0x94, 0x92, 0x8e, 0xb5, 0x7a, 0x6e,
+  0xf6, 0x0b, 0xa7, 0x99, 0x5a, 0x27, 0x60, 0x08,
+  0x9f, 0x9a, 0x3c, 0x6c, 0x23, 0x30, 0x26, 0x0c
 };
 
 #define GOO_TABLEN (1 << (GOO_WINDOW_SIZE - 2))
@@ -110,7 +119,7 @@ typedef struct goo_sig_s {
 } goo_sig_t;
 
 typedef struct goo_group_s {
-  /* Parameters */
+  /* Group parameters */
   mpz_t n;
   size_t bits;
   size_t size;
@@ -128,42 +137,17 @@ typedef struct goo_group_s {
   mpz_t table_n1[GOO_TABLEN];
   mpz_t table_n2[GOO_TABLEN];
   mpz_t table_p2[GOO_TABLEN];
+  long wnaf0[GOO_MAX_RSA_BITS + 1];
   long wnaf1[GOO_ELL_BITS + 1];
   long wnaf2[GOO_ELL_BITS + 1];
 
+  /* PRNG */
   goo_prng_t prng;
+
+  /* Cached SHA midstate */
   goo_sha256_t sha;
 
-  /* Temporary variables (for verification) */
-  /* goo_group_verify() */
-  mpz_t msg;
-  goo_sig_t sig;
-  mpz_t C1;
-  mpz_t C1i;
-  mpz_t C2i;
-  mpz_t C3i;
-  mpz_t Aqi;
-  mpz_t Bqi;
-  mpz_t Cqi;
-  mpz_t Dqi;
-  mpz_t A;
-  mpz_t B;
-  mpz_t C;
-  mpz_t D;
-  mpz_t E;
-  mpz_t z_w2_m_an;
-  mpz_t tmp;
-  mpz_t chal0;
-  mpz_t ell0;
-  mpz_t ell1;
-
-  /* goo_group_wnaf() */
-  mpz_t e;
-
-  /* goo_group_recon() */
-  mpz_t gh;
-
-  /* goo_hash_all() */
+  /* Used for goo_group_hash() */
   unsigned char slab[(GOO_MAX_RSA_BITS + 7) / 8];
 } goo_group_t;
 
@@ -179,9 +163,6 @@ goo_init(goo_ctx_t *ctx,
 
 void
 goo_uninit(goo_ctx_t *ctx);
-
-int
-goo_generate(goo_ctx_t *ctx, unsigned char *s_prime);
 
 int
 goo_challenge(goo_ctx_t *ctx,
@@ -211,7 +192,8 @@ goo_sign(goo_ctx_t *ctx,
          const unsigned char *p,
          size_t p_len,
          const unsigned char *q,
-         size_t q_len);
+         size_t q_len,
+         const unsigned char *seed);
 
 int
 goo_verify(goo_ctx_t *ctx,

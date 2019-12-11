@@ -5,8 +5,9 @@
       "./src/goo/drbg.c",
       "./src/goo/goo.c",
       "./src/goo/hmac.c",
-      "./src/goo/random.c",
-      "./src/goosig.cc"
+      "./src/goo/sha256.c",
+      "./src/goosig.cc",
+      "./src/random.cc"
     ],
     "cflags": [
       "-Wall",
@@ -31,6 +32,7 @@
       "<!(node -e \"require('nan')\")"
     ],
     "defines": [
+      "GOO_HAS_OPENSSL",
       "GOO_TEST"
     ],
     "variables": {

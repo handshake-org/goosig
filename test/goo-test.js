@@ -17,8 +17,6 @@ const vectors = require('./data/vectors.json');
 
 function runTests(name, Goo, Other) {
   describe(name, function() {
-    this.timeout(60000);
-
     const tests = [
       ['2048-bit RSA GoUO, 2048-bit Signer PK', Goo.AOL1, 2, 3, 2048],
       ['2048-bit RSA GoUO, 4096-bit Signer PK', Goo.AOL1, 2, 3, 4096],
@@ -127,6 +125,7 @@ function runTests(name, Goo, Other) {
   });
 }
 
-runTests('Goo', JS, Native);
 if (Native)
   runTests('Goo (Native)', Native, JS);
+
+runTests('Goo', JS, Native);

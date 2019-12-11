@@ -10,8 +10,6 @@ const testUtil = require('./util');
 const Goo = require('../');
 
 describe('API', function() {
-  this.timeout(60000);
-
   const tests = [
     ['2048-bit RSA GoUO, 2048-bit Signer PK', Goo.AOL1, 2, 3, 2048],
     ['2048-bit RSA GoUO, 4096-bit Signer PK', Goo.AOL1, 2, 3, 4096],

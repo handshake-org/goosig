@@ -5,6 +5,7 @@
  */
 
 #include "goosig.h"
+#include "random.h"
 
 NAN_INLINE static bool
 IsNull(v8::Local<v8::Value> obj) {
@@ -91,12 +92,10 @@ NAN_METHOD(Goo::New) {
 }
 
 NAN_METHOD(Goo::Generate) {
-  Goo *goo = ObjectWrap::Unwrap<Goo>(info.Holder());
-
   unsigned char s_prime[32];
 
-  if (!goo_generate(&goo->ctx, s_prime))
-    return Nan::ThrowError("Could create challenge.");
+  if (!goo_random((void *)&s_prime[0], 32))
+    return Nan::ThrowError("Could not generate s_prime.");
 
   info.GetReturnValue().Set(
     Nan::CopyBuffer((char *)s_prime, 32).ToLocalChecked());
@@ -131,7 +130,7 @@ NAN_METHOD(Goo::Challenge) {
     return Nan::ThrowRangeError("s_prime must be 32 bytes.");
 
   if (!goo_challenge(&goo->ctx, &C1, &C1_len, s_prime, n, n_len))
-    return Nan::ThrowError("Could create challenge.");
+    return Nan::ThrowError("Could not create challenge.");
 
   info.GetReturnValue().Set(
     Nan::NewBuffer((char *)C1, C1_len).ToLocalChecked());
@@ -227,12 +226,18 @@ NAN_METHOD(Goo::Sign) {
   if (s_prime_len != 32)
     return Nan::ThrowRangeError("s_prime must be 32 bytes.");
 
+  uint8_t seed[64];
+
+  if (!goo_random((void *)&seed[0], 64))
+    return Nan::ThrowError("Could not seed RNG.");
+
   if (!goo_sign(&goo->ctx,
                 &sig, &sig_len,
                 msg, msg_len,
                 s_prime,
                 p, p_len,
-                q, q_len)) {
+                q, q_len,
+                &seed[0])) {
     return Nan::ThrowError("Could create signature.");
   }
 

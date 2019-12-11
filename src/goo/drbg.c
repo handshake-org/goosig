@@ -1,6 +1,6 @@
 /*!
- * drbg.c - hmac-drbg for C
- * Copyright (c) 2018, Christopher Jeffrey (MIT License).
+ * drbg.c - hmac-drbg for C89
+ * Copyright (c) 2018-2019, Christopher Jeffrey (MIT License).
  * https://github.com/handshake-org/goosig
  *
  * Resources:
@@ -26,7 +26,7 @@ goo_drbg_init(goo_drbg_t *drbg, const unsigned char *seed, size_t seed_len) {
   assert(seed != NULL);
   assert(seed_len >= 24);
 
-  for (i = 0; i < GOO_HASH_SIZE; i++) {
+  for (i = 0; i < GOO_SHA256_HASH_SIZE; i++) {
     drbg->K[i] = 0x00;
     drbg->V[i] = 0x01;
   }
@@ -37,8 +37,8 @@ goo_drbg_init(goo_drbg_t *drbg, const unsigned char *seed, size_t seed_len) {
 
 static void
 goo_drbg_update(goo_drbg_t *drbg, const unsigned char *seed, size_t seed_len) {
-  goo_hmac_init(&drbg->kmac, drbg->K, GOO_HASH_SIZE);
-  goo_hmac_update(&drbg->kmac, drbg->V, GOO_HASH_SIZE);
+  goo_hmac_init(&drbg->kmac, drbg->K, GOO_SHA256_HASH_SIZE);
+  goo_hmac_update(&drbg->kmac, drbg->V, GOO_SHA256_HASH_SIZE);
   goo_hmac_update(&drbg->kmac, &ZERO[0], 1);
 
   if (seed)
@@ -46,19 +46,19 @@ goo_drbg_update(goo_drbg_t *drbg, const unsigned char *seed, size_t seed_len) {
 
   goo_hmac_final(&drbg->kmac, drbg->K);
 
-  goo_hmac_init(&drbg->kmac, drbg->K, GOO_HASH_SIZE);
-  goo_hmac_update(&drbg->kmac, drbg->V, GOO_HASH_SIZE);
+  goo_hmac_init(&drbg->kmac, drbg->K, GOO_SHA256_HASH_SIZE);
+  goo_hmac_update(&drbg->kmac, drbg->V, GOO_SHA256_HASH_SIZE);
   goo_hmac_final(&drbg->kmac, drbg->V);
 
   if (seed) {
-    goo_hmac_init(&drbg->kmac, drbg->K, GOO_HASH_SIZE);
-    goo_hmac_update(&drbg->kmac, drbg->V, GOO_HASH_SIZE);
+    goo_hmac_init(&drbg->kmac, drbg->K, GOO_SHA256_HASH_SIZE);
+    goo_hmac_update(&drbg->kmac, drbg->V, GOO_SHA256_HASH_SIZE);
     goo_hmac_update(&drbg->kmac, &ONE[0], 1);
     goo_hmac_update(&drbg->kmac, seed, seed_len);
     goo_hmac_final(&drbg->kmac, drbg->K);
 
-    goo_hmac_init(&drbg->kmac, drbg->K, GOO_HASH_SIZE);
-    goo_hmac_update(&drbg->kmac, drbg->V, GOO_HASH_SIZE);
+    goo_hmac_init(&drbg->kmac, drbg->K, GOO_SHA256_HASH_SIZE);
+    goo_hmac_update(&drbg->kmac, drbg->V, GOO_SHA256_HASH_SIZE);
     goo_hmac_final(&drbg->kmac, drbg->V);
   }
 }
@@ -72,23 +72,22 @@ goo_drbg_reseed(goo_drbg_t *drbg, const unsigned char *seed, size_t seed_len) {
   drbg->rounds = 1;
 }
 
-void
-goo_drbg_generate(goo_drbg_t *drbg, unsigned char *out, size_t len) {
+int
+goo_drbg_generate(goo_drbg_t *drbg, void *out, size_t len) {
+  unsigned char *bytes = (unsigned char *)out;
   size_t pos = 0;
   size_t left = len;
-  size_t outlen = GOO_HASH_SIZE;
-
-  assert(drbg->rounds <= GOO_RESEED_INTERVAL);
+  size_t outlen = GOO_SHA256_HASH_SIZE;
 
   while (pos < len) {
-    goo_hmac_init(&drbg->kmac, drbg->K, GOO_HASH_SIZE);
-    goo_hmac_update(&drbg->kmac, drbg->V, GOO_HASH_SIZE);
+    goo_hmac_init(&drbg->kmac, drbg->K, GOO_SHA256_HASH_SIZE);
+    goo_hmac_update(&drbg->kmac, drbg->V, GOO_SHA256_HASH_SIZE);
     goo_hmac_final(&drbg->kmac, drbg->V);
 
     if (outlen > left)
       outlen = left;
 
-    memcpy(&out[pos], &drbg->V[0], outlen);
+    memcpy(&bytes[pos], &drbg->V[0], outlen);
 
     pos += outlen;
     left -= outlen;
@@ -99,4 +98,6 @@ goo_drbg_generate(goo_drbg_t *drbg, unsigned char *out, size_t len) {
 
   goo_drbg_update(drbg, NULL, 0);
   drbg->rounds += 1;
+
+  return drbg->rounds - 1 <= GOO_RESEED_INTERVAL;
 }

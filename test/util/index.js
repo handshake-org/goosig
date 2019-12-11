@@ -285,14 +285,13 @@ const testUtil = {
     const q1 = q.subn(1);
     const lam = p1.mul(q1).div(p1.gcd(q1));
 
-    for (const p of primes.primesSkip(1)) {
+    for (const p of primes.testPrimes.slice(1)) {
       if (p > 1000)
         throw new Error('Could find a suitable exponent!');
 
-      const e = BN.from(p);
+      const e = new BN(p);
 
-      let d = null;
-
+      let d;
       try {
         d = e.invert(lam);
       } catch (e) {

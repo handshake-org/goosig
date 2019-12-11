@@ -1,6 +1,6 @@
 /*!
- * sha256.h - sha256 for C
- * Copyright (c) 2018, Christopher Jeffrey (MIT License).
+ * sha256.h - sha256 for C89
+ * Copyright (c) 2018-2019, Christopher Jeffrey (MIT License).
  * https://github.com/handshake-org/goosig
  */
 
@@ -8,36 +8,43 @@
 #define _GOO_SHA256_H
 
 #include <stdlib.h>
-#include "openssl/sha.h"
+#include <stdint.h>
 
 #if defined(__cplusplus)
 extern "C" {
 #endif
 
-#define GOO_HASH_SIZE 32
-#define GOO_BLOCK_SIZE 64
+#define GOO_SHA256_HASH_SIZE 32
+#define GOO_SHA256_BLOCK_SIZE 64
+
+#ifdef GOO_HAS_OPENSSL
+
+#include "openssl/sha.h"
 
 typedef SHA256_CTX goo_sha256_t;
 
-static void
-goo_sha256_init(goo_sha256_t *ctx) {
-  SHA256_Init(ctx);
-}
+#else
 
-static void
-goo_sha256_update(goo_sha256_t *ctx, const unsigned char *data, size_t len) {
-  SHA256_Update(ctx, data, len);
-}
+typedef struct goo_sha256_s {
+  uint32_t state[8];
+  uint32_t msg[64];
+  uint8_t block[64];
+  size_t size;
+} goo_sha256_t;
 
-static void
-goo_sha256_final(goo_sha256_t *ctx, unsigned char *out) {
-  SHA256_Final(out, ctx);
-}
+#endif /* GOO_HAS_OPENSSL */
 
-static void
-goo_sha256(unsigned char *out, const unsigned char *data, size_t len) {
-  SHA256(data, len, out);
-}
+void
+goo_sha256_init(goo_sha256_t *ctx);
+
+void
+goo_sha256_update(goo_sha256_t *ctx, const void *data, size_t len);
+
+void
+goo_sha256_final(goo_sha256_t *ctx, unsigned char *out);
+
+void
+goo_sha256(unsigned char *out, const void *data, size_t len);
 
 #if defined(__cplusplus)
 }

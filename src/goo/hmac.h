@@ -1,6 +1,6 @@
 /*!
- * hmac.c - hmac for C
- * Copyright (c) 2018, Christopher Jeffrey (MIT License).
+ * hmac.c - hmac for C89
+ * Copyright (c) 2018-2019, Christopher Jeffrey (MIT License).
  * https://github.com/handshake-org/goosig
  */
 
