@@ -34,7 +34,6 @@ describe('Group Ops', function() {
     delete h0.items;
 
     assert.deepStrictEqual(g0, {
-      base: '02',
       pointsPerAdd: 7,
       addsPerShift: 4,
       shifts: 5,
@@ -45,7 +44,6 @@ describe('Group Ops', function() {
     });
 
     assert.deepStrictEqual(h0, {
-      base: '03',
       pointsPerAdd: 7,
       addsPerShift: 4,
       shifts: 5,
@@ -70,7 +68,6 @@ describe('Group Ops', function() {
     delete h1.items;
 
     assert.deepStrictEqual(g0, {
-      base: '02',
       pointsPerAdd: 8,
       addsPerShift: 2,
       shifts: 128,
@@ -81,7 +78,6 @@ describe('Group Ops', function() {
     });
 
     assert.deepStrictEqual(h0, {
-      base: '03',
       pointsPerAdd: 8,
       addsPerShift: 2,
       shifts: 128,
@@ -92,7 +88,6 @@ describe('Group Ops', function() {
     });
 
     assert.deepStrictEqual(g1, {
-      base: '02',
       pointsPerAdd: 8,
       addsPerShift: 2,
       shifts: 265,
@@ -103,7 +98,6 @@ describe('Group Ops', function() {
     });
 
     assert.deepStrictEqual(h1, {
-      base: '03',
       pointsPerAdd: 8,
       addsPerShift: 2,
       shifts: 265,

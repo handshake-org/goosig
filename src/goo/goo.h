@@ -31,6 +31,7 @@ extern "C" {
 #define GOO_CHAL_BITS 128
 #define GOO_ELL_BITS 136
 #define GOO_ELLDIFF_MAX 512
+#define GOO_TABLEN (1 << (GOO_WINDOW_SIZE - 2))
 
 /* SHA256("Goo Signature") */
 static const unsigned char GOO_HASH_PREFIX[32] = {
@@ -60,8 +61,6 @@ static const unsigned char GOO_DRBG_LOCAL[32] = {
   0x9f, 0x9a, 0x3c, 0x6c, 0x23, 0x30, 0x26, 0x0c
 };
 
-#define GOO_TABLEN (1 << (GOO_WINDOW_SIZE - 2))
-
 typedef struct goo_combspec_s {
   long points_per_add;
   long adds_per_shift;
@@ -78,8 +77,8 @@ typedef struct goo_comb_s {
   long bits;
   long points_per_subcomb;
   long size;
-  long **wins;
   mpz_t *items;
+  long **wins;
 } goo_comb_t;
 
 typedef struct goo_comb_item_s {

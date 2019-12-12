@@ -426,7 +426,7 @@ goo_prng_random_num(goo_prng_t *prng, unsigned long max) {
  */
 
 static unsigned long
-goo_dsqrt(unsigned long x) {
+goo_isqrt(unsigned long x) {
   unsigned long len = 0;
   unsigned long y = x;
   unsigned long z1, z2;
@@ -1285,7 +1285,7 @@ combspec_size(long bits) {
 
   for (ppa = 2; ppa < 18; ppa++) {
     bpw = (bits + ppa - 1) / ppa;
-    sqrt = goo_dsqrt(bpw);
+    sqrt = goo_isqrt(bpw);
 
     for (aps = 1; aps < sqrt + 2; aps++) {
       if (bpw % aps != 0)
@@ -1350,7 +1350,7 @@ goo_combspec_init(goo_combspec_t *out, long bits, long maxsize) {
 
   for (ppa = 2; ppa < 18; ppa++) {
     bpw = (bits + ppa - 1) / ppa;
-    sqrt = goo_dsqrt(bpw);
+    sqrt = goo_isqrt(bpw);
 
     for (aps = 1; aps < sqrt + 2; aps++) {
       if (bpw % aps != 0)
@@ -1416,65 +1416,62 @@ goo_comb_init(goo_comb_t *comb,
               goo_group_t *group,
               mpz_t base,
               goo_combspec_t *spec) {
-  long skip, i, j;
-  mpz_t *it;
-  mpz_t win;
+  long i, j, skip;
+  mpz_t *items, exp;
 
-  memset((void *)comb, 0x00, sizeof(goo_comb_t));
+  assert((size_t)spec->points_per_add < sizeof(long) * 8);
 
-  skip = (1 << spec->points_per_add) - 1;
+  mpz_init(exp);
 
   comb->points_per_add = spec->points_per_add;
   comb->adds_per_shift = spec->adds_per_shift;
   comb->shifts = spec->shifts;
   comb->bits_per_window = spec->bits_per_window;
   comb->bits = spec->bits_per_window * spec->points_per_add;
-  comb->points_per_subcomb = skip;
+  comb->points_per_subcomb = (1 << spec->points_per_add) - 1;
   comb->size = spec->size;
-
-  comb->wins = (long **)goo_calloc(comb->shifts, sizeof(long *));
-
-  for (i = 0; i < comb->shifts; i++)
-    comb->wins[i] = (long *)goo_calloc(comb->adds_per_shift, sizeof(long));
-
-  comb->items = (mpz_t *)goo_calloc(comb->size, sizeof(mpz_t));
+  comb->items = goo_calloc(comb->size, sizeof(mpz_t));
+  comb->wins = goo_calloc(comb->shifts, sizeof(long *));
 
   for (i = 0; i < comb->size; i++)
     mpz_init(comb->items[i]);
 
+  for (i = 0; i < comb->shifts; i++)
+    comb->wins[i] = goo_calloc(comb->adds_per_shift, sizeof(long));
+
   mpz_set(comb->items[0], base);
 
-  it = &comb->items[0];
+  items = &comb->items[0];
 
-  mpz_init(win);
-
-  /* win = 1 << bits_per_window */
-  mpz_set_ui(win, 1);
-  mpz_mul_2exp(win, win, comb->bits_per_window);
+  /* exp = 1 << bits_per_window */
+  mpz_set_ui(exp, 1);
+  mpz_mul_2exp(exp, exp, comb->bits_per_window);
 
   for (i = 1; i < comb->points_per_add; i++) {
     long x = 1 << i;
     long y = x >> 1;
 
-    goo_group_pow_slow(group, it[x - 1], it[y - 1], win);
+    goo_group_pow_slow(group, items[x - 1], items[y - 1], exp);
 
     for (j = x + 1; j < 2 * x; j++)
-      goo_group_mul(group, it[j - 1], it[j - x - 1], it[x - 1]);
+      goo_group_mul(group, items[j - 1], items[j - x - 1], items[x - 1]);
   }
 
-  /* win = 1 << shifts */
-  mpz_set_ui(win, 1);
-  mpz_mul_2exp(win, win, comb->shifts);
+  /* exp = 1 << shifts */
+  mpz_set_ui(exp, 1);
+  mpz_mul_2exp(exp, exp, comb->shifts);
+
+  skip = comb->points_per_subcomb;
 
   for (i = 1; i < comb->adds_per_shift; i++) {
     for (j = 0; j < skip; j++) {
       long k = i * skip + j;
 
-      goo_group_pow_slow(group, it[k], it[k - skip], win);
+      goo_group_pow_slow(group, items[k], items[k - skip], exp);
     }
   }
 
-  mpz_clear(win);
+  mpz_clear(exp);
 }
 
 static void
@@ -1487,10 +1484,11 @@ goo_comb_uninit(goo_comb_t *comb) {
   for (i = 0; i < comb->shifts; i++)
     goo_free(comb->wins[i]);
 
+  goo_free(comb->items);
   goo_free(comb->wins);
 
-  comb->size = 0;
   comb->shifts = 0;
+  comb->size = 0;
   comb->items = NULL;
   comb->wins = NULL;
 }
@@ -1538,15 +1536,13 @@ goo_group_init(goo_group_t *group,
                const mpz_t n,
                unsigned long g,
                unsigned long h,
-               unsigned long modbits) {
+               unsigned long bits) {
   long i;
 
-  if (modbits != 0) {
-    if (modbits < GOO_MIN_RSA_BITS || modbits > GOO_MAX_RSA_BITS)
+  if (bits != 0) {
+    if (bits < GOO_MIN_RSA_BITS || bits > GOO_MAX_RSA_BITS)
       return 0;
   }
-
-  memset((void *)group, 0x00, sizeof(goo_group_t));
 
   mpz_init(group->n);
   mpz_init(group->nh);
@@ -1565,9 +1561,9 @@ goo_group_init(goo_group_t *group,
 
   group->rand_bits = goo_mpz_bitlen(group->n) - 1;
 
-  if (modbits != 0) {
-    long big1 = 2 * modbits;
-    long big2 = modbits + group->rand_bits;
+  if (bits != 0) {
+    long big1 = 2 * bits;
+    long big2 = bits + group->rand_bits;
     long big = big1 > big2 ? big1 : big2;
     long big_bits = big + GOO_ELL_BITS + 1;
     long small_bits = group->rand_bits;
@@ -2923,7 +2919,7 @@ goo_init(goo_ctx_t *ctx,
          size_t n_len,
          unsigned long g,
          unsigned long h,
-         unsigned long modbits) {
+         unsigned long bits) {
   int r = 0;
   mpz_t n_n;
 
@@ -2934,7 +2930,7 @@ goo_init(goo_ctx_t *ctx,
 
   goo_mpz_import(n_n, n, n_len);
 
-  if (!goo_group_init(ctx, n_n, g, h, modbits))
+  if (!goo_group_init(ctx, n_n, g, h, bits))
     goto fail;
 
   r = 1;
@@ -3314,8 +3310,8 @@ run_util_test(void) {
   {
     printf("Testing sqrt...\n");
 
-    assert(goo_dsqrt(1024) == 32);
-    assert(goo_dsqrt(1025) == 32);
+    assert(goo_isqrt(1024) == 32);
+    assert(goo_isqrt(1025) == 32);
   }
 
   /* test division */
