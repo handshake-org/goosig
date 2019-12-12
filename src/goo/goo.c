@@ -1529,7 +1529,7 @@ static int
 goo_hash_int(goo_sha256_t *ctx,
              const mpz_t n,
              size_t size,
-             unsigned char *buf);
+             unsigned char *slab);
 
 static int
 goo_group_init(goo_group_t *group,
