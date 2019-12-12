@@ -442,6 +442,8 @@ goo_isqrt(unsigned long x) {
   z1 = 1 << ((len >> 1) + 1);
 
   for (;;) {
+    assert(z1 != 0);
+
     z2 = x / z1;
     z2 += z1;
     z2 >>= 1;
@@ -1281,27 +1283,30 @@ goo_sig_import(goo_sig_t *sig,
 static size_t
 combspec_size(long bits) {
   long max = 0;
-  long ppa, bpw, sqrt, aps, shifts, ops1, ops2, ops;
+  long ppa;
 
   for (ppa = 2; ppa < 18; ppa++) {
-    bpw = (bits + ppa - 1) / ppa;
-    sqrt = goo_isqrt(bpw);
+    long bpw = (bits + ppa - 1) / ppa;
+    long sqrt = goo_isqrt(bpw);
+    long aps;
 
     for (aps = 1; aps < sqrt + 2; aps++) {
+      long shifts, ops1, ops2, ops;
+
       if (bpw % aps != 0)
         continue;
 
       shifts = bpw / aps;
       ops1 = shifts * (aps + 1) - 1;
       ops2 = aps * (shifts + 1) - 1;
-      ops = (ops1 > ops2 ? ops1 : ops2) + 1;
+      ops = ops1 > ops2 ? ops1 : ops2;
 
       if (ops > max)
         max = ops;
     }
   }
 
-  return max;
+  return max + 1;
 }
 
 static void
@@ -1339,9 +1344,9 @@ goo_combspec_init(goo_combspec_t *out, long bits, long maxsize) {
   int r = 0;
   size_t specs_len, i;
   goo_combspec_t **specs, *ret;
-  long ppa, bpw, sqrt, aps, shifts, sm;
+  long ppa, sm;
 
-  if (bits < 0 || maxsize < 0)
+  if (bits <= 0 || maxsize <= 0)
     return 0;
 
   /* We don't have a hash table, so this allocates up to ~70kb. */
@@ -1349,14 +1354,19 @@ goo_combspec_init(goo_combspec_t *out, long bits, long maxsize) {
   specs = goo_calloc(specs_len, sizeof(goo_combspec_t *));
 
   for (ppa = 2; ppa < 18; ppa++) {
-    bpw = (bits + ppa - 1) / ppa;
-    sqrt = goo_isqrt(bpw);
+    long bpw = (bits + ppa - 1) / ppa;
+    long sqrt = goo_isqrt(bpw);
+    long aps;
 
     for (aps = 1; aps < sqrt + 2; aps++) {
+      long shifts;
+
       if (bpw % aps != 0)
         continue;
 
       shifts = bpw / aps;
+
+      assert(shifts > 0);
 
       combspec_generate(specs, specs_len, shifts, aps, ppa, bpw);
       combspec_generate(specs, specs_len, aps, shifts, ppa, bpw);
