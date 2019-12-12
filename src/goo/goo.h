@@ -33,7 +33,20 @@ extern "C" {
 #define GOO_ELLDIFF_MAX 512
 #define GOO_TABLEN (1 << (GOO_WINDOW_SIZE - 2))
 
-/* SHA256("Goo Signature") */
+/* SHA256("Goo Signature")
+ *
+ * This, combined with the group hash of
+ * SHA256(g || h || n), gives us an IV of:
+ *
+ *   0x4332417d
+ *   0xf3a92851
+ *   0xd59e8673
+ *   0x6cbbfa97
+ *   0xd44855ed
+ *   0x385a0490
+ *   0xa2297690
+ *   0x0e0ea0e4
+ */
 static const unsigned char GOO_HASH_PREFIX[32] = {
   0xc8, 0x30, 0xd5, 0xfd, 0xdc, 0xb2, 0x23, 0xcd,
   0x86, 0x00, 0x7a, 0xbf, 0x91, 0xc4, 0x40, 0x27,
