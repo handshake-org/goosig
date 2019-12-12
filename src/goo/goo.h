@@ -130,16 +130,18 @@ typedef struct goo_sig_s {
 typedef struct goo_group_s {
   /* Group parameters */
   mpz_t n;
-  size_t bits;
-  size_t size;
-  mpz_t nh;
   mpz_t g;
   mpz_t h;
+  mpz_t nh;
+  size_t bits;
+  size_t size;
   size_t rand_bits;
 
-  /* Combs */
-  long combs_len;
-  goo_comb_item_t combs[2];
+  /* PRNG */
+  goo_prng_t prng;
+
+  /* Cached SHA midstate */
+  goo_sha256_t sha;
 
   /* WNAF */
   mpz_t table_p1[GOO_TABLEN];
@@ -150,11 +152,9 @@ typedef struct goo_group_s {
   long wnaf1[GOO_ELL_BITS + 1];
   long wnaf2[GOO_ELL_BITS + 1];
 
-  /* PRNG */
-  goo_prng_t prng;
-
-  /* Cached SHA midstate */
-  goo_sha256_t sha;
+  /* Combs */
+  long combs_len;
+  goo_comb_item_t combs[2];
 
   /* Used for goo_group_hash() */
   unsigned char slab[(GOO_MAX_RSA_BITS + 7) / 8];

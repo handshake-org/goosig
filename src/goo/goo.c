@@ -1541,6 +1541,9 @@ goo_hash_int(goo_sha256_t *ctx,
              size_t size,
              unsigned char *slab);
 
+static void
+goo_group_uninit(goo_group_t *group);
+
 static int
 goo_group_init(goo_group_t *group,
                const mpz_t n,
@@ -1549,54 +1552,13 @@ goo_group_init(goo_group_t *group,
                unsigned long bits) {
   long i;
 
-  if (bits != 0) {
-    if (bits < GOO_MIN_RSA_BITS || bits > GOO_MAX_RSA_BITS)
-      return 0;
-  }
-
+  /* Allocate. */
   mpz_init(group->n);
-  mpz_init(group->nh);
   mpz_init(group->g);
   mpz_init(group->h);
+  mpz_init(group->nh);
 
-  mpz_set(group->n, n);
-
-  group->bits = goo_mpz_bitlen(group->n);
-  group->size = (group->bits + 7) / 8;
-
-  mpz_tdiv_q_2exp(group->nh, group->n, 1);
-
-  mpz_set_ui(group->g, g);
-  mpz_set_ui(group->h, h);
-
-  group->rand_bits = goo_mpz_bitlen(group->n) - 1;
-
-  if (bits != 0) {
-    long big1 = 2 * bits;
-    long big2 = bits + group->rand_bits;
-    long big = big1 > big2 ? big1 : big2;
-    long big_bits = big + GOO_ELL_BITS + 1;
-    long small_bits = group->rand_bits;
-    goo_combspec_t big_spec, small_spec;
-
-    assert(goo_combspec_init(&big_spec, big_bits, GOO_MAX_COMB_SIZE));
-    assert(goo_combspec_init(&small_spec, small_bits, GOO_MAX_COMB_SIZE));
-
-    group->combs_len = 2;
-    goo_comb_init(&group->combs[0].g, group, group->g, &small_spec);
-    goo_comb_init(&group->combs[0].h, group, group->h, &small_spec);
-    goo_comb_init(&group->combs[1].g, group, group->g, &big_spec);
-    goo_comb_init(&group->combs[1].h, group, group->h, &big_spec);
-  } else {
-    long tiny_bits = GOO_ELL_BITS;
-    goo_combspec_t tiny_spec;
-
-    assert(goo_combspec_init(&tiny_spec, tiny_bits, GOO_MAX_COMB_SIZE));
-
-    group->combs_len = 1;
-    goo_comb_init(&group->combs[0].g, group, group->g, &tiny_spec);
-    goo_comb_init(&group->combs[0].h, group, group->h, &tiny_spec);
-  }
+  goo_prng_init(&group->prng);
 
   for (i = 0; i < GOO_TABLEN; i++) {
     mpz_init(group->table_p1[i]);
@@ -1605,19 +1567,74 @@ goo_group_init(goo_group_t *group,
     mpz_init(group->table_n2[i]);
   }
 
-  goo_prng_init(&group->prng);
+  group->combs_len = 0;
 
+  /* Initialize. */
+  mpz_set(group->n, n);
+  mpz_set_ui(group->g, g);
+  mpz_set_ui(group->h, h);
+  mpz_tdiv_q_2exp(group->nh, group->n, 1);
+
+  group->bits = goo_mpz_bitlen(group->n);
+  group->size = (group->bits + 7) / 8;
+  group->rand_bits = group->bits - 1;
+
+  /* Pre-calculate signature hash prefix. */
   goo_sha256_init(&group->sha);
-  assert(goo_hash_int(&group->sha, group->g, 4, group->slab));
-  assert(goo_hash_int(&group->sha, group->h, 4, group->slab));
-  assert(goo_hash_int(&group->sha, group->n, group->size, group->slab));
+
+  if (!goo_hash_int(&group->sha, group->g, 4, group->slab)
+      || !goo_hash_int(&group->sha, group->h, 4, group->slab)
+      || !goo_hash_int(&group->sha, group->n, group->size, group->slab)) {
+    goto fail;
+  }
+
   goo_sha256_final(&group->sha, group->slab);
 
   goo_sha256_init(&group->sha);
   goo_sha256_update(&group->sha, GOO_HASH_PREFIX, 32);
   goo_sha256_update(&group->sha, group->slab, 32);
 
+  /* Calculate combs for g^e1 * h^e2 mod n. */
+  if (bits != 0) {
+    long big1 = 2 * bits;
+    long big2 = bits + group->rand_bits;
+    long big = big1 > big2 ? big1 : big2;
+    long big_bits = big + GOO_ELL_BITS + 1;
+    long small_bits = group->rand_bits;
+    goo_combspec_t big_spec, small_spec;
+
+    if (bits < GOO_MIN_RSA_BITS || bits > GOO_MAX_RSA_BITS)
+      goto fail;
+
+    if (!goo_combspec_init(&big_spec, big_bits, GOO_MAX_COMB_SIZE))
+      goto fail;
+
+    if (!goo_combspec_init(&small_spec, small_bits, GOO_MAX_COMB_SIZE))
+      goto fail;
+
+    goo_comb_init(&group->combs[0].g, group, group->g, &small_spec);
+    goo_comb_init(&group->combs[0].h, group, group->h, &small_spec);
+    goo_comb_init(&group->combs[1].g, group, group->g, &big_spec);
+    goo_comb_init(&group->combs[1].h, group, group->h, &big_spec);
+
+    group->combs_len = 2;
+  } else {
+    long tiny_bits = GOO_ELL_BITS;
+    goo_combspec_t tiny_spec;
+
+    if (!goo_combspec_init(&tiny_spec, tiny_bits, GOO_MAX_COMB_SIZE))
+      goto fail;
+
+    goo_comb_init(&group->combs[0].g, group, group->g, &tiny_spec);
+    goo_comb_init(&group->combs[0].h, group, group->h, &tiny_spec);
+
+    group->combs_len = 1;
+  }
+
   return 1;
+fail:
+  goo_group_uninit(group);
+  return 0;
 }
 
 static void
@@ -1629,12 +1646,7 @@ goo_group_uninit(goo_group_t *group) {
   mpz_clear(group->g);
   mpz_clear(group->h);
 
-  for (i = 0; i < group->combs_len; i++) {
-    goo_comb_uninit(&group->combs[i].g);
-    goo_comb_uninit(&group->combs[i].h);
-  }
-
-  group->combs_len = 0;
+  goo_prng_uninit(&group->prng);
 
   for (i = 0; i < GOO_TABLEN; i++) {
     mpz_clear(group->table_p1[i]);
@@ -1643,7 +1655,12 @@ goo_group_uninit(goo_group_t *group) {
     mpz_clear(group->table_n2[i]);
   }
 
-  goo_prng_uninit(&group->prng);
+  for (i = 0; i < group->combs_len; i++) {
+    goo_comb_uninit(&group->combs[i].g);
+    goo_comb_uninit(&group->combs[i].h);
+  }
+
+  group->combs_len = 0;
 }
 
 static void
@@ -1787,6 +1804,7 @@ fail:
   return r;
 }
 
+#ifdef GOO_TEST
 static int
 goo_group_powgh_slow(
   goo_group_t *group,
@@ -1818,6 +1836,7 @@ goo_group_powgh_slow(
 
   return 1;
 }
+#endif
 
 static int
 goo_group_powgh(goo_group_t *group, mpz_t ret, const mpz_t e1, const mpz_t e2) {
@@ -1990,6 +2009,7 @@ goo_group_pow(goo_group_t *group,
   return 1;
 }
 
+#ifdef GOO_TEST
 static int
 goo_group_pow2_slow(goo_group_t *group,
                     mpz_t ret,
@@ -2021,6 +2041,7 @@ goo_group_pow2_slow(goo_group_t *group,
 
   return 1;
 }
+#endif
 
 static int
 goo_group_pow2(goo_group_t *group,
