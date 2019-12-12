@@ -63,17 +63,14 @@ static const unsigned char GOO_DRBG_LOCAL[32] = {
 #define GOO_TABLEN (1 << (GOO_WINDOW_SIZE - 2))
 
 typedef struct goo_combspec_s {
-  int exists;
   long points_per_add;
   long adds_per_shift;
   long shifts;
   long bits_per_window;
-  long ops;
   long size;
 } goo_combspec_t;
 
 typedef struct goo_comb_s {
-  int exists;
   long points_per_add;
   long adds_per_shift;
   long shifts;
