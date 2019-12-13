@@ -1903,7 +1903,9 @@ run_api_test(void) {
 void
 goo_test(void) {
   run_hash_test();
+#ifdef HAVE_LIBCRYPTO
   run_sha256_test();
+#endif
   run_hmac_test();
   run_drbg_test();
   run_prng_test();
