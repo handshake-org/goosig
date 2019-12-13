@@ -32,8 +32,7 @@
       "<!(node -e \"require('nan')\")"
     ],
     "defines": [
-      "GOO_HAS_OPENSSL",
-      "GOO_TEST"
+      "GOO_HAS_OPENSSL"
     ],
     "variables": {
       "conditions": [
