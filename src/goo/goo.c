@@ -393,13 +393,15 @@ goo_prng_seed(goo_prng_t *prng,
 }
 
 static void
-goo_prng_seed_key(goo_prng_t *prng, const unsigned char *key) {
-  unsigned char entropy[96];
+goo_prng_seed_key(goo_prng_t *prng,
+                  const unsigned char *key,
+                  const unsigned char *iv) {
+  unsigned char entropy[64];
 
-  memcpy(&entropy[0], key, 32);
-  memcpy(&entropy[32], GOO_DRBG_PERS, 64);
+  memcpy(&entropy[0], iv, 32);
+  memcpy(&entropy[32], key, 32);
 
-  goo_prng_seed(prng, &entropy[0], 96);
+  goo_prng_seed(prng, &entropy[0], 64);
 }
 
 static int
@@ -412,7 +414,7 @@ goo_prng_seed_sign(goo_prng_t *prng,
                    unsigned char *slab) {
   int r = 0;
   goo_sha256_t ctx;
-  unsigned char entropy[64];
+  unsigned char key[32];
 
   goo_sha256_init(&ctx);
 
@@ -423,19 +425,16 @@ goo_prng_seed_sign(goo_prng_t *prng,
     goto fail;
 
   goo_sha256_update(&ctx, s_prime, 32);
-  goo_sha256_final(&ctx, &entropy[0]);
-
-  goo_sha256_init(&ctx);
   goo_sha256_update(&ctx, msg, msg_len);
-  goo_sha256_final(&ctx, &entropy[32]);
+  goo_sha256_final(&ctx, &key[0]);
 
-  goo_prng_seed(prng, &entropy[0], 64);
+  goo_prng_seed_key(prng, &key[0], GOO_PRNG_SIGN);
 
   r = 1;
 fail:
   goo_cleanse(slab, GOO_MAX_RSA_BYTES);
   goo_cleanse(&ctx, sizeof(goo_sha256_t));
-  goo_cleanse(&entropy[0], 64);
+  goo_cleanse(&key[0], 32);
   return r;
 }
 
@@ -893,7 +892,7 @@ goo_is_prime_mr(
 
   /* Setup PRNG. */
   goo_prng_init(&prng);
-  goo_prng_seed_key(&prng, key);
+  goo_prng_seed_key(&prng, key, GOO_PRNG_PRIMALITY);
 
   for (i = 0; i < reps; i++) {
     if (i == reps - 1 && force2) {
@@ -2291,7 +2290,7 @@ goo_group_derive(goo_group_t *group,
   if (!goo_group_hash(group, key, C1, C2, C3, t, A, B, C, D, E, msg, msg_len))
     return 0;
 
-  goo_prng_seed_key(&group->prng, key);
+  goo_prng_seed_key(&group->prng, key, GOO_PRNG_DERIVE);
   goo_prng_random_bits(&group->prng, chal, GOO_CHAL_BITS);
   goo_prng_random_bits(&group->prng, ell, GOO_ELL_BITS);
 
@@ -2301,7 +2300,7 @@ goo_group_derive(goo_group_t *group,
 static void
 goo_group_expand_sprime(goo_group_t *group, mpz_t s,
                         const unsigned char *s_prime) {
-  goo_prng_seed_key(&group->prng, s_prime);
+  goo_prng_seed_key(&group->prng, s_prime, GOO_PRNG_EXPAND);
   goo_prng_random_bits(&group->prng, s, GOO_EXPONENT_BITS);
 }
 

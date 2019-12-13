@@ -942,7 +942,7 @@ run_prng_test(void) {
   mpz_init(x);
   mpz_init(y);
 
-  goo_prng_seed_key(&prng, key);
+  goo_prng_seed_key(&prng, key, GOO_PRNG_DERIVE);
 
   goo_prng_random_bits(&prng, x, 256);
   assert(mpz_sgn(x) > 0);
@@ -954,14 +954,14 @@ run_prng_test(void) {
   assert(mpz_cmp(y, x) < 0);
 
   goo_prng_random_bits(&prng, x, 30);
-  assert(mpz_cmp_ui(x, 889224476) == 0);
+  assert(mpz_cmp_ui(x, 297763732) == 0);
   goo_prng_random_bits(&prng, x, 31);
-  assert(mpz_cmp_ui(x, 1264675751) == 0);
+  assert(mpz_cmp_ui(x, 2131273610) == 0);
   goo_prng_random_bits(&prng, x, 31);
   goo_prng_random_int(&prng, y, x);
-  assert(mpz_cmp_ui(y, 768829332) == 0);
+  assert(mpz_cmp_ui(y, 670061897) == 0);
 
-  assert(goo_prng_random_num(&prng, 65537) == 21931);
+  assert(goo_prng_random_num(&prng, 65537) == 41044);
 
   goo_prng_random_bits(&prng, x, 1024);
   goo_prng_random_bits(&prng, y, 1024);
@@ -972,7 +972,7 @@ run_prng_test(void) {
   goo_prng_seed_sign(&prng, x, y, s_prime, msg, 32, slab);
 
   goo_prng_random_bits(&prng, x, 31);
-  assert(mpz_cmp_ui(x, 1529442110) == 0);
+  assert(mpz_cmp_ui(x, 1886980239) == 0);
 
   mpz_clear(x);
   mpz_clear(y);
@@ -2105,7 +2105,7 @@ run_api_test(goo_prng_t *rng) {
                      exp, sizeof(exp), NULL, 0, msg));
 
   assert(goo_decrypt(&pt, &pt_len, ct, ct_len,
-                     PRIME_P_2048, sizeof(PRIME_Q_2048),
+                     PRIME_P_2048, sizeof(PRIME_P_2048),
                      PRIME_Q_2048, sizeof(PRIME_Q_2048),
                      exp, sizeof(exp), NULL, 0, msg));
 
@@ -2117,7 +2117,7 @@ run_api_test(goo_prng_t *rng) {
                       PRIME_Q_2048, sizeof(PRIME_Q_2048)));
 
   assert(goo_sign(goo, &sig, &sig_len, msg, sizeof(msg), s_prime,
-                  PRIME_P_2048, sizeof(PRIME_Q_2048),
+                  PRIME_P_2048, sizeof(PRIME_P_2048),
                   PRIME_Q_2048, sizeof(PRIME_Q_2048)));
 
   assert(goo_verify(goo, msg, sizeof(msg), sig, sig_len, C1, C1_len));

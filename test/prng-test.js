@@ -5,12 +5,13 @@
 'use strict';
 
 const assert = require('bsert');
+const constants = require('../lib/internal/constants');
 const PRNG = require('../lib/js/prng');
 
 describe('PRNG', function() {
   it('should generate deterministically random numbers', () => {
     const key = Buffer.alloc(32, 0xaa);
-    const rng = PRNG.fromKey(key);
+    const rng = PRNG.fromKey(key, constants.PRNG_DERIVE);
     const x = rng.randomBits(256);
 
     assert(x.cmpn(0) > 0);
@@ -22,12 +23,12 @@ describe('PRNG', function() {
     assert(y.bitLength() <= 256);
     assert(y.cmp(x) < 0);
 
-    assert.strictEqual(rng.randomBits(30).toString(), '889224476');
-    assert.strictEqual(rng.randomBits(31).toString(), '1264675751');
+    assert.strictEqual(rng.randomBits(30).toString(), '297763732');
+    assert.strictEqual(rng.randomBits(31).toString(), '2131273610');
     assert.strictEqual(rng.randomInt(rng.randomBits(31)).toString(),
-                       '768829332');
+                       '670061897');
 
-    assert.strictEqual(rng.randomNum(65537).toString(), '21931');
+    assert.strictEqual(rng.randomNum(65537).toString(), '41044');
 
     const p = rng.randomBits(1024);
     const q = rng.randomBits(1024);
@@ -35,6 +36,6 @@ describe('PRNG', function() {
     const msg = rng.generate(32);
     const rng2 = PRNG.fromSign(p, q, s_prime, msg);
 
-    assert.strictEqual(rng2.randomBits(31).toString(), '1529442110');
+    assert.strictEqual(rng2.randomBits(31).toString(), '1886980239');
   });
 });
