@@ -917,6 +917,7 @@ fail:
   mpz_clear(q);
   mpz_clear(x);
   mpz_clear(y);
+  goo_prng_uninit(&prng);
   return r;
 }
 
