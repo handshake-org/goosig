@@ -20,7 +20,7 @@ public:
   Goo();
   ~Goo();
 
-  goo_ctx_t ctx;
+  goo_ctx_t *ctx;
 
 private:
   static NAN_METHOD(Init);

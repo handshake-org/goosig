@@ -15,10 +15,13 @@ IsNull(v8::Local<v8::Value> obj) {
 
 static Nan::Persistent<v8::FunctionTemplate> goosig_constructor;
 
-Goo::Goo() {}
+Goo::Goo() {
+  ctx = NULL;
+}
 
 Goo::~Goo() {
-  goo_uninit(&ctx);
+  goo_destroy(ctx);
+  ctx = NULL;
 }
 
 void
@@ -82,12 +85,15 @@ NAN_METHOD(Goo::New) {
     modbits = (unsigned long)Nan::To<int64_t>(info[3]).FromJust();
   }
 
+  goo_ctx_t *ctx = goo_create(n, n_len, g, h, modbits);
+
+  if (ctx == NULL)
+    return Nan::ThrowError("Could not create context.");
+
   Goo *goo = new Goo();
 
   goo->Wrap(info.This());
-
-  if (!goo_init(&goo->ctx, n, n_len, g, h, modbits))
-    return Nan::ThrowError("Could not initialize context.");
+  goo->ctx = ctx;
 
   info.GetReturnValue().Set(info.This());
 }
@@ -130,7 +136,7 @@ NAN_METHOD(Goo::Challenge) {
   if (s_prime_len != 32)
     return Nan::ThrowRangeError("s_prime must be 32 bytes.");
 
-  if (!goo_challenge(&goo->ctx, &C1, &C1_len, s_prime, n, n_len))
+  if (!goo_challenge(goo->ctx, &C1, &C1_len, s_prime, n, n_len))
     return Nan::ThrowError("Could not create challenge.");
 
   info.GetReturnValue().Set(
@@ -178,7 +184,7 @@ NAN_METHOD(Goo::Validate) {
   if (s_prime_len != 32)
     return Nan::ThrowRangeError("s_prime must be 32 bytes.");
 
-  int result = goo_validate(&goo->ctx, s_prime, C1, C1_len, p, p_len, q, q_len);
+  int result = goo_validate(goo->ctx, s_prime, C1, C1_len, p, p_len, q, q_len);
 
   return info.GetReturnValue().Set(Nan::New<v8::Boolean>(result));
 }
@@ -227,7 +233,7 @@ NAN_METHOD(Goo::Sign) {
   if (s_prime_len != 32)
     return Nan::ThrowRangeError("s_prime must be 32 bytes.");
 
-  if (!goo_sign(&goo->ctx,
+  if (!goo_sign(goo->ctx,
                 &sig, &sig_len,
                 msg, msg_len,
                 s_prime,
@@ -270,7 +276,7 @@ NAN_METHOD(Goo::Verify) {
   const uint8_t *C1 = (const uint8_t *)node::Buffer::Data(C1_buf);
   size_t C1_len = node::Buffer::Length(C1_buf);
 
-  int result = goo_verify(&goo->ctx, msg, msg_len,
+  int result = goo_verify(goo->ctx, msg, msg_len,
                           sig, sig_len, C1, C1_len);
 
   return info.GetReturnValue().Set(Nan::New<v8::Boolean>(result));

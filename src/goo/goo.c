@@ -40,6 +40,7 @@
 #include <windows.h>
 #endif
 
+#include "internal.h"
 #include "goo.h"
 #include "primes.h"
 
@@ -3360,18 +3361,18 @@ fail:
  * API
  */
 
-int
-goo_init(goo_ctx_t *ctx,
-         const unsigned char *n,
-         size_t n_len,
-         unsigned long g,
-         unsigned long h,
-         unsigned long bits) {
-  int r = 0;
+goo_ctx_t *
+goo_create(const unsigned char *n,
+           size_t n_len,
+           unsigned long g,
+           unsigned long h,
+           unsigned long bits) {
+  goo_ctx_t *ctx = goo_malloc(sizeof(goo_ctx_t));
+  goo_ctx_t *ret = NULL;
   mpz_t n_n;
 
   if (ctx == NULL || n == NULL)
-    return 0;
+    goto fail;
 
   mpz_init(n_n);
 
@@ -3380,16 +3381,20 @@ goo_init(goo_ctx_t *ctx,
   if (!goo_group_init(ctx, n_n, g, h, bits))
     goto fail;
 
-  r = 1;
+  ret = ctx;
+  ctx = NULL;
 fail:
   mpz_clear(n_n);
-  return r;
+  goo_free(ctx);
+  return ret;
 }
 
 void
-goo_uninit(goo_ctx_t *ctx) {
-  if (ctx != NULL)
+goo_destroy(goo_ctx_t *ctx) {
+  if (ctx != NULL) {
     goo_group_uninit(ctx);
+    goo_free(ctx);
+  }
 }
 
 int

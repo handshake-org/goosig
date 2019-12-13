@@ -2088,14 +2088,14 @@ run_api_test(goo_prng_t *rng) {
 
   printf("Testing API...\n");
 
-  goo = goo_malloc(sizeof(goo_group_t));
-  ver = goo_malloc(sizeof(goo_group_t));
-
   goo_prng_generate(rng, s_prime, 32);
   goo_prng_generate(rng, msg, 32);
 
-  assert(goo_init(goo, GOO_RSA2048, sizeof(GOO_RSA2048), 2, 3, 4096));
-  assert(goo_init(ver, GOO_RSA2048, sizeof(GOO_RSA2048), 2, 3, 0));
+  goo = goo_create(GOO_RSA2048, sizeof(GOO_RSA2048), 2, 3, 4096);
+  ver = goo_create(GOO_RSA2048, sizeof(GOO_RSA2048), 2, 3, 0);
+
+  assert(goo != NULL);
+  assert(ver != NULL);
 
   assert(goo_challenge(goo, &C1, &C1_len, s_prime,
                        MODULUS_4096, sizeof(MODULUS_4096)));
@@ -2127,10 +2127,8 @@ run_api_test(goo_prng_t *rng) {
   goo_free(ct);
   goo_free(pt);
   goo_free(sig);
-  goo_uninit(goo);
-  goo_uninit(ver);
-  goo_free(goo);
-  goo_free(ver);
+  goo_destroy(goo);
+  goo_destroy(ver);
 }
 
 void
