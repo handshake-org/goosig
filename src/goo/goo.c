@@ -1334,8 +1334,7 @@ goo_sig_import(goo_sig_t *sig,
   goo_read_int(sig->z_sa, GOO_ELL_BYTES);
   goo_read_int(sig->z_s2, GOO_ELL_BYTES);
 
-  sign = data[pos];
-  pos += 1;
+  sign = data[pos++];
 
   assert(pos == data_len);
 
