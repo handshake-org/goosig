@@ -38,9 +38,6 @@ Goo::Init(v8::Local<v8::Object> &target) {
   Nan::SetPrototypeMethod(tpl, "validate", Goo::Validate);
   Nan::SetPrototypeMethod(tpl, "sign", Goo::Sign);
   Nan::SetPrototypeMethod(tpl, "verify", Goo::Verify);
-#ifdef GOO_TEST
-  Nan::SetMethod(tpl, "test", Goo::Test);
-#endif
 
   v8::Local<v8::FunctionTemplate> ctor =
     Nan::New<v8::FunctionTemplate>(goosig_constructor);
@@ -274,13 +271,6 @@ NAN_METHOD(Goo::Verify) {
 
   return info.GetReturnValue().Set(Nan::New<v8::Boolean>(result));
 }
-
-#ifdef GOO_TEST
-NAN_METHOD(Goo::Test) {
-  goo_test();
-  return info.GetReturnValue().Set(Nan::Null());
-}
-#endif
 
 NAN_MODULE_INIT(init) {
   Goo::Init(target);

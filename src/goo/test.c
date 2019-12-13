@@ -1,3 +1,7 @@
+#define GOO_TEST
+
+#include "goo.c"
+
 #include <stdio.h>
 
 #define GOO_ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
@@ -661,7 +665,9 @@ goo_hexcmp(const unsigned char *data, const char *expect, size_t size) {
   return 0;
 }
 
-#ifndef _WIN32
+#if defined(GOO_HAS_CRYPTO)
+#include <openssl/rand.h>
+#elif !defined(_WIN32)
 #include <sys/types.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -672,8 +678,22 @@ goo_hexcmp(const unsigned char *data, const char *expect, size_t size) {
 #endif
 
 static int
-goo_get_entropy(void *dst, size_t len) {
-#ifndef _WIN32
+get_entropy(void *dst, size_t len) {
+#if defined(GOO_HAS_CRYPTO)
+  for (;;) {
+    int status = RAND_status();
+
+    assert(status >= 0);
+
+    if (status != 0)
+      break;
+
+    if (RAND_poll() == 0)
+      break;
+  }
+
+  return RAND_bytes((unsigned char *)dst, (int)len) == 1;
+#elif !defined(_WIN32)
   char *ptr = (char *)dst;
   size_t left = len;
   int fd = open("/dev/urandom", O_RDONLY | O_CLOEXEC);
@@ -681,7 +701,7 @@ goo_get_entropy(void *dst, size_t len) {
   if (fd == -1) {
     fd = open("/dev/random", O_RDONLY | O_CLOEXEC);
     if (fd == -1)
-      goto fail;
+      return 0;
   }
 
   while (left > 0) {
@@ -689,7 +709,7 @@ goo_get_entropy(void *dst, size_t len) {
 
     if (bytes <= 0) {
       close(fd);
-      goto fail;
+      return 0;
     }
 
     assert((size_t)bytes <= left);
@@ -704,16 +724,16 @@ goo_get_entropy(void *dst, size_t len) {
   close(fd);
 
   return 1;
-fail:
-#endif
+#else
   return 0;
+#endif
 }
 
 static void
 rng_init(goo_prng_t *rng) {
   unsigned char entropy[64];
 
-  if (!goo_get_entropy(&entropy[0], 64)) {
+  if (!get_entropy(&entropy[0], 64)) {
     size_t i;
 
     for (i = 0; i < 64; i++)
@@ -788,7 +808,7 @@ run_hash_test(void) {
   assert(memcmp(&out[0], GOO_RSA617_HASH, 32) == 0);
 }
 
-#ifdef HAVE_LIBCRYPTO
+#ifdef GOO_HAS_CRYPTO
 #include <openssl/sha.h>
 
 static void
@@ -2005,7 +2025,7 @@ goo_test(void) {
   rng_init(&rng);
 
   run_hash_test();
-#ifdef HAVE_LIBCRYPTO
+#ifdef GOO_HAS_CRYPTO
   run_sha256_test(&rng);
 #endif
   run_hmac_test();
@@ -2024,10 +2044,8 @@ goo_test(void) {
   printf("All tests passed!\n");
 }
 
-#ifdef GOO_VALGRIND
 int
 main(void) {
   goo_test();
   return 0;
 }
-#endif

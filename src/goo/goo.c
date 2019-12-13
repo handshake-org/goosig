@@ -3186,11 +3186,3 @@ fail:
   mpz_clear(C1_n);
   return ret;
 }
-
-/*
- * Test
- */
-
-#ifdef GOO_TEST
-#include "test.c"
-#endif
