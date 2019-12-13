@@ -8,6 +8,7 @@ const assert = require('bsert');
 const BN = require('bcrypto/lib/bn.js');
 const random = require('bcrypto/lib/random');
 const primes = require('../lib/js/primes');
+const {primes1024} = require('./util');
 
 // https://github.com/golang/go/blob/aadaec5/src/math/big/prime_test.go
 const primes_ = [
@@ -237,7 +238,17 @@ describe('Primes', function() {
     });
   }
 
-  it('should get next prime', () => {
+  it('should get next prime (1)', () => {
     assert.strictEqual(primes.nextPrime(new BN(4), zero, 512).toString(), '5');
+  });
+
+  it('should get next prime (2)', () => {
+    const p = BN.decode(primes1024[0]).addn(1);
+    const expect = p.addn(885);
+    const r1 = primes.nextPrime(p, zero, 884);
+    const r2 = primes.nextPrime(p, zero, 885);
+
+    assert.strictEqual(r1.toString(), '0');
+    assert.strictEqual(r2.toString(), expect.toString());
   });
 });

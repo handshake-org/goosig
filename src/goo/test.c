@@ -734,7 +734,7 @@ rng_init(goo_prng_t *rng) {
   unsigned char entropy[64];
 
   if (!get_entropy(&entropy[0], 64)) {
-    size_t i;
+    int i;
 
     for (i = 0; i < 64; i++)
       entropy[i] = (unsigned char)rand();
@@ -813,15 +813,15 @@ run_hash_test(void) {
 
 static void
 run_sha256_test(goo_prng_t *rng) {
-  unsigned char msg[1024];
+  unsigned char msg[2048];
   unsigned char out[32];
   unsigned char expect[32];
   int i;
 
   printf("Testing SHA256...\n");
 
-  for (i = 0; i < 10000; i++) {
-    size_t msg_len = (size_t)goo_prng_random_num(rng, 1024);
+  for (i = 0; i < 2048; i++) {
+    size_t msg_len = (size_t)goo_prng_random_num(rng, 2048);
 
     goo_prng_generate(rng, msg, msg_len);
 
@@ -829,6 +829,33 @@ run_sha256_test(goo_prng_t *rng) {
     SHA256(msg, msg_len, expect);
 
     assert(memcmp(&out[0], &expect[0], 32) == 0);
+
+    /* test chunks */
+    {
+      size_t chunk_max = msg_len >> 2;
+      size_t pos = 0;
+      goo_sha256_t ctx;
+
+      if (chunk_max < 2)
+        chunk_max = 2;
+
+      goo_sha256_init(&ctx);
+
+      while (pos < msg_len) {
+        size_t chunk_len = goo_prng_random_num(rng, chunk_max);
+
+        if (pos + chunk_len > msg_len)
+          chunk_len = msg_len - pos;
+
+        goo_sha256_update(&ctx, &msg[pos], chunk_len);
+
+        pos += chunk_len;
+      }
+
+      goo_sha256_final(&ctx, &out[0]);
+
+      assert(memcmp(&out[0], &expect[0], 32) == 0);
+    }
   }
 }
 #endif
@@ -998,7 +1025,7 @@ run_util_test(goo_prng_t *rng) {
 
     goo_mpz_mask(n, n, 16, t);
 
-    assert(mpz_get_ui(n) == 0x1234);
+    assert(mpz_cmp_ui(n, 0x1234) == 0);
 
     mpz_clear(n);
     mpz_clear(t);
@@ -1086,7 +1113,7 @@ run_util_test(goo_prng_t *rng) {
     mpz_init(q);
     mpz_init(n);
 
-    for (i = 0; i < 100; i++) {
+    for (i = 0; i < 20; i++) {
       random_prime(p, rng, 256);
       random_prime(q, rng, 256);
       mpz_mul(n, p, q);
@@ -1139,7 +1166,7 @@ run_util_test(goo_prng_t *rng) {
 
   /* test jacobi */
   {
-    size_t i;
+    int i;
 
     printf("Testing jacobi...\n");
 
@@ -1557,16 +1584,42 @@ run_primes_test(goo_prng_t *rng) {
   {
     mpz_t n;
 
-    printf("Testing next_prime...\n");
+    printf("Testing next_prime (1)...\n");
 
     mpz_init(n);
     mpz_set_ui(n, 4);
 
     assert(goo_next_prime(n, n, zero, 512));
 
-    assert(mpz_get_ui(n) == 5);
+    assert(mpz_cmp_ui(n, 5) == 0);
 
     mpz_clear(n);
+  }
+
+  /* test next_prime */
+  {
+    mpz_t n, e, r;
+
+    printf("Testing next_prime (2)...\n");
+
+    mpz_init(n);
+    mpz_init(e);
+    mpz_init(r);
+
+    goo_mpz_import(n, PRIME_P_1024, sizeof(PRIME_P_1024));
+
+    mpz_add_ui(n, n, 1);
+    mpz_add_ui(e, n, 885);
+
+    assert(!goo_next_prime(r, n, zero, 884));
+
+    assert(goo_next_prime(r, n, zero, 885));
+
+    assert(mpz_cmp(r, e) == 0);
+
+    mpz_clear(n);
+    mpz_clear(e);
+    mpz_clear(r);
   }
 }
 
@@ -1625,6 +1678,7 @@ run_ops_test(goo_prng_t *rng) {
   {
     mpz_t b, bi, e;
     mpz_t r1, r2;
+    int i;
 
     printf("Testing pow...\n");
 
@@ -1634,14 +1688,16 @@ run_ops_test(goo_prng_t *rng) {
     mpz_init(r1);
     mpz_init(r2);
 
-    goo_prng_random_bits(rng, b, 2048);
-    goo_prng_random_bits(rng, e, 4096);
+    for (i = 0; i < 20; i++) {
+      goo_prng_random_bits(rng, b, 2048);
+      goo_prng_random_bits(rng, e, 4096);
 
-    assert(goo_group_inv(goo, bi, b));
-    assert(goo_group_pow_slow(goo, r1, b, e));
-    assert(goo_group_pow(goo, r2, b, bi, e));
+      assert(goo_group_inv(goo, bi, b));
+      assert(goo_group_pow_slow(goo, r1, b, e));
+      assert(goo_group_pow(goo, r2, b, bi, e));
 
-    assert(mpz_cmp(r1, r2) == 0);
+      assert(mpz_cmp(r1, r2) == 0);
+    }
 
     mpz_clear(b);
     mpz_clear(bi);
@@ -1655,6 +1711,7 @@ run_ops_test(goo_prng_t *rng) {
     mpz_t b1, b2, e1, e2;
     mpz_t b1i, b2i;
     mpz_t r1, r2;
+    int i;
 
     printf("Testing pow2...\n");
 
@@ -1669,16 +1726,18 @@ run_ops_test(goo_prng_t *rng) {
     mpz_init(r1);
     mpz_init(r2);
 
-    goo_prng_random_bits(rng, b1, 2048);
-    goo_prng_random_bits(rng, b2, 2048);
-    goo_prng_random_bits(rng, e1, 128);
-    goo_prng_random_bits(rng, e2, 128);
+    for (i = 0; i < 20; i++) {
+      goo_prng_random_bits(rng, b1, 2048);
+      goo_prng_random_bits(rng, b2, 2048);
+      goo_prng_random_bits(rng, e1, 128);
+      goo_prng_random_bits(rng, e2, 128);
 
-    assert(goo_group_inv2(goo, b1i, b2i, b1, b2));
-    assert(goo_group_pow2_slow(goo, r1, b1, e1, b2, e2));
-    assert(goo_group_pow2(goo, r2, b1, b1i, e1, b2, b2i, e2));
+      assert(goo_group_inv2(goo, b1i, b2i, b1, b2));
+      assert(goo_group_pow2_slow(goo, r1, b1, e1, b2, e2));
+      assert(goo_group_pow2(goo, r2, b1, b1i, e1, b2, b2i, e2));
 
-    assert(mpz_cmp(r1, r2) == 0);
+      assert(mpz_cmp(r1, r2) == 0);
+    }
 
     mpz_clear(b1);
     mpz_clear(b2);
@@ -1694,6 +1753,7 @@ run_ops_test(goo_prng_t *rng) {
   {
     mpz_t e1, e2;
     mpz_t r1, r2;
+    int i;
 
     printf("Testing powgh...\n");
 
@@ -1703,13 +1763,15 @@ run_ops_test(goo_prng_t *rng) {
     mpz_init(r1);
     mpz_init(r2);
 
-    goo_prng_random_bits(rng, e1, 2048 + GOO_ELL_BITS + 2 - 1);
-    goo_prng_random_bits(rng, e2, 2048 + GOO_ELL_BITS + 2 - 1);
+    for (i = 0; i < 20; i++) {
+      goo_prng_random_bits(rng, e1, 2048 + GOO_ELL_BITS + 2 - 1);
+      goo_prng_random_bits(rng, e2, 2048 + GOO_ELL_BITS + 2 - 1);
 
-    assert(goo_group_powgh_slow(goo, r1, e1, e2));
-    assert(goo_group_powgh(goo, r2, e1, e2));
+      assert(goo_group_powgh_slow(goo, r1, e1, e2));
+      assert(goo_group_powgh(goo, r2, e1, e2));
 
-    assert(mpz_cmp(r1, r2) == 0);
+      assert(mpz_cmp(r1, r2) == 0);
+    }
 
     mpz_clear(e1);
     mpz_clear(e2);
@@ -1723,6 +1785,7 @@ run_ops_test(goo_prng_t *rng) {
     mpz_t e1_s, e2_s;
     mpz_t e1_si, e2_si;
     mpz_t r1, r2;
+    int i;
 
     printf("Testing inv2...\n");
 
@@ -1736,25 +1799,27 @@ run_ops_test(goo_prng_t *rng) {
     mpz_init(r1);
     mpz_init(r2);
 
-    goo_prng_random_bits(rng, e1, 2048);
-    goo_prng_random_bits(rng, e2, 2048);
+    for (i = 0; i < 20; i++) {
+      goo_prng_random_bits(rng, e1, 2048);
+      goo_prng_random_bits(rng, e2, 2048);
 
-    mpz_fdiv_q_2exp(e1_s, e1, 1536);
-    mpz_fdiv_q_2exp(e2_s, e2, 1536);
+      mpz_fdiv_q_2exp(e1_s, e1, 1536);
+      mpz_fdiv_q_2exp(e2_s, e2, 1536);
 
-    assert(goo_group_inv2(goo, e1_si, e2_si, e1_s, e2_s));
+      assert(goo_group_inv2(goo, e1_si, e2_si, e1_s, e2_s));
 
-    mpz_mul(r1, e1_s, e1_si);
-    mpz_mod(r1, r1, goo->n);
+      mpz_mul(r1, e1_s, e1_si);
+      mpz_mod(r1, r1, goo->n);
 
-    mpz_mul(r2, e2_s, e2_si);
-    mpz_mod(r2, r1, goo->n);
+      mpz_mul(r2, e2_s, e2_si);
+      mpz_mod(r2, r1, goo->n);
 
-    goo_group_reduce(goo, r1, r1);
-    goo_group_reduce(goo, r2, r2);
+      goo_group_reduce(goo, r1, r1);
+      goo_group_reduce(goo, r2, r2);
 
-    assert(mpz_cmp_ui(r1, 1) == 0);
-    assert(mpz_cmp_ui(r2, 1) == 0);
+      assert(mpz_cmp_ui(r1, 1) == 0);
+      assert(mpz_cmp_ui(r2, 1) == 0);
+    }
 
     mpz_clear(e1);
     mpz_clear(e2);
@@ -1770,29 +1835,36 @@ run_ops_test(goo_prng_t *rng) {
   {
     mpz_t evals[7];
     mpz_t einvs[7];
-    int i;
+    int i, j;
 
     printf("Testing inv7...\n");
 
     for (i = 0; i < 7; i++) {
       mpz_init(evals[i]);
       mpz_init(einvs[i]);
-
-      goo_prng_random_bits(rng, evals[i], 2048);
     }
 
-    assert(goo_group_inv7(goo,
-      einvs[0], einvs[1], einvs[2], einvs[3], einvs[4], einvs[5], einvs[6],
-      evals[0], evals[1], evals[2], evals[3], evals[4], evals[5], evals[6]));
+    for (i = 0; i < 20; i++) {
+      for (j = 0; j < 7; j++)
+        goo_prng_random_bits(rng, evals[j], 2048);
+
+      assert(goo_group_inv7(goo,
+        einvs[0], einvs[1], einvs[2], einvs[3], einvs[4], einvs[5], einvs[6],
+        evals[0], evals[1], evals[2], evals[3], evals[4], evals[5], evals[6]));
+
+      for (j = 0; j < 7; j++) {
+        assert(mpz_cmp_ui(evals[j], 1) != 0);
+
+        mpz_mul(evals[j], evals[j], einvs[j]);
+        mpz_mod(evals[j], evals[j], goo->n);
+
+        goo_group_reduce(goo, evals[j], evals[j]);
+
+        assert(mpz_cmp_ui(evals[j], 1) == 0);
+      }
+    }
 
     for (i = 0; i < 7; i++) {
-      mpz_mul(evals[i], evals[i], einvs[i]);
-      mpz_mod(evals[i], evals[i], goo->n);
-
-      goo_group_reduce(goo, evals[i], evals[i]);
-
-      assert(mpz_cmp_ui(evals[i], 1) == 0);
-
       mpz_clear(evals[i]);
       mpz_clear(einvs[i]);
     }
@@ -1941,9 +2013,10 @@ run_goo_test(goo_prng_t *rng) {
   mpz_t mod_n;
   mpz_t C1;
   goo_sig_t sig;
-  goo_group_t *goo;
+  goo_group_t *goo, *ver;
   unsigned char s_prime[32];
   unsigned char msg[32];
+  int i;
 
   printf("Testing signing/verifying...\n");
 
@@ -1956,6 +2029,7 @@ run_goo_test(goo_prng_t *rng) {
   goo_sig_init(&sig);
 
   goo = goo_malloc(sizeof(goo_group_t));
+  ver = goo_malloc(sizeof(goo_group_t));
 
   goo_mpz_import(p, PRIME_P_2048, sizeof(PRIME_P_2048));
   goo_mpz_import(q, PRIME_Q_2048, sizeof(PRIME_Q_2048));
@@ -1966,10 +2040,29 @@ run_goo_test(goo_prng_t *rng) {
   goo_prng_generate(rng, msg, 32);
 
   assert(goo_group_init(goo, mod_n, 2, 3, 4096));
+  assert(goo_group_init(ver, mod_n, 2, 3, 0));
   assert(goo_group_challenge(goo, C1, s_prime, n));
   assert(goo_group_validate(goo, s_prime, C1, p, q));
   assert(goo_group_sign(goo, &sig, msg, sizeof(msg), s_prime, p, q));
   assert(goo_group_verify(goo, msg, sizeof(msg), &sig, C1));
+  assert(goo_group_verify(ver, msg, sizeof(msg), &sig, C1));
+
+  for (i = 0; i < 5; i++) {
+    size_t prime_size = 1024 + goo_prng_random_num(rng, 1024);
+
+    random_prime(p, rng, prime_size);
+    random_prime(q, rng, prime_size);
+    mpz_mul(n, p, q);
+
+    goo_prng_generate(rng, s_prime, 32);
+    goo_prng_generate(rng, msg, 32);
+
+    assert(goo_group_challenge(goo, C1, s_prime, n));
+    assert(goo_group_validate(goo, s_prime, C1, p, q));
+    assert(goo_group_sign(goo, &sig, msg, sizeof(msg), s_prime, p, q));
+    assert(goo_group_verify(goo, msg, sizeof(msg), &sig, C1));
+    assert(goo_group_verify(ver, msg, sizeof(msg), &sig, C1));
+  }
 
   mpz_clear(p);
   mpz_clear(q);
@@ -1978,7 +2071,9 @@ run_goo_test(goo_prng_t *rng) {
   mpz_clear(C1);
   goo_sig_uninit(&sig);
   goo_group_uninit(goo);
+  goo_group_uninit(ver);
   goo_free(goo);
+  goo_free(ver);
 }
 
 static void
@@ -1988,16 +2083,18 @@ run_api_test(goo_prng_t *rng) {
   size_t C1_len, sig_len;
   unsigned char s_prime[32];
   unsigned char msg[32];
-  goo_group_t *goo;
+  goo_group_t *goo, *ver;
 
   printf("Testing API...\n");
 
   goo = goo_malloc(sizeof(goo_group_t));
+  ver = goo_malloc(sizeof(goo_group_t));
 
   goo_prng_generate(rng, s_prime, 32);
   goo_prng_generate(rng, msg, 32);
 
   assert(goo_init(goo, GOO_RSA2048, sizeof(GOO_RSA2048), 2, 3, 4096));
+  assert(goo_init(ver, GOO_RSA2048, sizeof(GOO_RSA2048), 2, 3, 0));
 
   assert(goo_challenge(goo, &C1, &C1_len, s_prime,
                        MODULUS_4096, sizeof(MODULUS_4096)));
@@ -2011,11 +2108,14 @@ run_api_test(goo_prng_t *rng) {
                   PRIME_Q_2048, sizeof(PRIME_Q_2048)));
 
   assert(goo_verify(goo, msg, sizeof(msg), sig, sig_len, C1, C1_len));
+  assert(goo_verify(ver, msg, sizeof(msg), sig, sig_len, C1, C1_len));
 
   goo_free(C1);
   goo_free(sig);
   goo_uninit(goo);
+  goo_uninit(ver);
   goo_free(goo);
+  goo_free(ver);
 }
 
 void
