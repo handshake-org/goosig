@@ -2277,15 +2277,14 @@ goo_group_derive(goo_group_t *group,
   return 1;
 }
 
-static int
+static void
 goo_group_expand_sprime(goo_group_t *group, mpz_t s,
                         const unsigned char *s_prime) {
   goo_prng_seed_key(&group->prng, s_prime);
   goo_prng_random_bits(&group->prng, s, GOO_EXPONENT_BITS);
-  return 1;
 }
 
-static int
+static void
 goo_group_random_scalar(goo_group_t *group, goo_prng_t *prng, mpz_t ret) {
   size_t bits = group->rand_bits;
 
@@ -2293,8 +2292,6 @@ goo_group_random_scalar(goo_group_t *group, goo_prng_t *prng, mpz_t ret) {
     bits = GOO_EXPONENT_BITS;
 
   goo_prng_random_bits(prng, ret, bits);
-
-  return 1;
 }
 
 static int
@@ -2344,8 +2341,7 @@ goo_group_challenge(goo_group_t *group,
     goto fail;
   }
 
-  if (!goo_group_expand_sprime(group, s, s_prime))
-    goto fail;
+  goo_group_expand_sprime(group, s, s_prime);
 
   /* Commit to the RSA modulus:
    *
@@ -2396,8 +2392,7 @@ goo_group_validate(goo_group_t *group,
   if (!goo_is_valid_rsa(n))
     goto fail;
 
-  if (!goo_group_expand_sprime(group, s, s_prime))
-    goto fail;
+  goo_group_expand_sprime(group, s, s_prime);
 
   if (!goo_group_powgh(group, x, n, s))
     goto fail;
@@ -2558,25 +2553,24 @@ goo_group_sign(goo_group_t *group,
    * Where `s`, `s1`, and `s2` are
    * random 2048-bit integers.
    */
-  if (!goo_group_expand_sprime(group, s, s_prime))
-    goto fail;
+  goo_group_expand_sprime(group, s, s_prime);
 
   if (!goo_group_powgh(group, C1, n, s))
     goto fail;
 
   goo_group_reduce(group, C1, C1);
 
-  if (!goo_group_random_scalar(group, &prng, s1)
-      || !goo_group_powgh(group, *C2, w, s1)) {
+  goo_group_random_scalar(group, &prng, s1);
+
+  if (!goo_group_powgh(group, *C2, w, s1))
     goto fail;
-  }
 
   goo_group_reduce(group, *C2, *C2);
 
-  if (!goo_group_random_scalar(group, &prng, s2)
-      || !goo_group_powgh(group, *C3, a, s2)) {
+  goo_group_random_scalar(group, &prng, s2);
+
+  if (!goo_group_powgh(group, *C3, a, s2))
     goto fail;
-  }
 
   goo_group_reduce(group, *C3, *C3);
 
@@ -2586,15 +2580,13 @@ goo_group_sign(goo_group_t *group,
 
   /* Eight random 2048-bit integers: */
   /*   r_w, r_w2, r_s1, r_a, r_an, r_s1w, r_sa, r_s2 */
-  if (!goo_group_random_scalar(group, &prng, r_w)
-      || !goo_group_random_scalar(group, &prng, r_w2)
-      || !goo_group_random_scalar(group, &prng, r_a)
-      || !goo_group_random_scalar(group, &prng, r_an)
-      || !goo_group_random_scalar(group, &prng, r_s1w)
-      || !goo_group_random_scalar(group, &prng, r_sa)
-      || !goo_group_random_scalar(group, &prng, r_s2)) {
-    goto fail;
-  }
+  goo_group_random_scalar(group, &prng, r_w);
+  goo_group_random_scalar(group, &prng, r_w2);
+  goo_group_random_scalar(group, &prng, r_a);
+  goo_group_random_scalar(group, &prng, r_an);
+  goo_group_random_scalar(group, &prng, r_s1w);
+  goo_group_random_scalar(group, &prng, r_sa);
+  goo_group_random_scalar(group, &prng, r_s2);
 
   /* Compute:
    *
@@ -2633,10 +2625,10 @@ goo_group_sign(goo_group_t *group,
   mpz_set_ui(*ell, 0);
 
   while (goo_mpz_bitlen(*ell) != GOO_ELL_BITS) {
-    if (!goo_group_random_scalar(group, &prng, r_s1)
-        || !goo_group_powgh(group, A, r_w, r_s1)) {
+    goo_group_random_scalar(group, &prng, r_s1);
+
+    if (!goo_group_powgh(group, A, r_w, r_s1))
       goto fail;
-    }
 
     goo_group_reduce(group, A, A);
 
@@ -3194,6 +3186,10 @@ fail:
   mpz_clear(C1_n);
   return ret;
 }
+
+/*
+ * Test
+ */
 
 #ifdef GOO_TEST
 #include "test.c"
