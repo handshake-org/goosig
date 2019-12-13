@@ -210,10 +210,33 @@ goo_verify(goo_ctx_t *ctx,
            const unsigned char *C1,
            size_t C1_len);
 
-#ifdef GOO_TEST
-void
-goo_test(void);
-#endif
+int
+goo_encrypt(unsigned char **out,
+            size_t *out_len,
+            const unsigned char *msg,
+            size_t msg_len,
+            const unsigned char *n,
+            size_t n_len,
+            const unsigned char *e,
+            size_t e_len,
+            const unsigned char *label,
+            size_t label_len,
+            const unsigned char *entropy);
+
+int
+goo_decrypt(unsigned char **out,
+            size_t *out_len,
+            const unsigned char *msg,
+            size_t msg_len,
+            const unsigned char *p,
+            size_t p_len,
+            const unsigned char *q,
+            size_t q_len,
+            const unsigned char *e,
+            size_t e_len,
+            const unsigned char *label,
+            size_t label_len,
+            const unsigned char *entropy);
 
 /**
  * Moduli of unknown factorization.

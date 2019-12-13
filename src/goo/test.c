@@ -1,8 +1,8 @@
 #define GOO_TEST
 
-#include "goo.c"
-
 #include <stdio.h>
+
+#include "goo.c"
 
 #define GOO_ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 
@@ -2078,11 +2078,12 @@ run_goo_test(goo_prng_t *rng) {
 
 static void
 run_api_test(goo_prng_t *rng) {
-  unsigned char *C1;
-  unsigned char *sig;
+  unsigned char *C1, *sig, *ct, *pt;
+  size_t ct_len, pt_len;
   size_t C1_len, sig_len;
   unsigned char s_prime[32];
   unsigned char msg[32];
+  unsigned char exp[3] = {0x01, 0x00, 0x01};
   goo_group_t *goo, *ver;
 
   printf("Testing API...\n");
@@ -2099,6 +2100,18 @@ run_api_test(goo_prng_t *rng) {
   assert(goo_challenge(goo, &C1, &C1_len, s_prime,
                        MODULUS_4096, sizeof(MODULUS_4096)));
 
+  assert(goo_encrypt(&ct, &ct_len, C1, C1_len,
+                     MODULUS_4096, sizeof(MODULUS_4096),
+                     exp, sizeof(exp), NULL, 0, msg));
+
+  assert(goo_decrypt(&pt, &pt_len, ct, ct_len,
+                     PRIME_P_2048, sizeof(PRIME_Q_2048),
+                     PRIME_Q_2048, sizeof(PRIME_Q_2048),
+                     exp, sizeof(exp), NULL, 0, msg));
+
+  assert(pt_len == C1_len);
+  assert(memcmp(pt, C1, pt_len) == 0);
+
   assert(goo_validate(goo, s_prime, C1, C1_len,
                       PRIME_P_2048, sizeof(PRIME_P_2048),
                       PRIME_Q_2048, sizeof(PRIME_Q_2048)));
@@ -2111,6 +2124,8 @@ run_api_test(goo_prng_t *rng) {
   assert(goo_verify(ver, msg, sizeof(msg), sig, sig_len, C1, C1_len));
 
   goo_free(C1);
+  goo_free(ct);
+  goo_free(pt);
   goo_free(sig);
   goo_uninit(goo);
   goo_uninit(ver);

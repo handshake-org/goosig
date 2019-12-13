@@ -117,6 +117,27 @@ goo_cleanse(void *ptr, size_t len) {
 #endif
 }
 
+static uint32_t
+safe_equal(uint32_t x, uint32_t y) {
+  return ((x ^ y) - 1) >> 31;
+}
+
+static uint32_t
+safe_select(uint32_t x, uint32_t y, uint32_t v) {
+  return (x & (v - 1)) | (y & ~(v - 1));
+}
+
+static uint32_t
+safe_equal_bytes(const unsigned char *x, const unsigned char *y, size_t len) {
+  uint32_t v = 0;
+  uint32_t i;
+
+  for (i = 0; i < len; i++)
+    v |= x[i] ^ y[i];
+
+  return (v - 1) >> 31;
+}
+
 /*
  * GMP helpers
  */
@@ -2308,7 +2329,7 @@ goo_is_valid_prime(const mpz_t n) {
 }
 
 static int
-goo_is_valid_rsa(const mpz_t n) {
+goo_is_valid_modulus(const mpz_t n) {
   size_t bits;
 
   /* if n <= 0 */
@@ -2319,6 +2340,20 @@ goo_is_valid_rsa(const mpz_t n) {
 
   /* if bitlen(n) < 1024 or bitlen(n) > 4096 */
   if (bits < GOO_MIN_RSA_BITS || bits > GOO_MAX_RSA_BITS)
+    return 0;
+
+  return 1;
+}
+
+static int
+goo_is_valid_exponent(const mpz_t e) {
+  if (mpz_even_p(e))
+    return 0;
+
+  if (mpz_cmp_ui(e, 3) < 0)
+    return 0;
+
+  if (goo_mpz_bitlen(e) > 33)
     return 0;
 
   return 1;
@@ -2336,7 +2371,7 @@ goo_group_challenge(goo_group_t *group,
 
   VERIFY_POS(n);
 
-  if (!goo_is_valid_rsa(n)) {
+  if (!goo_is_valid_modulus(n)) {
     /* Invalid RSA public key. */
     goto fail;
   }
@@ -2389,7 +2424,7 @@ goo_group_validate(goo_group_t *group,
    */
   mpz_mul(n, p, q);
 
-  if (!goo_is_valid_rsa(n))
+  if (!goo_is_valid_modulus(n))
     goto fail;
 
   goo_group_expand_sprime(group, s, s_prime);
@@ -2488,7 +2523,7 @@ goo_group_sign(goo_group_t *group,
 
   mpz_mul(n, p, q);
 
-  if (!goo_is_valid_rsa(n)) {
+  if (!goo_is_valid_modulus(n)) {
     /* Invalid RSA public key. */
     goto fail;
   }
@@ -2978,6 +3013,352 @@ fail:
 }
 
 /*
+ * RSA
+ */
+
+static void
+goo_mgf1xor(unsigned char *out,
+            size_t out_len,
+            const unsigned char *seed,
+            size_t seed_len) {
+  /* [RFC8017] Page 67, Section B.2.1. */
+  unsigned char ctr[4];
+  unsigned char digest[32];
+  goo_sha256_t ctx, sha;
+  size_t i = 0;
+  int j;
+
+  memset(&ctr[0], 0x00, 4);
+
+  goo_sha256_init(&ctx);
+  goo_sha256_update(&ctx, seed, seed_len);
+
+  while (i < out_len) {
+    memcpy(&sha, &ctx, sizeof(goo_sha256_t));
+    goo_sha256_update(&sha, ctr, 4);
+    goo_sha256_final(&sha, &digest[0]);
+
+    j = 0;
+
+    while (i < out_len && j < 32)
+      out[i++] ^= digest[j++];
+
+    for (j = 3; j >= 0; j--) {
+      ctr[j] += 1;
+
+      if (ctr[j] != 0x00)
+        break;
+    }
+  }
+}
+
+static int
+goo_veil(mpz_t v,
+         const mpz_t c,
+         const mpz_t n,
+         size_t bits,
+         goo_prng_t *prng) {
+  int ret = 0;
+  mpz_t v0, vmax, rmax, r;
+
+  mpz_init(v0);
+  mpz_init(vmax);
+  mpz_init(rmax);
+  mpz_init(r);
+
+  if (bits < goo_mpz_bitlen(n))
+    goto fail;
+
+  if (mpz_cmp(c, n) >= 0)
+    goto fail;
+
+  /* vmax = 1 << bits */
+  mpz_set_ui(vmax, 1);
+  mpz_mul_2exp(vmax, vmax, bits);
+
+  /* rmax = (vmax - c + n - 1) / n */
+  mpz_sub(rmax, vmax, c);
+  mpz_add(rmax, rmax, n);
+  mpz_sub_ui(rmax, rmax, 1);
+  mpz_fdiv_q(rmax, rmax, n);
+
+  assert(mpz_sgn(rmax) > 0);
+
+  mpz_set(v0, vmax);
+
+  while (mpz_cmp(v0, vmax) >= 0) {
+    goo_prng_random_int(prng, r, rmax);
+
+    /* v = c + r * n */
+    mpz_mul(r, r, n);
+    mpz_add(v0, c, r);
+  }
+
+  mpz_mod(r, v0, n);
+
+  assert(mpz_cmp(r, c) == 0);
+  assert(goo_mpz_bitlen(v0) <= bits);
+
+  mpz_set(v, v0);
+
+  ret = 1;
+fail:
+  mpz_clear(v0);
+  mpz_clear(vmax);
+  mpz_clear(rmax);
+  mpz_clear(r);
+  return ret;
+}
+
+static int
+goo_unveil(mpz_t m,
+           const unsigned char *msg,
+           size_t msg_len,
+           const mpz_t n,
+           size_t bits) {
+  size_t klen = goo_mpz_bytelen(n);
+
+  if (msg_len < klen)
+    return 0;
+
+  goo_mpz_import(m, msg, msg_len);
+
+  if (goo_mpz_bitlen(m) > bits)
+    return 0;
+
+  mpz_mod(m, m, n);
+
+  return 1;
+}
+
+static int
+goo_encrypt_oaep(unsigned char **out,
+                 size_t *out_len,
+                 const unsigned char *msg,
+                 size_t msg_len,
+                 const mpz_t n,
+                 const mpz_t e,
+                 const unsigned char *label,
+                 size_t label_len,
+                 const unsigned char *entropy) {
+  /* [RFC8017] Page 22, Section 7.1.1. */
+  int r = 0;
+  goo_prng_t prng;
+  size_t klen = goo_mpz_bytelen(n);
+  size_t mlen = msg_len;
+  size_t hlen = 32;
+  unsigned char *em = NULL;
+  unsigned char *seed, *db;
+  unsigned char label_hash[32];
+  size_t slen, dlen;
+  mpz_t m, c, v;
+
+  goo_prng_init(&prng);
+  mpz_init(m);
+  mpz_init(c);
+  mpz_init(v);
+
+  if (!goo_is_valid_modulus(n))
+    goto fail;
+
+  if (!goo_is_valid_exponent(e))
+    goto fail;
+
+  if (msg_len > klen - 2 * hlen - 2)
+    goto fail;
+
+  /* EM = 0x00 || (seed) || (Hash(L) || PS || 0x01 || M) */
+  em = goo_calloc(klen, sizeof(unsigned char));
+  goo_sha256(&label_hash[0], label, label_len);
+  seed = &em[1];
+  slen = hlen;
+  db = &em[1 + hlen];
+  dlen = klen - (1 + hlen);
+
+  em[0] = 0x00;
+
+  goo_prng_seed(&prng, entropy, 32);
+  goo_prng_generate(&prng, seed, slen);
+  memcpy(&db[0], &label_hash[0], 32);
+  memset(&db[hlen], 0x00, (dlen - mlen - 1) - hlen);
+  db[dlen - mlen - 1] = 0x01;
+  memcpy(&db[dlen - mlen], msg, mlen);
+
+  goo_mgf1xor(db, dlen, seed, slen);
+  goo_mgf1xor(seed, slen, db, dlen);
+
+  goo_mpz_import(m, em, klen);
+  goo_cleanse(em, klen);
+
+  mpz_powm(c, m, e, n);
+
+  if (!goo_veil(v, c, n, GOO_MAX_RSA_BITS + 8, &prng))
+    goto fail;
+
+  *out_len = (GOO_MAX_RSA_BITS + 8 + 7) / 8;
+  *out = goo_mpz_pad(NULL, *out_len, v);
+
+  r = 1;
+fail:
+  goo_prng_uninit(&prng);
+  goo_cleanse(&prng, sizeof(goo_prng_t));
+  goo_mpz_cleanse(m);
+  goo_mpz_cleanse(c);
+  goo_mpz_cleanse(v);
+  goo_free(em);
+  return r;
+}
+
+static int
+goo_decrypt_oaep(unsigned char **out,
+                 size_t *out_len,
+                 const unsigned char *msg,
+                 size_t msg_len,
+                 const mpz_t p,
+                 const mpz_t q,
+                 const mpz_t e,
+                 const unsigned char *label,
+                 size_t label_len,
+                 const unsigned char *entropy) {
+  /* [RFC8017] Page 25, Section 7.1.2. */
+  int r = 0;
+  goo_prng_t prng;
+  mpz_t n, t, d, c, m, nm1, s, b, bi;
+  unsigned char *em = NULL;
+  unsigned char *seed, *db, *rest, *label_hash;
+  size_t i, klen, slen, dlen, rlen;
+  size_t hlen = 32;
+  uint32_t zero, hash_valid, looking, index, invalid;
+  unsigned char expect[32];
+
+  goo_prng_init(&prng);
+
+  mpz_init(n);
+  mpz_init(t);
+  mpz_init(d);
+  mpz_init(c);
+  mpz_init(m);
+  mpz_init(nm1);
+  mpz_init(s);
+  mpz_init(b);
+  mpz_init(bi);
+
+  if (!goo_is_valid_prime(p) || !goo_is_valid_prime(q))
+    goto fail;
+
+  /* n = p * q */
+  mpz_mul(n, p, q);
+
+  if (!goo_is_valid_modulus(n))
+    goto fail;
+
+  if (!goo_is_valid_exponent(e))
+    goto fail;
+
+  /* t = (p - 1) * (q - 1) */
+  mpz_sub_ui(t, p, 1);
+  mpz_sub_ui(d, q, 1);
+  mpz_mul(t, t, d);
+
+  /* d = e^-1 mod t */
+  if (!mpz_invert(d, e, t))
+    goto fail;
+
+  klen = goo_mpz_bytelen(n);
+
+  if (klen < hlen * 2 + 2)
+    goto fail;
+
+  if (!goo_unveil(c, msg, msg_len, n, GOO_MAX_RSA_BITS + 8))
+    goto fail;
+
+  mpz_sub_ui(nm1, n, 1);
+
+  goo_prng_seed(&prng, entropy, 32);
+
+  /* Generate blinding factor. */
+  for (;;) {
+    /* s = random integer in [1,n-1] */
+    goo_prng_random_int(&prng, s, nm1);
+    mpz_add_ui(s, s, 1);
+
+    /* bi = s^-1 mod n */
+    if (!mpz_invert(bi, s, n))
+      continue;
+
+    /* b = s^e mod n */
+    mpz_powm(b, s, e, n);
+    break;
+  }
+
+  /* c' = c * b mod n (blind) */
+  mpz_mul(c, c, b);
+  mpz_mod(c, c, n);
+
+  /* m' = c'^d mod n */
+  mpz_powm(m, c, d, n);
+
+  /* m = m' * bi mod n (unblind) */
+  mpz_mul(m, m, bi);
+  mpz_mod(m, m, n);
+
+  /* EM = 0x00 || (seed) || (Hash(L) || PS || 0x01 || M) */
+  em = goo_mpz_pad(NULL, klen, m);
+  goo_sha256(&expect[0], label, label_len);
+  zero = safe_equal(em[0], 0x00);
+  seed = &em[1];
+  slen = hlen;
+  db = &em[hlen + 1];
+  dlen = klen - (hlen + 1);
+
+  goo_mgf1xor(seed, slen, db, dlen);
+  goo_mgf1xor(db, dlen, seed, slen);
+
+  label_hash = &db[0];
+  hash_valid = safe_equal_bytes(label_hash, expect, hlen);
+  rest = &db[hlen];
+  rlen = dlen - hlen;
+
+  looking = 1;
+  index = 0;
+  invalid = 0;
+
+  for (i = 0; i < rlen; i++) {
+    uint32_t equals0 = safe_equal(rest[i], 0x00);
+    uint32_t equals1 = safe_equal(rest[i], 0x01);
+
+    index = safe_select(index, i, looking & equals1);
+    looking = safe_select(looking, 0, equals1);
+    invalid = safe_select(invalid, 1, looking & (equals0 ^ 1));
+  }
+
+  if (!(zero & hash_valid & (invalid ^ 1) & (looking ^ 1)))
+    goto fail;
+
+  *out_len = rlen - (index + 1);
+  *out = goo_malloc(*out_len);
+  memcpy(*out, rest + index + 1, *out_len);
+
+  goo_cleanse(em, klen);
+
+  r = 1;
+fail:
+  goo_prng_uninit(&prng);
+  goo_cleanse(&prng, sizeof(goo_prng_t));
+  goo_mpz_cleanse(n);
+  goo_mpz_cleanse(t);
+  goo_mpz_cleanse(d);
+  goo_mpz_cleanse(c);
+  goo_mpz_cleanse(m);
+  goo_mpz_cleanse(nm1);
+  goo_mpz_cleanse(s);
+  goo_mpz_cleanse(b);
+  goo_mpz_cleanse(bi);
+  goo_free(em);
+  return r;
+}
+
+/*
  * API
  */
 
@@ -3185,4 +3566,93 @@ fail:
   goo_sig_uninit(&S);
   mpz_clear(C1_n);
   return ret;
+}
+
+int
+goo_encrypt(unsigned char **out,
+            size_t *out_len,
+            const unsigned char *msg,
+            size_t msg_len,
+            const unsigned char *n,
+            size_t n_len,
+            const unsigned char *e,
+            size_t e_len,
+            const unsigned char *label,
+            size_t label_len,
+            const unsigned char *entropy) {
+  int r = 0;
+  mpz_t n_n, e_n;
+
+  if (out == NULL
+      || out_len == NULL
+      || n == NULL
+      || e == NULL
+      || entropy == NULL) {
+    return 0;
+  }
+
+  mpz_init(n_n);
+  mpz_init(e_n);
+
+  goo_mpz_import(n_n, n, n_len);
+  goo_mpz_import(e_n, e, e_len);
+
+  if (!goo_encrypt_oaep(out, out_len, msg, msg_len, n_n,
+                        e_n, label, label_len, entropy)) {
+    goto fail;
+  }
+
+  r = 1;
+fail:
+  goo_mpz_cleanse(n_n);
+  goo_mpz_cleanse(e_n);
+  return r;
+}
+
+int
+goo_decrypt(unsigned char **out,
+            size_t *out_len,
+            const unsigned char *msg,
+            size_t msg_len,
+            const unsigned char *p,
+            size_t p_len,
+            const unsigned char *q,
+            size_t q_len,
+            const unsigned char *e,
+            size_t e_len,
+            const unsigned char *label,
+            size_t label_len,
+            const unsigned char *entropy) {
+  int r = 0;
+  mpz_t p_n, q_n, e_n;
+
+  if (out == NULL
+      || out_len == NULL
+      || msg == NULL
+      || p == NULL
+      || q == NULL
+      || e == NULL
+      || entropy == NULL) {
+    return 0;
+  }
+
+  mpz_init(p_n);
+  mpz_init(q_n);
+  mpz_init(e_n);
+
+  goo_mpz_import(p_n, p, p_len);
+  goo_mpz_import(q_n, q, q_len);
+  goo_mpz_import(e_n, e, e_len);
+
+  if (!goo_decrypt_oaep(out, out_len, msg, msg_len, p_n, q_n,
+                        e_n, label, label_len, entropy)) {
+    goto fail;
+  }
+
+  r = 1;
+fail:
+  goo_mpz_cleanse(p_n);
+  goo_mpz_cleanse(q_n);
+  goo_mpz_cleanse(e_n);
+  return r;
 }

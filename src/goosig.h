@@ -29,9 +29,8 @@ private:
   static NAN_METHOD(Validate);
   static NAN_METHOD(Sign);
   static NAN_METHOD(Verify);
-#ifdef GOO_TEST
-  static NAN_METHOD(Test);
-#endif
+  static NAN_METHOD(Encrypt);
+  static NAN_METHOD(Decrypt);
 };
 #endif
 
