@@ -226,18 +226,12 @@ NAN_METHOD(Goo::Sign) {
   if (s_prime_len != 32)
     return Nan::ThrowRangeError("s_prime must be 32 bytes.");
 
-  uint8_t seed[64];
-
-  if (!goo_random((void *)&seed[0], 64))
-    return Nan::ThrowError("Could not seed RNG.");
-
   if (!goo_sign(&goo->ctx,
                 &sig, &sig_len,
                 msg, msg_len,
                 s_prime,
                 p, p_len,
-                q, q_len,
-                &seed[0])) {
+                q, q_len)) {
     return Nan::ThrowError("Could create signature.");
   }
 

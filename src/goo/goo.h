@@ -25,13 +25,19 @@ extern "C" {
 #define GOO_DEFAULT_H 3
 #define GOO_MIN_RSA_BITS 1024
 #define GOO_MAX_RSA_BITS 4096
-#define GOO_EXPONENT_SIZE 2048
+#define GOO_EXPONENT_BITS 2048
 #define GOO_WINDOW_SIZE 6
 #define GOO_MAX_COMB_SIZE 512
 #define GOO_CHAL_BITS 128
 #define GOO_ELL_BITS 136
 #define GOO_ELLDIFF_MAX 512
 #define GOO_TABLEN (1 << (GOO_WINDOW_SIZE - 2))
+
+#define GOO_MIN_RSA_BYTES ((GOO_MIN_RSA_BITS + 7) / 8)
+#define GOO_MAX_RSA_BYTES ((GOO_MAX_RSA_BITS + 7) / 8)
+#define GOO_EXPONENT_BYTES ((GOO_EXPONENT_BITS + 7) / 8)
+#define GOO_CHAL_BYTES ((GOO_CHAL_BITS + 7) / 8)
+#define GOO_ELL_BYTES ((GOO_ELL_BITS + 7) / 8)
 
 /* SHA256("Goo Signature")
  *
@@ -64,14 +70,6 @@ static const unsigned char GOO_DRBG_PERS[64] = {
   0xc9, 0x2f, 0x13, 0x33, 0x95, 0x0f, 0xf1, 0x24,
   0x6a, 0xc4, 0x50, 0x55, 0x22, 0x97, 0xf5, 0xd5,
   0x14, 0xdf, 0x2d, 0x05, 0xe2, 0xfb, 0xbf, 0x9b
-};
-
-/* SHA256("Goo RNG") */
-static const unsigned char GOO_DRBG_LOCAL[32] = {
-  0xbe, 0xe9, 0xc0, 0xa5, 0x17, 0x2e, 0x45, 0x61,
-  0x9d, 0xca, 0x94, 0x92, 0x8e, 0xb5, 0x7a, 0x6e,
-  0xf6, 0x0b, 0xa7, 0x99, 0x5a, 0x27, 0x60, 0x08,
-  0x9f, 0x9a, 0x3c, 0x6c, 0x23, 0x30, 0x26, 0x0c
 };
 
 typedef struct goo_combspec_s {
@@ -157,7 +155,7 @@ typedef struct goo_group_s {
   goo_comb_item_t combs[2];
 
   /* Used for goo_group_hash() */
-  unsigned char slab[(GOO_MAX_RSA_BITS + 7) / 8];
+  unsigned char slab[GOO_MAX_RSA_BYTES];
 } goo_group_t;
 
 typedef struct goo_group_s goo_ctx_t;
@@ -201,8 +199,7 @@ goo_sign(goo_ctx_t *ctx,
          const unsigned char *p,
          size_t p_len,
          const unsigned char *q,
-         size_t q_len,
-         const unsigned char *seed);
+         size_t q_len);
 
 int
 goo_verify(goo_ctx_t *ctx,

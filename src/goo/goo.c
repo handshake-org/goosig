@@ -32,7 +32,13 @@
 #include <assert.h>
 #include <string.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <limits.h>
+
+#ifdef _WIN32
+/* For SecureZeroMemory (actually defined in winbase.h). */
+#include <windows.h>
+#endif
 
 #include "goo.h"
 #include "primes.h"
@@ -91,6 +97,27 @@ goo_free(void *ptr) {
 }
 
 /*
+ * Helpers
+ */
+
+static void
+goo_cleanse(void *ptr, size_t len) {
+#if defined(_WIN32)
+  /* https://github.com/jedisct1/libsodium/blob/3b26a5c/src/libsodium/sodium/utils.c#L112 */
+  SecureZeroMemory(ptr, len);
+#elif defined(__GNUC__)
+  /* https://github.com/torvalds/linux/blob/37d4e84/include/linux/string.h#L233 */
+  /* https://github.com/torvalds/linux/blob/37d4e84/include/linux/compiler-gcc.h#L21 */
+  memset(ptr, 0, len);
+  __asm__ __volatile__("": :"r"(ptr) :"memory");
+#else
+  /* http://www.daemonology.net/blog/2014-09-04-how-to-zero-a-buffer.html */
+  static void *(*const volatile memset_ptr)(void *, int, size_t) = memset;
+  (memset_ptr)(ptr, 0, len);
+#endif
+}
+
+/*
  * GMP helpers
  */
 
@@ -98,31 +125,9 @@ goo_free(void *ptr) {
   mpz_import((ret), (len), 1, sizeof((data)[0]), 0, 0, (data))
 
 #define goo_mpz_export(data, size, n) \
-  mpz_export((data), (size), 1, sizeof((data)[0]), 0, 0, (n));
+  mpz_export((data), (size), 1, sizeof((data)[0]), 0, 0, (n))
 
-#define goo_mpz_print(n) \
-  (mpz_out_str(stdout, 16, (n)), printf("\n"))
-
-/* For debugging */
-#define goo_print_hex(data, len) do { \
-  mpz_t n;                            \
-  mpz_init(n);                        \
-  goo_mpz_import(n, (data), (len));   \
-  goo_mpz_print(n);                   \
-  mpz_clear(n);                       \
-} while (0)
-
-#define goo_mpz_bytelen(n) \
-  (goo_mpz_bitlen((n)) + 7) / 8
-
-#define goo_mpz_lshift mpz_mul_2exp
-#define goo_mpz_rshift mpz_fdiv_q_2exp
-#define goo_mpz_urshift mpz_tdiv_q_2exp
-#define goo_mpz_mod_ui mpz_fdiv_ui
-#define goo_mpz_and_ui(x, y) (mpz_getlimbn((x), 0) & (y))
-
-/* Note: violates strict aliasing. */
-#define goo_mpz_unconst(n) *((mpz_t *)&(n))
+#define goo_mpz_bytelen(n) ((goo_mpz_bitlen((n)) + 7) / 8)
 
 #define VERIFY_POS(x) if (mpz_sgn((x)) < 0) goto fail
 
@@ -302,6 +307,45 @@ goo_mpz_sub_si(mpz_t r, const mpz_t n, long val) {
     mpz_sub_ui(r, n, val);
 }
 
+static void
+goo_mpz_cleanse(mpz_t n) {
+  size_t size = mpz_size(n);
+  mp_limb_t *limbs = mpz_limbs_modify(n, (mp_size_t)size);
+
+  goo_cleanse(limbs, size * sizeof(mp_limb_t));
+  mpz_clear(n);
+}
+
+/*
+ * Hashing
+ */
+
+static int
+goo_hash_int(goo_sha256_t *ctx,
+             const mpz_t n,
+             size_t size,
+             unsigned char *slab) {
+  size_t len = goo_mpz_bytelen(n);
+  size_t pos;
+
+  if (len > size)
+    return 0;
+
+  if (len > GOO_MAX_RSA_BYTES)
+    return 0;
+
+  pos = size - len;
+
+  memset(slab, 0x00, pos);
+
+  if (len != 0)
+    goo_mpz_export(slab + pos, NULL, n);
+
+  goo_sha256_update(ctx, slab, size);
+
+  return 1;
+}
+
 /*
  * PRNG
  */
@@ -319,29 +363,59 @@ goo_prng_uninit(goo_prng_t *prng) {
 }
 
 static void
-goo_prng_seed(goo_prng_t *prng, const unsigned char *key) {
-  unsigned char entropy[96];
-
-  memcpy(&entropy[0], key, 32);
-  memcpy(&entropy[32], GOO_DRBG_PERS, 64);
-
-  goo_drbg_init(&prng->ctx, entropy, 96);
-
+goo_prng_seed(goo_prng_t *prng,
+              const unsigned char *entropy,
+              size_t entropy_len) {
+  goo_drbg_init(&prng->ctx, entropy, entropy_len);
   mpz_set_ui(prng->save, 0);
   prng->total = 0;
 }
 
 static void
-goo_prng_seed_local(goo_prng_t *prng, const unsigned char *seed) {
+goo_prng_seed_key(goo_prng_t *prng, const unsigned char *key) {
   unsigned char entropy[96];
 
-  memcpy(&entropy[0], seed, 64);
-  memcpy(&entropy[64], GOO_DRBG_LOCAL, 32);
+  memcpy(&entropy[0], key, 32);
+  memcpy(&entropy[32], GOO_DRBG_PERS, 64);
 
-  goo_drbg_init(&prng->ctx, entropy, 96);
+  goo_prng_seed(prng, &entropy[0], 96);
+}
 
-  mpz_set_ui(prng->save, 0);
-  prng->total = 0;
+static int
+goo_prng_seed_sign(goo_prng_t *prng,
+                   const mpz_t p,
+                   const mpz_t q,
+                   const unsigned char *s_prime,
+                   const unsigned char *msg,
+                   size_t msg_len,
+                   unsigned char *slab) {
+  int r = 0;
+  goo_sha256_t ctx;
+  unsigned char entropy[64];
+
+  goo_sha256_init(&ctx);
+
+  if (!goo_hash_int(&ctx, p, GOO_MAX_RSA_BYTES, slab))
+    goto fail;
+
+  if (!goo_hash_int(&ctx, q, GOO_MAX_RSA_BYTES, slab))
+    goto fail;
+
+  goo_sha256_update(&ctx, s_prime, 32);
+  goo_sha256_final(&ctx, &entropy[0]);
+
+  goo_sha256_init(&ctx);
+  goo_sha256_update(&ctx, msg, msg_len);
+  goo_sha256_final(&ctx, &entropy[32]);
+
+  goo_prng_seed(prng, &entropy[0], 64);
+
+  r = 1;
+fail:
+  goo_cleanse(slab, GOO_MAX_RSA_BYTES);
+  goo_cleanse(&ctx, sizeof(goo_sha256_t));
+  goo_cleanse(&entropy[0], 64);
+  return r;
 }
 
 static void
@@ -406,15 +480,26 @@ goo_prng_random_int(goo_prng_t *prng, mpz_t ret, const mpz_t max) {
 }
 
 static unsigned long
-goo_prng_random_num(goo_prng_t *prng, unsigned long max) {
-  unsigned long x, r;
+goo_prng_random_num(goo_prng_t *prng, unsigned long mod) {
+  unsigned char raw[4];
+  uint32_t max = (uint32_t)mod;
+  uint32_t x, r;
+
+  assert(sizeof(unsigned long) >= sizeof(uint32_t));
 
   if (max == 0)
     return 0;
 
   /* http://www.pcg-random.org/posts/bounded-rands.html */
   do {
-    goo_prng_generate(prng, (void *)&x, sizeof(unsigned long));
+    goo_prng_generate(prng, &raw[0], 4);
+
+    x = 0;
+    x |= ((uint32_t)raw[0]) << 24;
+    x |= ((uint32_t)raw[1]) << 16;
+    x |= ((uint32_t)raw[2]) << 8;
+    x |= ((uint32_t)raw[3]) << 0;
+
     r = x % max;
   } while (x - r > (-max));
 
@@ -787,7 +872,7 @@ goo_is_prime_mr(
 
   /* Setup PRNG. */
   goo_prng_init(&prng);
-  goo_prng_seed(&prng, key);
+  goo_prng_seed_key(&prng, key);
 
   for (i = 0; i < reps; i++) {
     if (i == reps - 1 && force2) {
@@ -1139,23 +1224,20 @@ goo_sig_uninit(goo_sig_t *sig) {
 
 static size_t
 goo_sig_size(const goo_sig_t *sig, size_t bits) {
-  size_t mod_bytes = (bits + 7) / 8;
-  size_t exp_bytes = (GOO_EXPONENT_SIZE + 7) / 8;
-  size_t chal_bytes = (GOO_CHAL_BITS + 7) / 8;
-  size_t ell_bytes = (GOO_ELL_BITS + 7) / 8;
+  size_t GOO_MOD_BYTES = (bits + 7) / 8;
   size_t len = 0;
 
-  len += mod_bytes; /* C2 */
-  len += mod_bytes; /* C3 */
+  len += GOO_MOD_BYTES; /* C2 */
+  len += GOO_MOD_BYTES; /* C3 */
   len += 2; /* t */
-  len += chal_bytes; /* chal */
-  len += ell_bytes; /* ell */
-  len += mod_bytes; /* Aq */
-  len += mod_bytes; /* Bq */
-  len += mod_bytes; /* Cq */
-  len += mod_bytes; /* Dq */
-  len += exp_bytes; /* Eq */
-  len += ell_bytes * 8; /* z' */
+  len += GOO_CHAL_BYTES; /* chal */
+  len += GOO_ELL_BYTES; /* ell */
+  len += GOO_MOD_BYTES; /* Aq */
+  len += GOO_MOD_BYTES; /* Bq */
+  len += GOO_MOD_BYTES; /* Cq */
+  len += GOO_MOD_BYTES; /* Dq */
+  len += GOO_EXPONENT_BYTES; /* Eq */
+  len += GOO_ELL_BYTES * 8; /* z' */
   len += 1; /* Eq sign */
 
   return len;
@@ -1178,35 +1260,31 @@ goo_sig_size(const goo_sig_t *sig, size_t bits) {
 
 static int
 goo_sig_export(unsigned char *out, const goo_sig_t *sig, size_t bits) {
-  size_t mod_bytes = (bits + 7) / 8;
-  size_t exp_bytes = (GOO_EXPONENT_SIZE + 7) / 8;
-  size_t chal_bytes = (GOO_CHAL_BITS + 7) / 8;
-  size_t ell_bytes = (GOO_ELL_BITS + 7) / 8;
+  size_t GOO_MOD_BYTES = (bits + 7) / 8;
   size_t pos = 0;
 
-  goo_write_int(sig->C2, mod_bytes);
-  goo_write_int(sig->C3, mod_bytes);
+  goo_write_int(sig->C2, GOO_MOD_BYTES);
+  goo_write_int(sig->C3, GOO_MOD_BYTES);
   goo_write_int(sig->t, 2);
 
-  goo_write_int(sig->chal, chal_bytes);
-  goo_write_int(sig->ell, ell_bytes);
-  goo_write_int(sig->Aq, mod_bytes);
-  goo_write_int(sig->Bq, mod_bytes);
-  goo_write_int(sig->Cq, mod_bytes);
-  goo_write_int(sig->Dq, mod_bytes);
-  goo_write_int(sig->Eq, exp_bytes);
+  goo_write_int(sig->chal, GOO_CHAL_BYTES);
+  goo_write_int(sig->ell, GOO_ELL_BYTES);
+  goo_write_int(sig->Aq, GOO_MOD_BYTES);
+  goo_write_int(sig->Bq, GOO_MOD_BYTES);
+  goo_write_int(sig->Cq, GOO_MOD_BYTES);
+  goo_write_int(sig->Dq, GOO_MOD_BYTES);
+  goo_write_int(sig->Eq, GOO_EXPONENT_BYTES);
 
-  goo_write_int(sig->z_w, ell_bytes);
-  goo_write_int(sig->z_w2, ell_bytes);
-  goo_write_int(sig->z_s1, ell_bytes);
-  goo_write_int(sig->z_a, ell_bytes);
-  goo_write_int(sig->z_an, ell_bytes);
-  goo_write_int(sig->z_s1w, ell_bytes);
-  goo_write_int(sig->z_sa, ell_bytes);
-  goo_write_int(sig->z_s2, ell_bytes);
+  goo_write_int(sig->z_w, GOO_ELL_BYTES);
+  goo_write_int(sig->z_w2, GOO_ELL_BYTES);
+  goo_write_int(sig->z_s1, GOO_ELL_BYTES);
+  goo_write_int(sig->z_a, GOO_ELL_BYTES);
+  goo_write_int(sig->z_an, GOO_ELL_BYTES);
+  goo_write_int(sig->z_s1w, GOO_ELL_BYTES);
+  goo_write_int(sig->z_sa, GOO_ELL_BYTES);
+  goo_write_int(sig->z_s2, GOO_ELL_BYTES);
 
-  out[pos] = mpz_sgn(sig->Eq) < 0 ? 1 : 0;
-  pos += 1;
+  out[pos++] = mpz_sgn(sig->Eq) < 0 ? 1 : 0;
 
   assert(goo_sig_size(sig, bits) == pos);
 
@@ -1225,10 +1303,7 @@ goo_sig_import(goo_sig_t *sig,
                const unsigned char *data,
                size_t data_len,
                size_t bits) {
-  size_t mod_bytes = (bits + 7) / 8;
-  size_t exp_bytes = (GOO_EXPONENT_SIZE + 7) / 8;
-  size_t chal_bytes = (GOO_CHAL_BITS + 7) / 8;
-  size_t ell_bytes = (GOO_ELL_BITS + 7) / 8;
+  size_t GOO_MOD_BYTES = (bits + 7) / 8;
   size_t pos = 0;
   unsigned char sign;
 
@@ -1237,26 +1312,26 @@ goo_sig_import(goo_sig_t *sig,
     return 0;
   }
 
-  goo_read_int(sig->C2, mod_bytes);
-  goo_read_int(sig->C3, mod_bytes);
+  goo_read_int(sig->C2, GOO_MOD_BYTES);
+  goo_read_int(sig->C3, GOO_MOD_BYTES);
   goo_read_int(sig->t, 2);
 
-  goo_read_int(sig->chal, chal_bytes);
-  goo_read_int(sig->ell, ell_bytes);
-  goo_read_int(sig->Aq, mod_bytes);
-  goo_read_int(sig->Bq, mod_bytes);
-  goo_read_int(sig->Cq, mod_bytes);
-  goo_read_int(sig->Dq, mod_bytes);
-  goo_read_int(sig->Eq, exp_bytes);
+  goo_read_int(sig->chal, GOO_CHAL_BYTES);
+  goo_read_int(sig->ell, GOO_ELL_BYTES);
+  goo_read_int(sig->Aq, GOO_MOD_BYTES);
+  goo_read_int(sig->Bq, GOO_MOD_BYTES);
+  goo_read_int(sig->Cq, GOO_MOD_BYTES);
+  goo_read_int(sig->Dq, GOO_MOD_BYTES);
+  goo_read_int(sig->Eq, GOO_EXPONENT_BYTES);
 
-  goo_read_int(sig->z_w, ell_bytes);
-  goo_read_int(sig->z_w2, ell_bytes);
-  goo_read_int(sig->z_s1, ell_bytes);
-  goo_read_int(sig->z_a, ell_bytes);
-  goo_read_int(sig->z_an, ell_bytes);
-  goo_read_int(sig->z_s1w, ell_bytes);
-  goo_read_int(sig->z_sa, ell_bytes);
-  goo_read_int(sig->z_s2, ell_bytes);
+  goo_read_int(sig->z_w, GOO_ELL_BYTES);
+  goo_read_int(sig->z_w2, GOO_ELL_BYTES);
+  goo_read_int(sig->z_s1, GOO_ELL_BYTES);
+  goo_read_int(sig->z_a, GOO_ELL_BYTES);
+  goo_read_int(sig->z_an, GOO_ELL_BYTES);
+  goo_read_int(sig->z_s1w, GOO_ELL_BYTES);
+  goo_read_int(sig->z_sa, GOO_ELL_BYTES);
+  goo_read_int(sig->z_s2, GOO_ELL_BYTES);
 
   sign = data[pos];
   pos += 1;
@@ -1534,12 +1609,6 @@ goo_comb_recode(goo_comb_t *comb, const mpz_t e) {
 /*
  * Group
  */
-
-static int
-goo_hash_int(goo_sha256_t *ctx,
-             const mpz_t n,
-             size_t size,
-             unsigned char *slab);
 
 static void
 goo_group_uninit(goo_group_t *group);
@@ -2129,32 +2198,6 @@ fail:
 }
 
 static int
-goo_hash_int(goo_sha256_t *ctx,
-             const mpz_t n,
-             size_t size,
-             unsigned char *slab) {
-  size_t len = goo_mpz_bytelen(n);
-  size_t pos;
-
-  if (len > size)
-    return 0;
-
-  if (len > (GOO_MAX_RSA_BITS + 7) / 8)
-    return 0;
-
-  pos = size - len;
-
-  memset(slab, 0x00, pos);
-
-  if (len != 0)
-    goo_mpz_export(slab + pos, NULL, n);
-
-  goo_sha256_update(ctx, slab, size);
-
-  return 1;
-}
-
-static int
 goo_group_hash(goo_group_t *group,
                unsigned char *out,
                const mpz_t C1,
@@ -2170,7 +2213,7 @@ goo_group_hash(goo_group_t *group,
                size_t msg_len) {
   unsigned char *slab = &group->slab[0];
   size_t mod_bytes = group->size;
-  size_t exp_bytes = (GOO_EXPONENT_SIZE + 7) / 8;
+  size_t exp_bytes = (GOO_EXPONENT_BITS + 7) / 8;
   unsigned char sign[1] = {mpz_sgn(E) < 0 ? 1 : 0};
   goo_sha256_t ctx;
 
@@ -2227,7 +2270,7 @@ goo_group_derive(goo_group_t *group,
   if (!goo_group_hash(group, key, C1, C2, C3, t, A, B, C, D, E, msg, msg_len))
     return 0;
 
-  goo_prng_seed(&group->prng, key);
+  goo_prng_seed_key(&group->prng, key);
   goo_prng_random_bits(&group->prng, chal, GOO_CHAL_BITS);
   goo_prng_random_bits(&group->prng, ell, GOO_ELL_BITS);
 
@@ -2237,8 +2280,8 @@ goo_group_derive(goo_group_t *group,
 static int
 goo_group_expand_sprime(goo_group_t *group, mpz_t s,
                         const unsigned char *s_prime) {
-  goo_prng_seed(&group->prng, s_prime);
-  goo_prng_random_bits(&group->prng, s, GOO_EXPONENT_SIZE);
+  goo_prng_seed_key(&group->prng, s_prime);
+  goo_prng_random_bits(&group->prng, s, GOO_EXPONENT_BITS);
   return 1;
 }
 
@@ -2246,8 +2289,8 @@ static int
 goo_group_random_scalar(goo_group_t *group, goo_prng_t *prng, mpz_t ret) {
   size_t bits = group->rand_bits;
 
-  if (bits > GOO_EXPONENT_SIZE)
-    bits = GOO_EXPONENT_SIZE;
+  if (bits > GOO_EXPONENT_BITS)
+    bits = GOO_EXPONENT_BITS;
 
   goo_prng_random_bits(prng, ret, bits);
 
@@ -2379,8 +2422,7 @@ goo_group_sign(goo_group_t *group,
                size_t msg_len,
                const unsigned char *s_prime,
                const mpz_t p,
-               const mpz_t q,
-               const unsigned char *seed) {
+               const mpz_t q) {
   int r = 0;
   int found;
   unsigned long primes[GOO_PRIMES_LEN];
@@ -2414,7 +2456,6 @@ goo_group_sign(goo_group_t *group,
   mpz_t *z_s2 = &S->z_s2;
 
   goo_prng_init(&prng);
-  goo_prng_seed_local(&prng, seed);
 
   mpz_init(n);
   mpz_init(s);
@@ -2456,6 +2497,10 @@ goo_group_sign(goo_group_t *group,
     /* Invalid RSA public key. */
     goto fail;
   }
+
+  /* Seed the PRNG using the primes and message as entropy. */
+  if (!goo_prng_seed_sign(&prng, p, q, s_prime, msg, msg_len, group->slab))
+    goto fail;
 
   /* Find a small quadratic residue prime `t`. */
   found = 0;
@@ -2693,7 +2738,7 @@ goo_group_sign(goo_group_t *group,
   mpz_sub(*Eq, *z_w2, *z_an);
   mpz_fdiv_q(*Eq, *Eq, *ell);
 
-  assert(goo_mpz_bitlen(*Eq) <= GOO_EXPONENT_SIZE);
+  assert(goo_mpz_bitlen(*Eq) <= GOO_EXPONENT_BITS);
 
   /* Compute `z' = (z mod ell)`. */
   mpz_mod(*z_w, *z_w, *ell);
@@ -2842,7 +2887,7 @@ goo_group_verify(goo_group_t *group,
   }
 
   /* `Eq` must be in range. */
-  if (goo_mpz_bitlen(*Eq) > GOO_EXPONENT_SIZE)
+  if (goo_mpz_bitlen(*Eq) > GOO_EXPONENT_BITS)
     goto fail;
 
   /* `z'` must be within range. */
@@ -3052,8 +3097,8 @@ goo_validate(goo_ctx_t *ctx,
   r = 1;
 fail:
   mpz_clear(C1_n);
-  mpz_clear(p_n);
-  mpz_clear(q_n);
+  goo_mpz_cleanse(p_n);
+  goo_mpz_cleanse(q_n);
   return r;
 }
 
@@ -3067,8 +3112,7 @@ goo_sign(goo_ctx_t *ctx,
          const unsigned char *p,
          size_t p_len,
          const unsigned char *q,
-         size_t q_len,
-         const unsigned char *seed) {
+         size_t q_len) {
   int r = 0;
   mpz_t p_n, q_n;
   goo_sig_t S;
@@ -3080,8 +3124,7 @@ goo_sign(goo_ctx_t *ctx,
       || out_len == NULL
       || s_prime == NULL
       || p == NULL
-      || q == NULL
-      || seed == NULL) {
+      || q == NULL) {
     return 0;
   }
 
@@ -3092,7 +3135,7 @@ goo_sign(goo_ctx_t *ctx,
   goo_mpz_import(p_n, p, p_len);
   goo_mpz_import(q_n, q, q_len);
 
-  if (!goo_group_sign(ctx, &S, msg, msg_len, s_prime, p_n, q_n, seed))
+  if (!goo_group_sign(ctx, &S, msg, msg_len, s_prime, p_n, q_n))
     goto fail;
 
   size = goo_sig_size(&S, ctx->bits);
@@ -3106,8 +3149,8 @@ goo_sign(goo_ctx_t *ctx,
 
   r = 1;
 fail:
-  mpz_clear(p_n);
-  mpz_clear(q_n);
+  goo_mpz_cleanse(p_n);
+  goo_mpz_cleanse(q_n);
   goo_sig_uninit(&S);
 
   if (r == 0)
@@ -3176,6 +3219,25 @@ goo_hex_cmp(const unsigned char *data, size_t len, const char *expect) {
 }
 
 static void
+run_hash_test(void) {
+  static const char data[] = "hello world";
+  unsigned char out[32];
+
+  static const char expect[] =
+    "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9";
+
+  goo_sha256_t ctx;
+
+  printf("Testing SHA256...\n");
+
+  goo_sha256_init(&ctx);
+  goo_sha256_update(&ctx, (unsigned char *)data, sizeof(data) - 1);
+  goo_sha256_final(&ctx, &out[0]);
+
+  assert(goo_hex_cmp(&out[0], 32, expect) == 0);
+}
+
+static void
 run_hmac_test(void) {
   static const char data[] = "hello world";
   unsigned char key[32];
@@ -3192,7 +3254,6 @@ run_hmac_test(void) {
 
   goo_hmac_init(&ctx, &key[0], 32);
   goo_hmac_update(&ctx, (unsigned char *)data, sizeof(data) - 1);
-
   goo_hmac_final(&ctx, &out[0]);
 
   assert(goo_hex_cmp(&out[0], 32, expect) == 0);
@@ -3229,14 +3290,14 @@ run_drbg_test(void) {
 
 static void
 rng_init(goo_prng_t *prng) {
-  unsigned char key[64];
+  unsigned char entropy[64];
   size_t i;
 
   for (i = 0; i < 64; i++)
-    key[i] = (unsigned char)rand();
+    entropy[i] = (unsigned char)rand();
 
   goo_prng_init(prng);
-  goo_prng_seed_local(prng, &key[0]);
+  goo_prng_seed(prng, &entropy[0], 64);
 }
 
 static void
@@ -3248,6 +3309,9 @@ static void
 run_prng_test(void) {
   goo_prng_t prng;
   unsigned char key[32];
+  unsigned char s_prime[32];
+  unsigned char msg[32];
+  unsigned char slab[GOO_MAX_RSA_BYTES];
   mpz_t x, y;
 
   printf("Testing PRNG...\n");
@@ -3257,7 +3321,7 @@ run_prng_test(void) {
   mpz_init(x);
   mpz_init(y);
 
-  goo_prng_seed(&prng, key);
+  goo_prng_seed_key(&prng, key);
 
   goo_prng_random_bits(&prng, x, 256);
   assert(mpz_sgn(x) > 0);
@@ -3275,6 +3339,19 @@ run_prng_test(void) {
   goo_prng_random_bits(&prng, x, 31);
   goo_prng_random_int(&prng, y, x);
   assert(mpz_cmp_ui(y, 768829332) == 0);
+
+  assert(goo_prng_random_num(&prng, 65537) == 21931);
+
+  goo_prng_random_bits(&prng, x, 1024);
+  goo_prng_random_bits(&prng, y, 1024);
+
+  goo_prng_generate(&prng, &s_prime[0], 32);
+  goo_prng_generate(&prng, &msg[0], 32);
+
+  goo_prng_seed_sign(&prng, x, y, s_prime, msg, 32, slab);
+
+  goo_prng_random_bits(&prng, x, 31);
+  assert(mpz_cmp_ui(x, 1529442110) == 0);
 
   mpz_clear(x);
   mpz_clear(y);
@@ -4778,7 +4855,6 @@ run_goo_test(void) {
   unsigned char s_prime[32];
   unsigned char msg[32];
   goo_sig_t sig;
-  unsigned char seed[64];
 
   printf("Testing signing/verifying...\n");
 
@@ -4808,10 +4884,8 @@ run_goo_test(void) {
 
   memset(&msg[0], 0xaa, sizeof(msg));
 
-  goo_prng_generate(&rng, seed, 64);
-
   assert(goo_group_validate(goo, s_prime, C1, p, q));
-  assert(goo_group_sign(goo, &sig, msg, sizeof(msg), s_prime, p, q, seed));
+  assert(goo_group_sign(goo, &sig, msg, sizeof(msg), s_prime, p, q));
   assert(goo_group_verify(goo, msg, sizeof(msg), &sig, C1));
 
   rng_clear(&rng);
@@ -4827,6 +4901,7 @@ run_goo_test(void) {
 
 void
 goo_test(void) {
+  run_hash_test();
   run_hmac_test();
   run_drbg_test();
   run_prng_test();
@@ -4838,4 +4913,5 @@ goo_test(void) {
   run_goo_test();
   printf("All tests passed!\n");
 }
+
 #endif
