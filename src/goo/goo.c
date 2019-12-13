@@ -3361,14 +3361,14 @@ fail:
  * API
  */
 
-goo_ctx_t *
+goo_group_t *
 goo_create(const unsigned char *n,
            size_t n_len,
            unsigned long g,
            unsigned long h,
            unsigned long bits) {
-  goo_ctx_t *ctx = goo_malloc(sizeof(goo_ctx_t));
-  goo_ctx_t *ret = NULL;
+  goo_group_t *ctx = goo_malloc(sizeof(goo_group_t));
+  goo_group_t *ret = NULL;
   mpz_t n_n;
 
   if (ctx == NULL || n == NULL)
@@ -3390,7 +3390,7 @@ fail:
 }
 
 void
-goo_destroy(goo_ctx_t *ctx) {
+goo_destroy(goo_group_t *ctx) {
   if (ctx != NULL) {
     goo_group_uninit(ctx);
     goo_free(ctx);
@@ -3398,7 +3398,7 @@ goo_destroy(goo_ctx_t *ctx) {
 }
 
 int
-goo_challenge(goo_ctx_t *ctx,
+goo_challenge(goo_group_t *ctx,
               unsigned char **C1,
               size_t *C1_len,
               const unsigned char *s_prime,
@@ -3437,7 +3437,7 @@ fail:
 }
 
 int
-goo_validate(goo_ctx_t *ctx,
+goo_validate(goo_group_t *ctx,
              const unsigned char *s_prime,
              const unsigned char *C1,
              size_t C1_len,
@@ -3479,7 +3479,7 @@ fail:
 }
 
 int
-goo_sign(goo_ctx_t *ctx,
+goo_sign(goo_group_t *ctx,
          unsigned char **out,
          size_t *out_len,
          const unsigned char *msg,
@@ -3536,7 +3536,7 @@ fail:
 }
 
 int
-goo_verify(goo_ctx_t *ctx,
+goo_verify(goo_group_t *ctx,
            const unsigned char *msg,
            size_t msg_len,
            const unsigned char *sig,

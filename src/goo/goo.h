@@ -13,9 +13,7 @@
 extern "C" {
 #endif
 
-#ifndef GOO_INTERNAL
 typedef struct goo_group_s goo_ctx_t;
-#endif
 
 goo_ctx_t *
 goo_create(const unsigned char *n,

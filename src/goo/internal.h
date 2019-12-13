@@ -17,7 +17,6 @@
 
 #include "drbg.h"
 
-#define GOO_INTERNAL
 #define GOO_DEFAULT_G 2
 #define GOO_DEFAULT_H 3
 #define GOO_MIN_RSA_BITS 1024
@@ -174,8 +173,6 @@ typedef struct goo_group_s {
   /* Used for goo_group_hash() */
   unsigned char slab[GOO_MAX_RSA_BYTES];
 } goo_group_t;
-
-typedef struct goo_group_s goo_ctx_t;
 
 /**
  * Moduli of unknown factorization.
