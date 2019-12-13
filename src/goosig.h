@@ -33,4 +33,3 @@ private:
   static NAN_METHOD(Decrypt);
 };
 #endif
-

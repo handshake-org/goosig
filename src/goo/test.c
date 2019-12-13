@@ -2131,8 +2131,8 @@ run_api_test(goo_prng_t *rng) {
   goo_destroy(ver);
 }
 
-void
-goo_test(void) {
+int
+main(void) {
   goo_prng_t rng;
 
   rng_init(&rng);
@@ -2155,10 +2155,6 @@ goo_test(void) {
   rng_clear(&rng);
 
   printf("All tests passed!\n");
-}
 
-int
-main(void) {
-  goo_test();
   return 0;
 }
