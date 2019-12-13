@@ -3035,7 +3035,7 @@ goo_mgf1xor(unsigned char *out,
 
   while (i < out_len) {
     memcpy(&sha, &ctx, sizeof(goo_sha256_t));
-    goo_sha256_update(&sha, ctr, 4);
+    goo_sha256_update(&sha, &ctr[0], 4);
     goo_sha256_final(&sha, &digest[0]);
 
     j = 0;
@@ -3058,13 +3058,16 @@ goo_veil(mpz_t v,
          const mpz_t n,
          size_t bits,
          goo_prng_t *prng) {
-  int ret = 0;
-  mpz_t v0, vmax, rmax, r;
+  int r = 0;
+  mpz_t v0, vmax, rmax, r0;
 
   mpz_init(v0);
   mpz_init(vmax);
   mpz_init(rmax);
-  mpz_init(r);
+  mpz_init(r0);
+
+  if (!goo_is_valid_modulus(n))
+    goto fail;
 
   if (bits < goo_mpz_bitlen(n))
     goto fail;
@@ -3087,27 +3090,27 @@ goo_veil(mpz_t v,
   mpz_set(v0, vmax);
 
   while (mpz_cmp(v0, vmax) >= 0) {
-    goo_prng_random_int(prng, r, rmax);
+    goo_prng_random_int(prng, r0, rmax);
 
     /* v = c + r * n */
-    mpz_mul(r, r, n);
-    mpz_add(v0, c, r);
+    mpz_mul(r0, r0, n);
+    mpz_add(v0, c, r0);
   }
 
-  mpz_mod(r, v0, n);
+  mpz_mod(r0, v0, n);
 
-  assert(mpz_cmp(r, c) == 0);
+  assert(mpz_cmp(r0, c) == 0);
   assert(goo_mpz_bitlen(v0) <= bits);
 
   mpz_set(v, v0);
 
-  ret = 1;
+  r = 1;
 fail:
   mpz_clear(v0);
   mpz_clear(vmax);
   mpz_clear(rmax);
-  mpz_clear(r);
-  return ret;
+  mpz_clear(r0);
+  return r;
 }
 
 static int
@@ -3116,9 +3119,10 @@ goo_unveil(mpz_t m,
            size_t msg_len,
            const mpz_t n,
            size_t bits) {
-  size_t klen = goo_mpz_bytelen(n);
+  if (!goo_is_valid_modulus(n))
+    return 0;
 
-  if (msg_len < klen)
+  if (msg_len < goo_mpz_bytelen(n))
     return 0;
 
   goo_mpz_import(m, msg, msg_len);
@@ -3151,12 +3155,10 @@ goo_encrypt_oaep(unsigned char **out,
   unsigned char *seed, *db;
   unsigned char label_hash[32];
   size_t slen, dlen;
-  mpz_t m, c, v;
+  mpz_t m;
 
   goo_prng_init(&prng);
   mpz_init(m);
-  mpz_init(c);
-  mpz_init(v);
 
   if (!goo_is_valid_modulus(n))
     goto fail;
@@ -3190,21 +3192,20 @@ goo_encrypt_oaep(unsigned char **out,
   goo_mpz_import(m, em, klen);
   goo_cleanse(em, klen);
 
-  mpz_powm(c, m, e, n);
+  /* c = m^e mod n */
+  mpz_powm(m, m, e, n);
 
-  if (!goo_veil(v, c, n, GOO_MAX_RSA_BITS + 8, &prng))
+  if (!goo_veil(m, m, n, GOO_MAX_RSA_BITS + 8, &prng))
     goto fail;
 
   *out_len = (GOO_MAX_RSA_BITS + 8 + 7) / 8;
-  *out = goo_mpz_pad(NULL, *out_len, v);
+  *out = goo_mpz_pad(NULL, *out_len, m);
 
   r = 1;
 fail:
   goo_prng_uninit(&prng);
   goo_cleanse(&prng, sizeof(goo_prng_t));
   goo_mpz_cleanse(m);
-  goo_mpz_cleanse(c);
-  goo_mpz_cleanse(v);
   goo_free(em);
   return r;
 }
@@ -3223,7 +3224,7 @@ goo_decrypt_oaep(unsigned char **out,
   /* [RFC8017] Page 25, Section 7.1.2. */
   int r = 0;
   goo_prng_t prng;
-  mpz_t n, t, d, c, m, nm1, s, b, bi;
+  mpz_t n, t, d, m, s, b, bi;
   unsigned char *em = NULL;
   unsigned char *seed, *db, *rest, *label_hash;
   size_t i, klen, slen, dlen, rlen;
@@ -3236,9 +3237,7 @@ goo_decrypt_oaep(unsigned char **out,
   mpz_init(n);
   mpz_init(t);
   mpz_init(d);
-  mpz_init(c);
   mpz_init(m);
-  mpz_init(nm1);
   mpz_init(s);
   mpz_init(b);
   mpz_init(bi);
@@ -3269,17 +3268,19 @@ goo_decrypt_oaep(unsigned char **out,
   if (klen < hlen * 2 + 2)
     goto fail;
 
-  if (!goo_unveil(c, msg, msg_len, n, GOO_MAX_RSA_BITS + 8))
+  if (!goo_unveil(m, msg, msg_len, n, GOO_MAX_RSA_BITS + 8))
     goto fail;
 
-  mpz_sub_ui(nm1, n, 1);
-
+  /* Seed PRNG with user-provided entropy. */
   goo_prng_seed(&prng, entropy, 32);
+
+  /* t = n - 1 */
+  mpz_sub_ui(t, n, 1);
 
   /* Generate blinding factor. */
   for (;;) {
     /* s = random integer in [1,n-1] */
-    goo_prng_random_int(&prng, s, nm1);
+    goo_prng_random_int(&prng, s, t);
     mpz_add_ui(s, s, 1);
 
     /* bi = s^-1 mod n */
@@ -3292,11 +3293,11 @@ goo_decrypt_oaep(unsigned char **out,
   }
 
   /* c' = c * b mod n (blind) */
-  mpz_mul(c, c, b);
-  mpz_mod(c, c, n);
+  mpz_mul(m, m, b);
+  mpz_mod(m, m, n);
 
   /* m' = c'^d mod n */
-  mpz_powm(m, c, d, n);
+  mpz_powm(m, m, d, n);
 
   /* m = m' * bi mod n (unblind) */
   mpz_mul(m, m, bi);
@@ -3348,9 +3349,7 @@ fail:
   goo_mpz_cleanse(n);
   goo_mpz_cleanse(t);
   goo_mpz_cleanse(d);
-  goo_mpz_cleanse(c);
   goo_mpz_cleanse(m);
-  goo_mpz_cleanse(nm1);
   goo_mpz_cleanse(s);
   goo_mpz_cleanse(b);
   goo_mpz_cleanse(bi);
