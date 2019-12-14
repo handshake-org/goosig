@@ -11,7 +11,7 @@ const PRNG = require('../lib/js/prng');
 describe('PRNG', function() {
   it('should generate deterministically random numbers', () => {
     const key = Buffer.alloc(32, 0xaa);
-    const rng = PRNG.fromKey(key, constants.PRNG_DERIVE);
+    const rng = new PRNG(key, constants.PRNG_DERIVE);
     const x = rng.randomBits(256);
 
     assert(x.cmpn(0) > 0);
