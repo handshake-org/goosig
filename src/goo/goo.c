@@ -386,11 +386,23 @@ goo_prng_uninit(goo_prng_t *prng) {
 
 static void
 goo_prng_seed(goo_prng_t *prng,
-              const unsigned char *key,
-              const unsigned char *nonce) {
-  goo_chacha20_init(&prng->ctx, key, nonce);
+              const unsigned char *entropy,
+              size_t entropy_len) {
+  goo_drbg_init(&prng->ctx, entropy, entropy_len);
   mpz_set_ui(prng->save, 0);
   prng->total = 0;
+}
+
+static void
+goo_prng_seed_key(goo_prng_t *prng,
+                  const unsigned char *key,
+                  const unsigned char *iv) {
+  unsigned char entropy[64];
+
+  memcpy(&entropy[0], iv, 32);
+  memcpy(&entropy[32], key, 32);
+
+  goo_prng_seed(prng, &entropy[0], 64);
 }
 
 static int
@@ -417,7 +429,7 @@ goo_prng_seed_sign(goo_prng_t *prng,
   goo_sha256_update(&ctx, msg, msg_len);
   goo_sha256_final(&ctx, &key[0]);
 
-  goo_prng_seed(prng, &key[0], GOO_PRNG_SIGN);
+  goo_prng_seed_key(prng, &key[0], GOO_PRNG_SIGN);
 
   r = 1;
 fail:
@@ -429,8 +441,7 @@ fail:
 
 static void
 goo_prng_generate(goo_prng_t *prng, void *out, size_t len) {
-  memset(out, 0x00, len);
-  goo_chacha20_encrypt(&prng->ctx, out, out, len);
+  (void)goo_drbg_generate(&prng->ctx, out, len);
 }
 
 static void
@@ -882,7 +893,7 @@ goo_is_prime_mr(
 
   /* Setup PRNG. */
   goo_prng_init(&prng);
-  goo_prng_seed(&prng, key, GOO_PRNG_PRIMALITY);
+  goo_prng_seed_key(&prng, key, GOO_PRNG_PRIMALITY);
 
   for (i = 0; i < reps; i++) {
     if (i == reps - 1 && force2) {
@@ -2280,7 +2291,7 @@ goo_group_derive(goo_group_t *group,
   if (!goo_group_hash(group, key, C1, C2, C3, t, A, B, C, D, E, msg, msg_len))
     return 0;
 
-  goo_prng_seed(&group->prng, key, GOO_PRNG_DERIVE);
+  goo_prng_seed_key(&group->prng, key, GOO_PRNG_DERIVE);
   goo_prng_random_bits(&group->prng, chal, GOO_CHAL_BITS);
   goo_prng_random_bits(&group->prng, ell, GOO_ELL_BITS);
 
@@ -2290,7 +2301,7 @@ goo_group_derive(goo_group_t *group,
 static void
 goo_group_expand_sprime(goo_group_t *group, mpz_t s,
                         const unsigned char *s_prime) {
-  goo_prng_seed(&group->prng, s_prime, GOO_PRNG_EXPAND);
+  goo_prng_seed_key(&group->prng, s_prime, GOO_PRNG_EXPAND);
   goo_prng_random_bits(&group->prng, s, GOO_EXP_BITS);
 }
 
@@ -3168,7 +3179,7 @@ goo_encrypt_oaep(unsigned char **out,
 
   em[0] = 0x00;
 
-  goo_prng_seed(&prng, entropy, GOO_PRNG_ENCRYPT);
+  goo_prng_seed(&prng, entropy, 32);
   goo_prng_generate(&prng, seed, slen);
   memcpy(&db[0], &lhash[0], 32);
   memset(&db[hlen], 0x00, (dlen - mlen - 1) - hlen);
@@ -3261,7 +3272,7 @@ goo_decrypt_oaep(unsigned char **out,
     goto fail;
 
   /* Seed PRNG with user-provided entropy. */
-  goo_prng_seed(&prng, entropy, GOO_PRNG_DECRYPT);
+  goo_prng_seed(&prng, entropy, 32);
 
   /* t = n - 1 */
   mpz_sub_ui(t, n, 1);

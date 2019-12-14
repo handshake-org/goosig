@@ -2,8 +2,9 @@
   "targets": [{
     "target_name": "goosig",
     "sources": [
-      "./src/goo/chacha20.c",
+      "./src/goo/drbg.c",
       "./src/goo/goo.c",
+      "./src/goo/hmac.c",
       "./src/goo/sha256.c",
       "./src/goosig.cc",
       "./src/random.cc"
@@ -52,16 +53,6 @@
       ]
     },
     "conditions": [
-      ["node_byteorder=='big'", {
-        "defines": [
-          "WORDS_BIGENDIAN"
-        ]
-      }],
-      ["target_arch=='x64' and OS!='win'", {
-        "defines": [
-          "GOO_USE_ASM",
-        ]
-      }],
       ["with_gmp=='true'", {
         "defines": [
           "GOO_HAS_GMP"
