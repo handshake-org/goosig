@@ -618,53 +618,6 @@ static const int SYMBOLS[][3] = {
   {1001, 9907, -1}
 };
 
-static unsigned char
-nibble(unsigned char ch) {
-  if (ch >= 0x30 && ch <= 0x39)
-    return ch - 0x30;
-
-  if (ch >= 0x41 && ch <= 0x46)
-    return ch - 0x41;
-
-  if (ch >= 0x61 && ch <= 0x66)
-    return ch - 0x61;
-
-  assert(0 && "invalid hex char");
-}
-
-static int
-goo_hexcmp(const unsigned char *data, const char *expect, size_t size) {
-  size_t len, i;
-
-  assert(expect != NULL);
-
-  len = strlen(expect);
-
-  assert((len & 1) == 0);
-
-  len >>= 1;
-
-  for (i = 0; i < (size < len ? size : len); i++) {
-    unsigned char hi = nibble(expect[i * 2 + 0]);
-    unsigned char lo = nibble(expect[i * 2 + 1]);
-    unsigned char ch = (hi << 4) | lo;
-
-    if (data[i] < ch)
-      return -1;
-
-    if (data[i] > ch)
-      return 1;
-  }
-
-  if (size < len)
-    return -1;
-
-  if (size > len)
-    return 1;
-
-  return 0;
-}
-
 #if defined(GOO_HAS_CRYPTO)
 #include <openssl/rand.h>
 #elif !defined(_WIN32)
@@ -1425,6 +1378,40 @@ run_primes_test(goo_prng_t *rng) {
 
     assert(mpz_set_str(p, primes[i], 10) == 0);
     assert(goo_is_prime_div(p));
+    assert(goo_is_prime_mr(p, key, 16 + 1, 1));
+    assert(goo_is_prime_mr(p, key, 1, 1));
+    assert(goo_is_prime_mr(p, key, 1, 0));
+    assert(goo_is_prime_mr(p, key, 0, 1));
+    assert(goo_is_prime_lucas(p));
+    assert(goo_is_prime(p, key));
+
+    mpz_clear(p);
+  }
+
+  for (i = 0; i < GOO_ARRAY_SIZE(goo_primes); i++) {
+    mpz_t p;
+
+    mpz_init(p);
+    mpz_set_ui(p, goo_primes[i]);
+
+    assert(goo_is_prime_div(p) == 2);
+    assert(goo_is_prime_mr(p, key, 16 + 1, 1));
+    assert(goo_is_prime_mr(p, key, 1, 1));
+    assert(goo_is_prime_mr(p, key, 1, 0));
+    assert(goo_is_prime_mr(p, key, 0, 1));
+    assert(goo_is_prime_lucas(p));
+    assert(goo_is_prime(p, key));
+
+    mpz_clear(p);
+  }
+
+  for (i = 0; i < GOO_ARRAY_SIZE(goo_test_primes); i++) {
+    mpz_t p;
+
+    mpz_init(p);
+    mpz_set_ui(p, goo_test_primes[i]);
+
+    assert(goo_is_prime_div(p) == 2);
     assert(goo_is_prime_mr(p, key, 16 + 1, 1));
     assert(goo_is_prime_mr(p, key, 1, 1));
     assert(goo_is_prime_mr(p, key, 1, 0));

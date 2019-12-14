@@ -238,6 +238,34 @@ describe('Primes', function() {
     });
   }
 
+  it('should test hardcoded primes', () => {
+    const items = [...primes.smallPrimes, ...primes.testPrimes];
+
+    for (const n of items) {
+      const p = new BN(n);
+
+      assert(primes.isPrimeDiv(p));
+      assert(primes.isPrimeMR(p, key, 16 + 1, true));
+      assert(primes.isPrimeMR(p, key, 1, true));
+      assert(primes.isPrimeMR(p, key, 1, false));
+      assert(primes.isPrimeLucas(p));
+      assert(primes.isPrime(p, key));
+    }
+  });
+
+  it('should test 1024 bit primes', () => {
+    for (const n of primes1024) {
+      const p = new BN(n);
+
+      assert(primes.isPrimeDiv(p));
+      assert(primes.isPrimeMR(p, key, 16 + 1, true));
+      assert(primes.isPrimeMR(p, key, 1, true));
+      assert(primes.isPrimeMR(p, key, 1, false));
+      assert(primes.isPrimeLucas(p));
+      assert(primes.isPrime(p, key));
+    }
+  });
+
   it('should get next prime (1)', () => {
     assert.strictEqual(primes.nextPrime(new BN(4), zero, 512).toString(), '5');
   });

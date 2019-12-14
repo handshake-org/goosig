@@ -10,10 +10,6 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-#if defined(__cplusplus)
-extern "C" {
-#endif
-
 #define GOO_SHA256_HASH_SIZE 32
 #define GOO_SHA256_BLOCK_SIZE 64
 
@@ -44,9 +40,5 @@ goo_sha256_final(goo_sha256_t *ctx, unsigned char *out);
 
 void
 goo_sha256(unsigned char *out, const void *data, size_t len);
-
-#if defined(__cplusplus)
-}
-#endif
 
 #endif

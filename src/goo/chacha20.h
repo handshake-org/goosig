@@ -10,10 +10,6 @@
 #include <stdlib.h>
 #include <stdint.h>
 
-#if defined(__cplusplus)
-extern "C" {
-#endif
-
 typedef struct goo_chacha20_s {
   uint32_t state[16];
   union {
@@ -38,9 +34,5 @@ void
 goo_chacha20_derive(unsigned char *out,
                     const unsigned char *key32,
                     const unsigned char *nonce16);
-
-#if defined(__cplusplus)
-}
-#endif
 
 #endif

@@ -11,6 +11,9 @@
  *   https://github.com/kwantam/GooSig/blob/master/libGooPy/primes.py
  */
 
+#ifndef _GOO_PRIMES_H
+#define _GOO_PRIMES_H
+
 #define GOO_PRIMES_LEN 168
 #define GOO_TEST_PRIMES_LEN 1000
 
@@ -105,3 +108,5 @@ static unsigned long goo_test_primes[1000] = {
   7703, 7717, 7723, 7727, 7741, 7753, 7757, 7759, 7789, 7793, 7817, 7823, 7829,
   7841, 7853, 7867, 7873, 7877, 7879, 7883, 7901, 7907, 7919
 };
+
+#endif

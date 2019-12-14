@@ -4,8 +4,8 @@
  * https://github.com/handshake-org/goosig
  */
 
-#ifndef _GOOSIG_INTERNAL_H
-#define _GOOSIG_INTERNAL_H
+#ifndef _GOO_INTERNAL_H
+#define _GOO_INTERNAL_H
 
 #include <stdlib.h>
 
