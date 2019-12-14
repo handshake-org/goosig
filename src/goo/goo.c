@@ -441,7 +441,7 @@ fail:
 
 static void
 goo_prng_generate(goo_prng_t *prng, void *out, size_t len) {
-  (void)goo_drbg_generate(&prng->ctx, out, len);
+  goo_drbg_generate(&prng->ctx, out, len);
 }
 
 static void
