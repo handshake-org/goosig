@@ -841,9 +841,6 @@ run_hmac_test(void) {
 
 static void
 run_drbg_test(void) {
-  unsigned char entropy[64];
-  unsigned char out[32];
-
   static const unsigned char expect1[] = {
     0x40, 0xe9, 0x5c, 0x4d, 0xba, 0x22, 0xfd, 0x05,
     0xd1, 0x57, 0x84, 0x07, 0x5b, 0x05, 0xca, 0x7c,
@@ -861,7 +858,17 @@ run_drbg_test(void) {
     0xec, 0x80, 0x4d, 0xb4, 0x9f, 0x82, 0x62, 0xce
   };
 
+  static const unsigned char expect4[] = {
+    0xa5, 0x60, 0x40, 0xc8, 0x24, 0xe8, 0x8a, 0x5b,
+    0xac, 0x52, 0x93, 0x1e, 0xc0, 0x39, 0xcb, 0x41,
+    0xfa, 0xd8, 0x91, 0x33, 0xdd, 0x78, 0x95, 0x90,
+    0x5e, 0xf6, 0xf7, 0x58, 0x9e, 0xa2, 0x62, 0xc1
+  };
+
+  unsigned char entropy[64];
+  unsigned char out[36];
   goo_drbg_t ctx;
+  int i;
 
   memset(&entropy[0], 0xaa, 64);
 
@@ -877,16 +884,35 @@ run_drbg_test(void) {
 
   goo_drbg_generate(&ctx, &out[0], 16);
   assert(memcmp(&out[0], expect3, 16) == 0);
+
+  memset(&entropy[0], 0x01, 32);
+  memset(&entropy[32], 0x02, 32);
+
+  goo_drbg_init(&ctx, &entropy[0], 64);
+
+  for (i = 0; i < 1000; i++)
+    goo_drbg_generate(&ctx, &out[0], ((i + 1) * 32) % 37);
+
+  goo_drbg_generate(&ctx, &out[0], 32);
+  assert(memcmp(&out[0], expect4, 32) == 0);
 }
 
 static void
 run_prng_test(void) {
+  const unsigned char expect[] = {
+    0xe9, 0x39, 0x0c, 0x3b, 0x67, 0x69, 0x24, 0x42,
+    0x76, 0xcf, 0x4f, 0xfa, 0x00, 0xff, 0x50, 0x53,
+    0x78, 0x91, 0xed, 0x2d, 0x78, 0xe3, 0xb0, 0xbb,
+    0x02, 0xd5, 0xfb, 0xb2, 0xab, 0x49, 0xbf, 0xf7
+  };
+
   goo_prng_t prng;
   unsigned char key[32];
   unsigned char s_prime[32];
   unsigned char msg[32];
   unsigned char slab[GOO_MAX_RSA_BYTES];
   mpz_t x, y;
+  int i;
 
   printf("Testing PRNG...\n");
 
@@ -926,6 +952,18 @@ run_prng_test(void) {
 
   goo_prng_random_bits(&prng, x, 31);
   assert(mpz_cmp_ui(x, 1886980239) == 0);
+
+  memset(&key[0], 0x01, 32);
+  goo_prng_seed(&prng, key, GOO_PRNG_DERIVE);
+
+  for (i = 0; i < 1000; i++)
+    goo_prng_random_bits(&prng, x, ((i + 1) * 512) % 521);
+
+  goo_prng_random_bits(&prng, x, 256);
+
+  goo_mpz_import(y, expect, sizeof(expect));
+
+  assert(mpz_cmp(x, y) == 0);
 
   mpz_clear(x);
   mpz_clear(y);

@@ -24,4 +24,18 @@ describe('DRBG', function() {
     assert.strictEqual(h3.toString('hex'),
       '705119fd1536e2a7ec804db49f8262ce');
   });
+
+  it('should generate deterministically random bits (1000 iterations)', () => {
+    const entropy = Buffer.alloc(32, 0x01);
+    const nonce = Buffer.alloc(32, 0x02);
+    const drbg = new HmacDRBG(SHA256, entropy, nonce);
+
+    for (let i = 0; i < 1000; i++)
+      drbg.generate(((i + 1) * 32) % 37);
+
+    const out = drbg.generate(32);
+
+    assert.strictEqual(out.toString('hex'),
+      'a56040c824e88a5bac52931ec039cb41fad89133dd7895905ef6f7589ea262c1');
+  });
 });
