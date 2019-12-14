@@ -1247,7 +1247,7 @@ goo_sig_size(const goo_sig_t *sig, size_t bits) {
   len += GOO_MOD_BYTES; /* Bq */
   len += GOO_MOD_BYTES; /* Cq */
   len += GOO_MOD_BYTES; /* Dq */
-  len += GOO_EXPONENT_BYTES; /* Eq */
+  len += GOO_EXP_BYTES; /* Eq */
   len += GOO_ELL_BYTES * 8; /* z' */
   len += 1; /* Eq sign */
 
@@ -1284,7 +1284,7 @@ goo_sig_export(unsigned char *out, const goo_sig_t *sig, size_t bits) {
   goo_write_int(sig->Bq, GOO_MOD_BYTES);
   goo_write_int(sig->Cq, GOO_MOD_BYTES);
   goo_write_int(sig->Dq, GOO_MOD_BYTES);
-  goo_write_int(sig->Eq, GOO_EXPONENT_BYTES);
+  goo_write_int(sig->Eq, GOO_EXP_BYTES);
 
   goo_write_int(sig->z_w, GOO_ELL_BYTES);
   goo_write_int(sig->z_w2, GOO_ELL_BYTES);
@@ -1333,7 +1333,7 @@ goo_sig_import(goo_sig_t *sig,
   goo_read_int(sig->Bq, GOO_MOD_BYTES);
   goo_read_int(sig->Cq, GOO_MOD_BYTES);
   goo_read_int(sig->Dq, GOO_MOD_BYTES);
-  goo_read_int(sig->Eq, GOO_EXPONENT_BYTES);
+  goo_read_int(sig->Eq, GOO_EXP_BYTES);
 
   goo_read_int(sig->z_w, GOO_ELL_BYTES);
   goo_read_int(sig->z_w2, GOO_ELL_BYTES);
@@ -2222,9 +2222,9 @@ goo_group_hash(goo_group_t *group,
                const unsigned char *msg,
                size_t msg_len) {
   unsigned char *slab = &group->slab[0];
-  size_t mod_bytes = group->size;
-  size_t exp_bytes = (GOO_EXPONENT_BITS + 7) / 8;
-  unsigned char sign[1] = {mpz_sgn(E) < 0 ? 1 : 0};
+  size_t GOO_MOD_BYTES = group->size;
+  size_t GOO_INT_BYTES = 4;
+  unsigned char sign[4] = {0, 0, 0, mpz_sgn(E) < 0 ? 1 : 0};
   goo_sha256_t ctx;
 
   VERIFY_POS(C1);
@@ -2240,19 +2240,19 @@ goo_group_hash(goo_group_t *group,
   /* This gives us a minor speedup. */
   memcpy(&ctx, &group->sha, sizeof(goo_sha256_t));
 
-  if (!goo_hash_int(&ctx, C1, mod_bytes, slab)
-      || !goo_hash_int(&ctx, C2, mod_bytes, slab)
-      || !goo_hash_int(&ctx, C3, mod_bytes, slab)
-      || !goo_hash_int(&ctx, t, 4, slab)
-      || !goo_hash_int(&ctx, A, mod_bytes, slab)
-      || !goo_hash_int(&ctx, B, mod_bytes, slab)
-      || !goo_hash_int(&ctx, C, mod_bytes, slab)
-      || !goo_hash_int(&ctx, D, mod_bytes, slab)
-      || !goo_hash_int(&ctx, E, exp_bytes, slab)) {
+  if (!goo_hash_int(&ctx, C1, GOO_MOD_BYTES, slab)
+      || !goo_hash_int(&ctx, C2, GOO_MOD_BYTES, slab)
+      || !goo_hash_int(&ctx, C3, GOO_MOD_BYTES, slab)
+      || !goo_hash_int(&ctx, t, GOO_INT_BYTES, slab)
+      || !goo_hash_int(&ctx, A, GOO_MOD_BYTES, slab)
+      || !goo_hash_int(&ctx, B, GOO_MOD_BYTES, slab)
+      || !goo_hash_int(&ctx, C, GOO_MOD_BYTES, slab)
+      || !goo_hash_int(&ctx, D, GOO_MOD_BYTES, slab)
+      || !goo_hash_int(&ctx, E, GOO_EXP_BYTES, slab)) {
     return 0;
   }
 
-  goo_sha256_update(&ctx, &sign[0], 1);
+  goo_sha256_update(&ctx, &sign[0], GOO_INT_BYTES);
   goo_sha256_update(&ctx, msg, msg_len);
   goo_sha256_final(&ctx, out);
 
@@ -2291,15 +2291,15 @@ static void
 goo_group_expand_sprime(goo_group_t *group, mpz_t s,
                         const unsigned char *s_prime) {
   goo_prng_seed(&group->prng, s_prime, GOO_PRNG_EXPAND);
-  goo_prng_random_bits(&group->prng, s, GOO_EXPONENT_BITS);
+  goo_prng_random_bits(&group->prng, s, GOO_EXP_BITS);
 }
 
 static void
 goo_group_random_scalar(goo_group_t *group, goo_prng_t *prng, mpz_t ret) {
   size_t bits = group->rand_bits;
 
-  if (bits > GOO_EXPONENT_BITS)
-    bits = GOO_EXPONENT_BITS;
+  if (bits > GOO_EXP_BITS)
+    bits = GOO_EXP_BITS;
 
   goo_prng_random_bits(prng, ret, bits);
 }
@@ -2754,7 +2754,7 @@ goo_group_sign(goo_group_t *group,
   mpz_sub(*Eq, *z_w2, *z_an);
   mpz_fdiv_q(*Eq, *Eq, *ell);
 
-  assert(goo_mpz_bitlen(*Eq) <= GOO_EXPONENT_BITS);
+  assert(goo_mpz_bitlen(*Eq) <= GOO_EXP_BITS);
 
   /* Compute `z' = (z mod ell)`. */
   mpz_mod(*z_w, *z_w, *ell);
@@ -2903,7 +2903,7 @@ goo_group_verify(goo_group_t *group,
   }
 
   /* `Eq` must be in range. */
-  if (goo_mpz_bitlen(*Eq) > GOO_EXPONENT_BITS)
+  if (goo_mpz_bitlen(*Eq) > GOO_EXP_BITS)
     goto fail;
 
   /* `z'` must be within range. */
