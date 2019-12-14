@@ -13,8 +13,8 @@ gcc -g -o ./goo-test       \
   -O3                      \
   -DGOO_HAS_GMP            \
   -DGOO_HAS_CRYPTO         \
-  ./src/goo/drbg.c         \
-  ./src/goo/hmac.c         \
+  -DGOO_USE_ASM            \
+  ./src/goo/chacha20.c     \
   ./src/goo/mini-gmp.c     \
   ./src/goo/sha256.c       \
   ./src/goo/test.c
