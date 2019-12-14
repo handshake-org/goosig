@@ -219,6 +219,21 @@ goo_sha256(unsigned char *out, const void *data, size_t len) {
   goo_sha256_final(&ctx, out);
 }
 
+static uint32_t
+read32(const void *src) {
+#ifdef WORDS_BIGENDIAN
+  uint32_t w;
+  memcpy((void *)&w, src, sizeof(w));
+  return w;
+#else
+  const uint8_t *p = (const uint8_t *)src;
+  return ((uint32_t)(p[0]) << 24)
+       | ((uint32_t)(p[1]) << 16)
+       | ((uint32_t)(p[2]) << 8)
+       | ((uint32_t)(p[3]) << 0);
+#endif
+}
+
 static void
 write32(void *dst, uint32_t w) {
 #ifdef WORDS_BIGENDIAN
@@ -246,21 +261,6 @@ write64(void *dst, uint64_t w) {
   p[5] = w >> 16;
   p[6] = w >> 8;
   p[7] = w >> 0;
-#endif
-}
-
-static uint32_t
-read32(const void *src) {
-#ifdef WORDS_BIGENDIAN
-  uint32_t w;
-  memcpy((void *)&w, src, sizeof(w));
-  return w;
-#else
-  const uint8_t *p = (const uint8_t *)src;
-  return ((uint32_t)(p[0]) << 24)
-       | ((uint32_t)(p[1]) << 16)
-       | ((uint32_t)(p[2]) << 8)
-       | ((uint32_t)(p[3]) << 0);
 #endif
 }
 

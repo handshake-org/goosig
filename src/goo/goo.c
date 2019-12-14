@@ -3153,7 +3153,7 @@ goo_encrypt_oaep(unsigned char **out,
   size_t hlen = 32;
   unsigned char *em = NULL;
   unsigned char *seed, *db;
-  unsigned char label_hash[32];
+  unsigned char lhash[32];
   size_t slen, dlen;
   mpz_t m;
 
@@ -3171,7 +3171,7 @@ goo_encrypt_oaep(unsigned char **out,
 
   /* EM = 0x00 || (seed) || (Hash(L) || PS || 0x01 || M) */
   em = goo_calloc(klen, sizeof(unsigned char));
-  goo_sha256(&label_hash[0], label, label_len);
+  goo_sha256(&lhash[0], label, label_len);
   seed = &em[1];
   slen = hlen;
   db = &em[1 + hlen];
@@ -3181,7 +3181,7 @@ goo_encrypt_oaep(unsigned char **out,
 
   goo_prng_seed(&prng, entropy, 32);
   goo_prng_generate(&prng, seed, slen);
-  memcpy(&db[0], &label_hash[0], 32);
+  memcpy(&db[0], &lhash[0], 32);
   memset(&db[hlen], 0x00, (dlen - mlen - 1) - hlen);
   db[dlen - mlen - 1] = 0x01;
   memcpy(&db[dlen - mlen], msg, mlen);
@@ -3226,10 +3226,10 @@ goo_decrypt_oaep(unsigned char **out,
   goo_prng_t prng;
   mpz_t n, t, d, m, s, b, bi;
   unsigned char *em = NULL;
-  unsigned char *seed, *db, *rest, *label_hash;
+  unsigned char *seed, *db, *rest, *lhash;
   size_t i, klen, slen, dlen, rlen;
   size_t hlen = 32;
-  uint32_t zero, hash_valid, looking, index, invalid;
+  uint32_t zero, lvalid, looking, index, invalid, valid;
   unsigned char expect[32];
 
   goo_prng_init(&prng);
@@ -3289,6 +3289,7 @@ goo_decrypt_oaep(unsigned char **out,
 
     /* b = s^e mod n */
     mpz_powm(b, s, e, n);
+
     break;
   }
 
@@ -3315,8 +3316,8 @@ goo_decrypt_oaep(unsigned char **out,
   goo_mgf1xor(seed, slen, db, dlen);
   goo_mgf1xor(db, dlen, seed, slen);
 
-  label_hash = &db[0];
-  hash_valid = safe_equal_bytes(label_hash, expect, hlen);
+  lhash = &db[0];
+  lvalid = safe_equal_bytes(lhash, expect, hlen);
   rest = &db[hlen];
   rlen = dlen - hlen;
 
@@ -3333,7 +3334,9 @@ goo_decrypt_oaep(unsigned char **out,
     invalid = safe_select(invalid, 1, looking & (equals0 ^ 1));
   }
 
-  if (!(zero & hash_valid & (invalid ^ 1) & (looking ^ 1)))
+  valid = zero & lvalid & (invalid ^ 1) & (looking ^ 1);
+
+  if (valid == 0)
     goto fail;
 
   *out_len = rlen - (index + 1);
