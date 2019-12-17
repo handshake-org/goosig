@@ -131,7 +131,7 @@ safe_select(uint32_t x, uint32_t y, uint32_t v) {
 static uint32_t
 safe_equal_bytes(const unsigned char *x, const unsigned char *y, size_t len) {
   uint32_t v = 0;
-  uint32_t i;
+  size_t i;
 
   for (i = 0; i < len; i++)
     v |= x[i] ^ y[i];
@@ -335,6 +335,11 @@ goo_mpz_cleanse(mpz_t n) {
   mp_limb_t *limbs = mpz_limbs_modify(n, (mp_size_t)size);
 
   goo_cleanse(limbs, size * sizeof(mp_limb_t));
+}
+
+static void
+goo_mpz_clear(mpz_t n) {
+  goo_mpz_cleanse(n);
   mpz_clear(n);
 }
 
@@ -1116,7 +1121,6 @@ goo_is_prime_lucas(const mpz_t n) {
   }
 
   goto fail;
-
 succeed:
   r = 1;
 fail:
@@ -1161,19 +1165,17 @@ goo_is_prime(const mpz_t p, const unsigned char *key) {
 }
 
 static int
-goo_next_prime(
-  mpz_t ret,
-  const mpz_t p,
-  const unsigned char *key,
-  unsigned long max
-) {
+goo_next_prime(mpz_t ret,
+               const mpz_t p,
+               const unsigned char *key,
+               unsigned long max) {
   unsigned long inc = 0;
 
   mpz_set(ret, p);
 
   if (mpz_even_p(ret)) {
-    inc += 1;
     mpz_add_ui(ret, ret, 1);
+    inc += 1;
   }
 
   while (!goo_is_prime(ret, key)) {
@@ -1596,7 +1598,7 @@ goo_comb_uninit(goo_comb_t *comb) {
 static int
 goo_comb_recode(goo_comb_t *comb, const mpz_t e) {
   long len = (long)goo_mpz_bitlen(e);
-  long i, j, k, ret, b;
+  long i;
 
   if (len < 0 || len > comb->bits)
     return 0;
@@ -1605,11 +1607,15 @@ goo_comb_recode(goo_comb_t *comb, const mpz_t e) {
     return 0;
 
   for (i = comb->adds_per_shift - 1; i >= 0; i--) {
+    long j;
+
     for (j = 0; j < comb->shifts; j++) {
-      ret = 0;
+      long ret = 0;
+      long k;
 
       for (k = 0; k < comb->points_per_add; k++) {
-        b = (i + k * comb->adds_per_shift) * comb->shifts + j;
+        long b = (i + k * comb->adds_per_shift) * comb->shifts + j;
+
         ret <<= 1;
         ret |= (long)mpz_tstbit(e, (comb->bits - 1) - b);
       }
@@ -2005,14 +2011,14 @@ static void
 goo_group_wnaf(goo_group_t *group, long *out, const mpz_t exp, long bits) {
   long w = GOO_WINDOW_SIZE;
   long mask = (1 << w) - 1;
-  long i, val;
+  long i;
   mpz_t e;
 
   mpz_init(e);
   mpz_set(e, exp);
 
   for (i = bits - 1; i >= 0; i--) {
-    val = 0;
+    long val = 0;
 
     if (mpz_odd_p(e)) {
       val = mpz_getlimbn(e, 0) & mask;
@@ -2310,13 +2316,13 @@ goo_group_random_scalar(goo_group_t *group, goo_prng_t *prng, mpz_t ret) {
 }
 
 static int
-goo_is_valid_prime(const mpz_t n) {
-  /* if n <= 0 */
-  if (mpz_sgn(n) <= 0)
+goo_is_valid_prime(const mpz_t p) {
+  /* if p < 3 */
+  if (mpz_cmp_ui(p, 3) < 0)
     return 0;
 
-  /* if bitlen(n) > 4096 */
-  if (goo_mpz_bitlen(n) > GOO_MAX_RSA_BITS)
+  /* if bitlen(p) > 4096 */
+  if (goo_mpz_bitlen(p) > GOO_MAX_RSA_BITS)
     return 0;
 
   return 1;
@@ -2383,7 +2389,7 @@ goo_group_challenge(goo_group_t *group,
 
   r = 1;
 fail:
-  mpz_clear(s);
+  goo_mpz_clear(s);
   return r;
 }
 
@@ -2433,9 +2439,9 @@ goo_group_validate(goo_group_t *group,
 
   r = 1;
 fail:
-  mpz_clear(n);
-  mpz_clear(s);
-  mpz_clear(x);
+  goo_mpz_clear(n);
+  goo_mpz_clear(s);
+  goo_mpz_clear(x);
   return r;
 }
 
@@ -2550,7 +2556,7 @@ goo_group_sign(goo_group_t *group,
   }
 
   if (!found) {
-    /* No prime quadratic residue less than 1000 mod N! */
+    /* No prime quadratic residue less than `1000 mod n`! */
     goto fail;
   }
 
@@ -2569,7 +2575,7 @@ goo_group_sign(goo_group_t *group,
   mpz_sub(t2, t2, *t);
 
   if (mpz_cmp(t1, t2) != 0) {
-    /* w^2 - t was not divisible by N! */
+    /* `w^2 - t` was not divisible by `n`! */
     goto fail;
   }
 
@@ -2775,33 +2781,34 @@ goo_group_sign(goo_group_t *group,
   r = 1;
 fail:
   goo_prng_uninit(&prng);
-  mpz_clear(n);
-  mpz_clear(s);
-  mpz_clear(C1);
-  mpz_clear(w);
-  mpz_clear(a);
-  mpz_clear(s1);
-  mpz_clear(s2);
-  mpz_clear(t1);
-  mpz_clear(t2);
-  mpz_clear(t3);
-  mpz_clear(t4);
-  mpz_clear(t5);
-  mpz_clear(C1i);
-  mpz_clear(C2i);
-  mpz_clear(r_w);
-  mpz_clear(r_w2);
-  mpz_clear(r_s1);
-  mpz_clear(r_a);
-  mpz_clear(r_an);
-  mpz_clear(r_s1w);
-  mpz_clear(r_sa);
-  mpz_clear(r_s2);
-  mpz_clear(A);
-  mpz_clear(B);
-  mpz_clear(C);
-  mpz_clear(D);
-  mpz_clear(E);
+  goo_mpz_clear(n);
+  goo_mpz_clear(s);
+  goo_mpz_clear(C1);
+  goo_mpz_clear(w);
+  goo_mpz_clear(a);
+  goo_mpz_clear(s1);
+  goo_mpz_clear(s2);
+  goo_mpz_clear(t1);
+  goo_mpz_clear(t2);
+  goo_mpz_clear(t3);
+  goo_mpz_clear(t4);
+  goo_mpz_clear(t5);
+  goo_mpz_clear(C1i);
+  goo_mpz_clear(C2i);
+  goo_mpz_clear(r_w);
+  goo_mpz_clear(r_w2);
+  goo_mpz_clear(r_s1);
+  goo_mpz_clear(r_a);
+  goo_mpz_clear(r_an);
+  goo_mpz_clear(r_s1w);
+  goo_mpz_clear(r_sa);
+  goo_mpz_clear(r_s2);
+  goo_mpz_clear(A);
+  goo_mpz_clear(B);
+  goo_mpz_clear(C);
+  goo_mpz_clear(D);
+  goo_mpz_clear(E);
+  goo_cleanse(&primes[0], sizeof(primes));
   return r;
 }
 
@@ -2811,7 +2818,7 @@ goo_group_verify(goo_group_t *group,
                  size_t msg_len,
                  const goo_sig_t *S,
                  const mpz_t C1) {
-  int ret = 0;
+  int r = 0;
   const mpz_t *C2 = &S->C2;
   const mpz_t *C3 = &S->C3;
   const mpz_t *t = &S->t;
@@ -2985,7 +2992,7 @@ goo_group_verify(goo_group_t *group,
   if (!goo_is_prime(*ell, &key[0]))
     goto fail;
 
-  ret = 1;
+  r = 1;
 fail:
   mpz_clear(C1i);
   mpz_clear(C2i);
@@ -3003,7 +3010,7 @@ fail:
   mpz_clear(chal0);
   mpz_clear(ell0);
   mpz_clear(ell1);
-  return ret;
+  return r;
 }
 
 /*
@@ -3100,10 +3107,10 @@ goo_veil(mpz_t v,
 
   r = 1;
 fail:
-  mpz_clear(v0);
-  mpz_clear(vmax);
-  mpz_clear(rmax);
-  mpz_clear(r0);
+  goo_mpz_clear(v0);
+  goo_mpz_clear(vmax);
+  goo_mpz_clear(rmax);
+  goo_mpz_clear(r0);
   return r;
 }
 
@@ -3199,7 +3206,7 @@ goo_encrypt_oaep(unsigned char **out,
 fail:
   goo_prng_uninit(&prng);
   goo_cleanse(&prng, sizeof(goo_prng_t));
-  goo_mpz_cleanse(m);
+  goo_mpz_clear(m);
   goo_free(em);
   return r;
 }
@@ -3292,7 +3299,14 @@ goo_decrypt_oaep(unsigned char **out,
   mpz_mod(m, m, n);
 
   /* m' = c'^d mod n */
+#ifdef GOO_HAS_GMP
+  if (mpz_sgn(d) != 0 && mpz_odd_p(n))
+    mpz_powm_sec(m, m, d, n);
+  else
+    mpz_powm(m, m, d, n);
+#else
   mpz_powm(m, m, d, n);
+#endif
 
   /* m = m' * bi mod n (unblind) */
   mpz_mul(m, m, bi);
@@ -3343,13 +3357,13 @@ goo_decrypt_oaep(unsigned char **out,
 fail:
   goo_prng_uninit(&prng);
   goo_cleanse(&prng, sizeof(goo_prng_t));
-  goo_mpz_cleanse(n);
-  goo_mpz_cleanse(t);
-  goo_mpz_cleanse(d);
-  goo_mpz_cleanse(m);
-  goo_mpz_cleanse(s);
-  goo_mpz_cleanse(b);
-  goo_mpz_cleanse(bi);
+  goo_mpz_clear(n);
+  goo_mpz_clear(t);
+  goo_mpz_clear(d);
+  goo_mpz_clear(m);
+  goo_mpz_clear(s);
+  goo_mpz_clear(b);
+  goo_mpz_clear(bi);
   goo_free(em);
   return r;
 }
@@ -3368,10 +3382,10 @@ goo_create(const unsigned char *n,
   goo_group_t *ret = NULL;
   mpz_t n_n;
 
+  mpz_init(n_n);
+
   if (ctx == NULL || n == NULL)
     goto fail;
-
-  mpz_init(n_n);
 
   goo_mpz_import(n_n, n, n_len);
 
@@ -3428,8 +3442,8 @@ goo_challenge(goo_group_t *ctx,
 
   r = 1;
 fail:
-  mpz_clear(C1_n);
-  mpz_clear(n_n);
+  goo_mpz_clear(C1_n);
+  goo_mpz_clear(n_n);
   return r;
 }
 
@@ -3469,9 +3483,9 @@ goo_validate(goo_group_t *ctx,
 
   r = 1;
 fail:
-  mpz_clear(C1_n);
-  goo_mpz_cleanse(p_n);
-  goo_mpz_cleanse(q_n);
+  goo_mpz_clear(C1_n);
+  goo_mpz_clear(p_n);
+  goo_mpz_clear(q_n);
   return r;
 }
 
@@ -3522,8 +3536,8 @@ goo_sign(goo_group_t *ctx,
 
   r = 1;
 fail:
-  goo_mpz_cleanse(p_n);
-  goo_mpz_cleanse(q_n);
+  goo_mpz_clear(p_n);
+  goo_mpz_clear(q_n);
   goo_sig_uninit(&S);
 
   if (r == 0)
@@ -3540,7 +3554,7 @@ goo_verify(goo_group_t *ctx,
            size_t sig_len,
            const unsigned char *C1,
            size_t C1_len) {
-  int ret = 0;
+  int r = 0;
   goo_sig_t S;
   mpz_t C1_n;
 
@@ -3561,11 +3575,11 @@ goo_verify(goo_group_t *ctx,
   if (!goo_group_verify(ctx, msg, msg_len, &S, C1_n))
     goto fail;
 
-  ret = 1;
+  r = 1;
 fail:
   goo_sig_uninit(&S);
   mpz_clear(C1_n);
-  return ret;
+  return r;
 }
 
 int
@@ -3604,8 +3618,8 @@ goo_encrypt(unsigned char **out,
 
   r = 1;
 fail:
-  goo_mpz_cleanse(n_n);
-  goo_mpz_cleanse(e_n);
+  goo_mpz_clear(n_n);
+  goo_mpz_clear(e_n);
   return r;
 }
 
@@ -3651,8 +3665,8 @@ goo_decrypt(unsigned char **out,
 
   r = 1;
 fail:
-  goo_mpz_cleanse(p_n);
-  goo_mpz_cleanse(q_n);
-  goo_mpz_cleanse(e_n);
+  goo_mpz_clear(p_n);
+  goo_mpz_clear(q_n);
+  goo_mpz_clear(e_n);
   return r;
 }
