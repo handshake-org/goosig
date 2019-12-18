@@ -59,6 +59,9 @@
           "-lgmp"
         ]
       }, {
+        "cflags_c": [
+          "-Wno-unused-parameter"
+        ],
         "sources": [
           "./src/goo/mini-gmp.c"
         ]
