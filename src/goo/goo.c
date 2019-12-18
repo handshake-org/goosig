@@ -679,7 +679,7 @@ goo_mpz_sqrtm(mpz_t ret, const mpz_t num, const mpz_t p) {
   /* n = 2 */
   mpz_set_ui(n, 2);
 
-  /* while (n^((p - 1) / 2) mod p) != -1 */
+  /* while n^((p - 1) / 2) != -1 mod p */
   while (mpz_jacobi(n, p) != -1) {
     /* n = n + 1 */
     mpz_add_ui(n, n, 1);

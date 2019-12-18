@@ -719,14 +719,22 @@ run_hash_test(void) {
   static const char msg[] = "hello world";
   unsigned char out[32];
 
-  static const unsigned char expect[] = {
+  static const unsigned char expect1[] = {
     0xb9, 0x4d, 0x27, 0xb9, 0x93, 0x4d, 0x3e, 0x08,
     0xa5, 0x2e, 0x52, 0xd7, 0xda, 0x7d, 0xab, 0xfa,
     0xc4, 0x84, 0xef, 0xe3, 0x7a, 0x53, 0x80, 0xee,
     0x90, 0x88, 0xf7, 0xac, 0xe2, 0xef, 0xcd, 0xe9
   };
 
+  static const unsigned char expect2[] = {
+    0x4f, 0x18, 0xbc, 0xc1, 0x3c, 0x4b, 0x6e, 0x96,
+    0xd0, 0x86, 0xdf, 0xd7, 0x08, 0x1d, 0x02, 0xcb,
+    0xeb, 0xca, 0xbe, 0xe7, 0x78, 0xb1, 0x03, 0xfa,
+    0x3a, 0x84, 0x4b, 0x00, 0x0c, 0xeb, 0xd0, 0xfe
+  };
+
   goo_sha256_t ctx;
+  unsigned long i;
 
   printf("Testing hashing...\n");
 
@@ -734,7 +742,12 @@ run_hash_test(void) {
   goo_sha256_update(&ctx, (unsigned char *)msg, sizeof(msg) - 1);
   goo_sha256_final(&ctx, &out[0]);
 
-  assert(memcmp(&out[0], expect, sizeof(out)) == 0);
+  assert(memcmp(&out[0], expect1, sizeof(out)) == 0);
+
+  for (i = 0; i < 1000; i++)
+    goo_sha256(&out[0], &out[0], sizeof(out));
+
+  assert(memcmp(&out[0], expect2, sizeof(out)) == 0);
 
   goo_sha256_init(&ctx);
   goo_sha256_update(&ctx, GOO_AOL1, sizeof(GOO_AOL1));
@@ -761,72 +774,28 @@ run_hash_test(void) {
   assert(memcmp(&out[0], GOO_RSA617_HASH, sizeof(out)) == 0);
 }
 
-#ifdef GOO_HAS_CRYPTO
-#include <openssl/sha.h>
-
-static void
-run_sha256_test(goo_prng_t *rng) {
-  unsigned char msg[2048];
-  unsigned char out[32];
-  unsigned char expect[32];
-  int i;
-
-  printf("Testing SHA256...\n");
-
-  for (i = 0; i < 2048; i++) {
-    size_t msg_len = (size_t)goo_prng_random_num(rng, 2048);
-
-    goo_prng_generate(rng, msg, msg_len);
-
-    goo_sha256(out, msg, msg_len);
-    SHA256(msg, msg_len, expect);
-
-    assert(memcmp(&out[0], &expect[0], sizeof(out)) == 0);
-
-    /* test chunks */
-    {
-      size_t chunk_max = msg_len >> 2;
-      size_t pos = 0;
-      goo_sha256_t ctx;
-
-      if (chunk_max < 2)
-        chunk_max = 2;
-
-      goo_sha256_init(&ctx);
-
-      while (pos < msg_len) {
-        size_t chunk_len = goo_prng_random_num(rng, chunk_max);
-
-        if (pos + chunk_len > msg_len)
-          chunk_len = msg_len - pos;
-
-        goo_sha256_update(&ctx, &msg[pos], chunk_len);
-
-        pos += chunk_len;
-      }
-
-      goo_sha256_final(&ctx, &out[0]);
-
-      assert(memcmp(&out[0], &expect[0], sizeof(out)) == 0);
-    }
-  }
-}
-#endif
-
 static void
 run_hmac_test(void) {
   static const char msg[] = "hello world";
   unsigned char key[32];
   unsigned char out[32];
 
-  static const unsigned char expect[] = {
+  static const unsigned char expect1[] = {
     0x42, 0xeb, 0x78, 0x77, 0x6a, 0xd8, 0x2f, 0x00,
     0x11, 0x79, 0xf4, 0x4e, 0x9e, 0x88, 0x26, 0x4f,
     0x2d, 0x80, 0x42, 0x51, 0xe0, 0x2d, 0x98, 0x8c,
     0x11, 0x94, 0xb9, 0x5d, 0xe8, 0x23, 0xa1, 0x4e
   };
 
+  static const unsigned char expect2[] = {
+    0x61, 0x7a, 0xec, 0xf0, 0x88, 0x8c, 0x86, 0x8c,
+    0x58, 0x8d, 0x16, 0x68, 0xf3, 0x4b, 0x59, 0x35,
+    0xe6, 0x68, 0x5d, 0x87, 0xed, 0xf9, 0xdb, 0xa4,
+    0x9d, 0x8c, 0x83, 0x08, 0x83, 0xa2, 0xeb, 0x18
+  };
+
   goo_hmac_t ctx;
+  unsigned long i;
 
   memset(&key[0], 0xff, sizeof(key));
 
@@ -836,7 +805,14 @@ run_hmac_test(void) {
   goo_hmac_update(&ctx, (unsigned char *)msg, sizeof(msg) - 1);
   goo_hmac_final(&ctx, &out[0]);
 
-  assert(memcmp(&out[0], expect, sizeof(out)) == 0);
+  assert(memcmp(&out[0], expect1, sizeof(out)) == 0);
+
+  for (i = 0; i < 1000; i++) {
+    memset(&key[0], i & 0xff, sizeof(key));
+    goo_hmac(&out[0], &out[0], sizeof(out), &key[0], sizeof(key));
+  }
+
+  assert(memcmp(&out[0], expect2, sizeof(out)) == 0);
 }
 
 static void
@@ -868,7 +844,7 @@ run_drbg_test(void) {
   unsigned char entropy[64];
   unsigned char out[36];
   goo_drbg_t ctx;
-  int i;
+  unsigned long i;
 
   memset(&entropy[0], 0xaa, 64);
 
@@ -912,7 +888,7 @@ run_prng_test(void) {
   unsigned char msg[32];
   unsigned char slab[GOO_MAX_RSA_BYTES];
   mpz_t x, y;
-  int i;
+  unsigned long i;
 
   printf("Testing PRNG...\n");
 
@@ -970,6 +946,58 @@ run_prng_test(void) {
   goo_prng_uninit(&prng);
 }
 
+#ifdef GOO_HAS_CRYPTO
+#include <openssl/sha.h>
+
+static void
+run_sha256_test(goo_prng_t *rng) {
+  unsigned char msg[2048];
+  unsigned char out[32];
+  unsigned char expect[32];
+  unsigned long i;
+
+  printf("Testing SHA256...\n");
+
+  for (i = 0; i < 2048; i++) {
+    size_t msg_len = (size_t)goo_prng_random_num(rng, 2048);
+
+    goo_prng_generate(rng, msg, msg_len);
+
+    goo_sha256(out, msg, msg_len);
+    SHA256(msg, msg_len, expect);
+
+    assert(memcmp(&out[0], &expect[0], sizeof(out)) == 0);
+
+    /* test chunks */
+    {
+      size_t chunk_max = msg_len >> 2;
+      size_t pos = 0;
+      goo_sha256_t ctx;
+
+      if (chunk_max < 2)
+        chunk_max = 2;
+
+      goo_sha256_init(&ctx);
+
+      while (pos < msg_len) {
+        size_t chunk_len = goo_prng_random_num(rng, chunk_max);
+
+        if (pos + chunk_len > msg_len)
+          chunk_len = msg_len - pos;
+
+        goo_sha256_update(&ctx, &msg[pos], chunk_len);
+
+        pos += chunk_len;
+      }
+
+      goo_sha256_final(&ctx, &out[0]);
+
+      assert(memcmp(&out[0], &expect[0], sizeof(out)) == 0);
+    }
+  }
+}
+#endif
+
 static void
 run_util_test(goo_prng_t *rng) {
   /* test bitlen and zerobits */
@@ -1024,7 +1052,7 @@ run_util_test(goo_prng_t *rng) {
 
   /* test sqrt */
   {
-    int i;
+    unsigned long i;
 
     printf("Testing sqrt...\n");
 
@@ -1114,7 +1142,7 @@ run_util_test(goo_prng_t *rng) {
   /* test sqrts */
   {
     mpz_t p, q, n;
-    int i;
+    unsigned long i;
 
     printf("Testing roots (random)...\n");
 
@@ -1732,7 +1760,7 @@ run_ops_test(goo_prng_t *rng) {
   {
     mpz_t b, bi, e;
     mpz_t r1, r2;
-    int i;
+    unsigned long i;
 
     printf("Testing pow...\n");
 
@@ -1765,7 +1793,7 @@ run_ops_test(goo_prng_t *rng) {
     mpz_t b1, b2, e1, e2;
     mpz_t b1i, b2i;
     mpz_t r1, r2;
-    int i;
+    unsigned long i;
 
     printf("Testing pow2...\n");
 
@@ -1807,7 +1835,7 @@ run_ops_test(goo_prng_t *rng) {
   {
     mpz_t e1, e2;
     mpz_t r1, r2;
-    int i;
+    unsigned long i;
 
     printf("Testing powgh...\n");
 
@@ -1839,7 +1867,7 @@ run_ops_test(goo_prng_t *rng) {
     mpz_t e1_s, e2_s;
     mpz_t e1_si, e2_si;
     mpz_t r1, r2;
-    int i;
+    unsigned long i;
 
     printf("Testing inv2...\n");
 
@@ -1889,7 +1917,7 @@ run_ops_test(goo_prng_t *rng) {
   {
     mpz_t evals[7];
     mpz_t einvs[7];
-    int i, j;
+    unsigned long i, j;
 
     printf("Testing inv7...\n");
 
@@ -1907,6 +1935,7 @@ run_ops_test(goo_prng_t *rng) {
         evals[0], evals[1], evals[2], evals[3], evals[4], evals[5], evals[6]));
 
       for (j = 0; j < 7; j++) {
+        /* A 2^-2048 chance of happening by accident. */
         assert(mpz_cmp_ui(evals[j], 1) != 0);
 
         mpz_mul(evals[j], evals[j], einvs[j]);
@@ -2070,7 +2099,7 @@ run_goo_test(goo_prng_t *rng) {
   goo_group_t *goo, *ver;
   unsigned char s_prime[32];
   unsigned char msg[32];
-  int i;
+  unsigned long i;
 
   printf("Testing signing/verifying...\n");
 
@@ -2195,12 +2224,12 @@ main(void) {
   rng_init(&rng);
 
   run_hash_test();
-#ifdef GOO_HAS_CRYPTO
-  run_sha256_test(&rng);
-#endif
   run_hmac_test();
   run_drbg_test();
   run_prng_test();
+#ifdef GOO_HAS_CRYPTO
+  run_sha256_test(&rng);
+#endif
   run_util_test(&rng);
   run_primes_test(&rng);
   run_ops_test(&rng);
