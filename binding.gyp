@@ -13,7 +13,6 @@
       "-Wall",
       "-Wextra",
       "-Wno-unknown-warning",
-      "-Wno-unused-function",
       "-O3"
     ],
     "cflags_c": [
@@ -21,8 +20,7 @@
       "-pedantic",
       "-Wcast-align",
       "-Wshadow",
-      "-Wno-long-long",
-      "-Wno-overlength-strings"
+      "-Wno-long-long"
     ],
     "cflags_cc+": [
       "-std=c++0x",

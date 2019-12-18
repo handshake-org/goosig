@@ -113,23 +113,23 @@ static const unsigned char GOO_PRNG_LOCAL[32] = {
 };
 
 typedef struct goo_combspec_s {
-  long points_per_add;
-  long adds_per_shift;
-  long shifts;
-  long bits_per_window;
-  long size;
+  unsigned long points_per_add;
+  unsigned long adds_per_shift;
+  unsigned long shifts;
+  unsigned long bits_per_window;
+  unsigned long size;
 } goo_combspec_t;
 
 typedef struct goo_comb_s {
-  long points_per_add;
-  long adds_per_shift;
-  long shifts;
-  long bits_per_window;
-  long bits;
-  long points_per_subcomb;
-  long size;
+  unsigned long points_per_add;
+  unsigned long adds_per_shift;
+  unsigned long shifts;
+  unsigned long bits_per_window;
+  unsigned long bits;
+  unsigned long points_per_subcomb;
+  unsigned long size;
   mpz_t *items;
-  long **wins;
+  unsigned long **wins;
 } goo_comb_t;
 
 typedef struct goo_comb_item_s {
@@ -191,7 +191,7 @@ typedef struct goo_group_s {
   long wnaf2[GOO_ELL_BITS + 1];
 
   /* Combs */
-  long combs_len;
+  size_t combs_len;
   goo_comb_item_t combs[2];
 
   /* Used for goo_group_hash() */

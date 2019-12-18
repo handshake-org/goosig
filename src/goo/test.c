@@ -686,10 +686,12 @@ static void
 rng_init(goo_prng_t *rng) {
   unsigned char entropy[32];
 
-  if (!get_entropy(&entropy[0], 32)) {
-    int i;
+  assert(sizeof(entropy) == 32);
 
-    for (i = 0; i < 32; i++)
+  if (!get_entropy(&entropy[0], sizeof(entropy))) {
+    size_t i;
+
+    for (i = 0; i < sizeof(entropy); i++)
       entropy[i] = (unsigned char)rand();
 
     printf("Warning: using bad entropy.\n");
@@ -710,7 +712,7 @@ random_prime(mpz_t ret, goo_prng_t *rng, size_t bits) {
 
   do {
     goo_prng_random_bits(rng, ret, bits);
-    goo_prng_generate(rng, &key[0], 32);
+    goo_prng_generate(rng, &key[0], sizeof(key));
   } while (!goo_is_prime(ret, key));
 }
 
@@ -734,31 +736,31 @@ run_hash_test(void) {
   goo_sha256_update(&ctx, (unsigned char *)msg, sizeof(msg) - 1);
   goo_sha256_final(&ctx, &out[0]);
 
-  assert(memcmp(&out[0], expect, 32) == 0);
+  assert(memcmp(&out[0], expect, sizeof(out)) == 0);
 
   goo_sha256_init(&ctx);
   goo_sha256_update(&ctx, GOO_AOL1, sizeof(GOO_AOL1));
   goo_sha256_final(&ctx, &out[0]);
 
-  assert(memcmp(&out[0], GOO_AOL1_HASH, 32) == 0);
+  assert(memcmp(&out[0], GOO_AOL1_HASH, sizeof(out)) == 0);
 
   goo_sha256_init(&ctx);
   goo_sha256_update(&ctx, GOO_AOL2, sizeof(GOO_AOL2));
   goo_sha256_final(&ctx, &out[0]);
 
-  assert(memcmp(&out[0], GOO_AOL2_HASH, 32) == 0);
+  assert(memcmp(&out[0], GOO_AOL2_HASH, sizeof(out)) == 0);
 
   goo_sha256_init(&ctx);
   goo_sha256_update(&ctx, GOO_RSA2048, sizeof(GOO_RSA2048));
   goo_sha256_final(&ctx, &out[0]);
 
-  assert(memcmp(&out[0], GOO_RSA2048_HASH, 32) == 0);
+  assert(memcmp(&out[0], GOO_RSA2048_HASH, sizeof(out)) == 0);
 
   goo_sha256_init(&ctx);
   goo_sha256_update(&ctx, GOO_RSA617, sizeof(GOO_RSA617));
   goo_sha256_final(&ctx, &out[0]);
 
-  assert(memcmp(&out[0], GOO_RSA617_HASH, 32) == 0);
+  assert(memcmp(&out[0], GOO_RSA617_HASH, sizeof(out)) == 0);
 }
 
 #ifdef GOO_HAS_CRYPTO
@@ -781,7 +783,7 @@ run_sha256_test(goo_prng_t *rng) {
     goo_sha256(out, msg, msg_len);
     SHA256(msg, msg_len, expect);
 
-    assert(memcmp(&out[0], &expect[0], 32) == 0);
+    assert(memcmp(&out[0], &expect[0], sizeof(out)) == 0);
 
     /* test chunks */
     {
@@ -807,7 +809,7 @@ run_sha256_test(goo_prng_t *rng) {
 
       goo_sha256_final(&ctx, &out[0]);
 
-      assert(memcmp(&out[0], &expect[0], 32) == 0);
+      assert(memcmp(&out[0], &expect[0], sizeof(out)) == 0);
     }
   }
 }
@@ -828,15 +830,15 @@ run_hmac_test(void) {
 
   goo_hmac_t ctx;
 
-  memset(&key[0], 0xff, 32);
+  memset(&key[0], 0xff, sizeof(key));
 
   printf("Testing HMAC...\n");
 
-  goo_hmac_init(&ctx, &key[0], 32);
+  goo_hmac_init(&ctx, &key[0], sizeof(key));
   goo_hmac_update(&ctx, (unsigned char *)msg, sizeof(msg) - 1);
   goo_hmac_final(&ctx, &out[0]);
 
-  assert(memcmp(&out[0], expect, 32) == 0);
+  assert(memcmp(&out[0], expect, sizeof(out)) == 0);
 }
 
 static void
@@ -916,7 +918,7 @@ run_prng_test(void) {
 
   printf("Testing PRNG...\n");
 
-  memset(&key[0], 0xaa, 32);
+  memset(&key[0], 0xaa, sizeof(key));
   goo_prng_init(&prng);
   mpz_init(x);
   mpz_init(y);
@@ -945,15 +947,15 @@ run_prng_test(void) {
   goo_prng_random_bits(&prng, x, 1024);
   goo_prng_random_bits(&prng, y, 1024);
 
-  goo_prng_generate(&prng, &s_prime[0], 32);
-  goo_prng_generate(&prng, &msg[0], 32);
+  goo_prng_generate(&prng, &s_prime[0], sizeof(s_prime));
+  goo_prng_generate(&prng, &msg[0], sizeof(msg));
 
-  goo_prng_seed_sign(&prng, x, y, s_prime, msg, 32, slab);
+  goo_prng_seed_sign(&prng, x, y, s_prime, msg, sizeof(msg), slab);
 
   goo_prng_random_bits(&prng, x, 31);
   assert(mpz_cmp_ui(x, 1886980239) == 0);
 
-  memset(&key[0], 0x01, 32);
+  memset(&key[0], 0x01, sizeof(key));
   goo_prng_seed(&prng, key, GOO_PRNG_DERIVE);
 
   for (i = 0; i < 1000; i++)
@@ -1157,7 +1159,7 @@ run_util_test(goo_prng_t *rng) {
 
   /* test jacobi */
   {
-    int i;
+    size_t i;
 
     printf("Testing jacobi...\n");
 
@@ -1439,9 +1441,9 @@ run_primes_test(goo_prng_t *rng) {
   unsigned char zero[32];
   unsigned long i;
 
-  goo_prng_generate(rng, key, 32);
+  goo_prng_generate(rng, key, sizeof(key));
 
-  memset(&zero[0], 0x00, 32);
+  memset(&zero[0], 0x00, sizeof(zero));
 
   printf("Testing primes...\n");
 
@@ -2061,8 +2063,8 @@ run_goo_test(goo_prng_t *rng) {
   goo_mpz_import(n, MODULUS_4096, sizeof(MODULUS_4096));
   goo_mpz_import(mod_n, GOO_RSA2048, sizeof(GOO_RSA2048));
 
-  goo_prng_generate(rng, s_prime, 32);
-  goo_prng_generate(rng, msg, 32);
+  goo_prng_generate(rng, s_prime, sizeof(s_prime));
+  goo_prng_generate(rng, msg, sizeof(msg));
 
   assert(goo_group_init(goo, mod_n, 2, 3, 4096));
   assert(goo_group_init(ver, mod_n, 2, 3, 0));
@@ -2079,8 +2081,8 @@ run_goo_test(goo_prng_t *rng) {
     random_prime(q, rng, prime_size);
     mpz_mul(n, p, q);
 
-    goo_prng_generate(rng, s_prime, 32);
-    goo_prng_generate(rng, msg, 32);
+    goo_prng_generate(rng, s_prime, sizeof(s_prime));
+    goo_prng_generate(rng, msg, sizeof(msg));
 
     assert(goo_group_challenge(goo, C1, s_prime, n));
     assert(goo_group_validate(goo, s_prime, C1, p, q));
@@ -2113,8 +2115,8 @@ run_api_test(goo_prng_t *rng) {
 
   printf("Testing API...\n");
 
-  goo_prng_generate(rng, s_prime, 32);
-  goo_prng_generate(rng, msg, 32);
+  goo_prng_generate(rng, s_prime, sizeof(s_prime));
+  goo_prng_generate(rng, msg, sizeof(msg));
 
   goo = goo_create(GOO_RSA2048, sizeof(GOO_RSA2048), 2, 3, 4096);
   ver = goo_create(GOO_RSA2048, sizeof(GOO_RSA2048), 2, 3, 0);
@@ -2159,6 +2161,9 @@ run_api_test(goo_prng_t *rng) {
 int
 main(void) {
   goo_prng_t rng;
+
+  (void)PRIME_Q_1024;
+  (void)MODULUS_2048;
 
   rng_init(&rng);
 
