@@ -32,6 +32,9 @@ describe('API', function() {
 
       // Generate the challenge token.
       const s_prime = goo.generate();
+
+      assert.notBufferEqual(s_prime, Buffer.alloc(32, 0x00));
+
       const C1 = goo.challenge(s_prime, key);
 
       // Encrypt to the recipient.

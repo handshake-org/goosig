@@ -42,6 +42,9 @@ function runTests(name, Goo, Other) {
 
         // Generate the challenge token.
         const s_prime = prover.generate();
+
+        assert.notBufferEqual(s_prime, Buffer.alloc(32, 0x00));
+
         const C1 = prover.challenge(s_prime, key);
 
         // Encrypt to the recipient.

@@ -104,11 +104,10 @@ NAN_METHOD(Goo::Generate) {
   unsigned char entropy[32];
   unsigned char s_prime[32];
 
-  memset(&entropy[0], 0x00, 32);
-  memset(&s_prime[0], 0x00, 32);
-
   if (!goo_random((void *)&entropy[0], 32))
     return Nan::ThrowError("Could not generate s_prime.");
+
+  memset((void *)&s_prime[0], 0x00, 32);
 
   if (!goo_generate(NULL, &s_prime[0], &entropy[0]))
     return Nan::ThrowError("Could not generate s_prime.");
