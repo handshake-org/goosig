@@ -686,8 +686,6 @@ static void
 rng_init(goo_prng_t *rng) {
   unsigned char entropy[32];
 
-  assert(sizeof(entropy) == 32);
-
   if (!get_entropy(&entropy[0], sizeof(entropy))) {
     size_t i;
 
@@ -1026,10 +1024,23 @@ run_util_test(goo_prng_t *rng) {
 
   /* test sqrt */
   {
+    int i;
+
     printf("Testing sqrt...\n");
 
+    assert(goo_isqrt(0) == 0);
+    assert(goo_isqrt(1) == 1);
+    assert(goo_isqrt(2) == 1);
+    assert(goo_isqrt(3) == 1);
+    assert(goo_isqrt(4) == 2);
     assert(goo_isqrt(1024) == 32);
     assert(goo_isqrt(1025) == 32);
+
+    for (i = 0; i < 1000; i++) {
+      uint32_t n = goo_prng_random_num(rng, 0x10000ul);
+
+      assert(goo_isqrt(n * n) == n);
+    }
   }
 
   /* test sqrts */
@@ -1057,6 +1068,11 @@ run_util_test(goo_prng_t *rng) {
 
       goo_prng_random_int(rng, x, p);
       mpz_powm_ui(x, x, 2, p);
+
+      if (mpz_sgn(x) != 0) {
+        assert(mpz_jacobi(x, p) == 1);
+        assert(goo_mpz_jacobi(x, p) == 1);
+      }
 
       assert(goo_mpz_sqrtm(y, x, p));
 
@@ -1120,6 +1136,17 @@ run_util_test(goo_prng_t *rng) {
 
         goo_prng_random_int(rng, x, p);
         mpz_powm_ui(x, x, 2, p);
+
+        if (mpz_sgn(x) != 0) {
+          assert(mpz_jacobi(x, p) == 1);
+          assert(goo_mpz_jacobi(x, p) == 1);
+
+          if ((mpz_getlimbn(p, 0) & 3) == 3) {
+            mpz_sub(y, p, x);
+            assert(mpz_jacobi(y, p) == -1);
+            assert(goo_mpz_jacobi(y, p) == -1);
+          }
+        }
 
         assert(goo_mpz_sqrtm(y, x, p));
 
