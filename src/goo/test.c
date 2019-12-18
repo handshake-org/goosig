@@ -1097,10 +1097,8 @@ run_util_test(goo_prng_t *rng) {
       goo_prng_random_int(rng, x, p);
       mpz_powm_ui(x, x, 2, p);
 
-      if (mpz_sgn(x) != 0) {
+      if (mpz_sgn(x) != 0)
         assert(mpz_jacobi(x, p) == 1);
-        assert(goo_mpz_jacobi(x, p) == 1);
-      }
 
       assert(goo_mpz_sqrtm(y, x, p));
 
@@ -1167,12 +1165,10 @@ run_util_test(goo_prng_t *rng) {
 
         if (mpz_sgn(x) != 0) {
           assert(mpz_jacobi(x, p) == 1);
-          assert(goo_mpz_jacobi(x, p) == 1);
 
           if ((mpz_getlimbn(p, 0) & 3) == 3) {
             mpz_sub(y, p, x);
             assert(mpz_jacobi(y, p) == -1);
-            assert(goo_mpz_jacobi(y, p) == -1);
           }
         }
 
@@ -1231,7 +1227,6 @@ run_util_test(goo_prng_t *rng) {
       mpz_set_si(y, v[1]);
 
       assert(mpz_jacobi(x, y) == v[2]);
-      assert(goo_mpz_jacobi(x, y) == v[2]);
 
       mpz_clear(x);
       mpz_clear(y);
@@ -1514,7 +1509,7 @@ run_primes_test(goo_prng_t *rng) {
     assert(goo_is_prime_mr(p, key, 1, 1));
     assert(goo_is_prime_mr(p, key, 1, 0));
     assert(goo_is_prime_mr(p, key, 0, 1));
-    assert(goo_is_prime_lucas(p));
+    assert(goo_is_prime_lucas(p, 50));
     assert(goo_is_prime(p, key));
 
     mpz_clear(p);
@@ -1531,7 +1526,7 @@ run_primes_test(goo_prng_t *rng) {
     assert(goo_is_prime_mr(p, key, 1, 1));
     assert(goo_is_prime_mr(p, key, 1, 0));
     assert(goo_is_prime_mr(p, key, 0, 1));
-    assert(goo_is_prime_lucas(p));
+    assert(goo_is_prime_lucas(p, 50));
     assert(goo_is_prime(p, key));
 
     mpz_clear(p);
@@ -1548,7 +1543,7 @@ run_primes_test(goo_prng_t *rng) {
     assert(goo_is_prime_mr(p, key, 1, 1));
     assert(goo_is_prime_mr(p, key, 1, 0));
     assert(goo_is_prime_mr(p, key, 0, 1));
-    assert(goo_is_prime_lucas(p));
+    assert(goo_is_prime_lucas(p, 50));
     assert(goo_is_prime(p, key));
 
     mpz_clear(p);
@@ -1579,9 +1574,9 @@ run_primes_test(goo_prng_t *rng) {
 
     if (i >= 8 && i <= 42) {
       /* Lucas pseudoprime. */
-      assert(goo_is_prime_lucas(p));
+      assert(goo_is_prime_lucas(p, 50));
     } else {
-      assert(!goo_is_prime_lucas(p));
+      assert(!goo_is_prime_lucas(p, 50));
     }
 
     /* No composite should ever pass */
@@ -1609,7 +1604,7 @@ run_primes_test(goo_prng_t *rng) {
       mpz_set_ui(n, i);
 
       pseudo = goo_is_prime_mr(n, zero, 1, 1)
-            && !goo_is_prime_lucas(n);
+            && !goo_is_prime_lucas(n, 50);
 
       if (pseudo && (len == 0 || i != want[0]))
         assert(0 && "miller-rabin: want false");
@@ -1643,7 +1638,7 @@ run_primes_test(goo_prng_t *rng) {
 
       mpz_set_ui(n, i);
 
-      pseudo = goo_is_prime_lucas(n)
+      pseudo = goo_is_prime_lucas(n, 50)
            && !goo_is_prime_mr(n, zero, 1, 1);
 
       if (pseudo && (len == 0 || i != want[0]))

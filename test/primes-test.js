@@ -244,7 +244,7 @@ describe('Primes', function() {
     for (const n of items) {
       const p = new BN(n);
 
-      assert(primes.isPrimeDiv(p));
+      assert(primes.isPrimeDiv(p) === 2);
       assert(primes.isPrimeMR(p, key, 16 + 1, true));
       assert(primes.isPrimeMR(p, key, 1, true));
       assert(primes.isPrimeMR(p, key, 1, false));

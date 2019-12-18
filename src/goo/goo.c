@@ -218,10 +218,11 @@ goo_mpz_mask(mpz_t r, const mpz_t n, unsigned long bit, mpz_t tmp) {
   mpz_and(r, n, mask);
 }
 
-#if !defined(GOO_HAS_GMP) || defined(GOO_TEST)
+#ifndef GOO_HAS_GMP
+/* `mpz_jacobi` is not implemented in mini-gmp. */
 /* https://github.com/golang/go/blob/aadaec5/src/math/big/int.go#L754 */
 static int
-goo_mpz_jacobi(const mpz_t x, const mpz_t y) {
+mpz_jacobi(const mpz_t x, const mpz_t y) {
   mpz_t a, b, c;
   unsigned long s, bmod8;
   int j;
@@ -237,8 +238,10 @@ goo_mpz_jacobi(const mpz_t x, const mpz_t y) {
 
   /* a = x */
   mpz_set(a, x);
+
   /* b = y */
   mpz_set(b, y);
+
   j = 1;
 
   /* if b < 0 */
@@ -246,6 +249,7 @@ goo_mpz_jacobi(const mpz_t x, const mpz_t y) {
     /* if a < 0 */
     if (mpz_sgn(a) < 0)
       j = -1;
+
     /* b = -b */
     mpz_neg(b, b);
   }
@@ -290,6 +294,7 @@ goo_mpz_jacobi(const mpz_t x, const mpz_t y) {
 
     /* a = b */
     mpz_set(a, b);
+
     /* b = c */
     mpz_set(b, c);
   }
@@ -300,11 +305,6 @@ goo_mpz_jacobi(const mpz_t x, const mpz_t y) {
 
   return j;
 }
-#endif
-
-#ifndef GOO_HAS_GMP
-/* Jacobi is not implemented in mini-gmp. */
-#define mpz_jacobi goo_mpz_jacobi
 #endif
 
 static void
@@ -578,7 +578,7 @@ goo_mpz_sqrtm(mpz_t ret, const mpz_t num, const mpz_t p) {
   if (mpz_sgn(p) <= 0 || mpz_even_p(p))
     goto fail;
 
-  /* if x < 0 || x >= p */
+  /* if x < 0 or x >= p */
   if (mpz_sgn(x) < 0 || mpz_cmp(x, p) >= 0) {
     /* x = x mod p */
     mpz_mod(x, x, p);
@@ -586,11 +586,9 @@ goo_mpz_sqrtm(mpz_t ret, const mpz_t num, const mpz_t p) {
 
   /* if p mod 4 == 3 */
   if ((mpz_getlimbn(p, 0) & 3) == 3) {
-    /* e = (p + 1) / 4 */
+    /* b = x^((p + 1) / 4) mod p */
     mpz_add_ui(e, p, 1);
     mpz_tdiv_q_2exp(e, e, 2);
-
-    /* b = x^e mod p */
     mpz_powm(b, x, e, p);
 
     /* g = b^2 mod p */
@@ -609,33 +607,23 @@ goo_mpz_sqrtm(mpz_t ret, const mpz_t num, const mpz_t p) {
 
   /* if p mod 8 == 5 */
   if ((mpz_getlimbn(p, 0) & 7) == 5) {
-    /* e = (p - 5) / 8 */
-    mpz_tdiv_q_2exp(e, p, 3);
-
     /* t = x * 2 mod p */
     mpz_mul_2exp(t, x, 1);
     mpz_mod(t, t, p);
 
-    /* a = t^e mod p */
+    /* a = t^((p - 5) / 8) mod p */
+    mpz_tdiv_q_2exp(e, p, 3);
     mpz_powm(a, t, e, p);
 
-    /* b = a^2 mod p */
+    /* b = (a^2 * t - 1) * x * a mod p */
     mpz_mul(b, a, a);
     mpz_mod(b, b, p);
-
-    /* b = b * t mod p */
     mpz_mul(b, b, t);
     mpz_mod(b, b, p);
-
-    /* b = (b - 1) mod p */
     mpz_sub_ui(b, b, 1);
     mpz_mod(b, b, p);
-
-    /* b = b * x mod p */
     mpz_mul(b, b, x);
     mpz_mod(b, b, p);
-
-    /* b = b * a mod p */
     mpz_mul(b, b, a);
     mpz_mod(b, b, p);
 
@@ -685,13 +673,9 @@ goo_mpz_sqrtm(mpz_t ret, const mpz_t num, const mpz_t p) {
     mpz_add_ui(n, n, 1);
   }
 
-  /* y = s + 1 */
+  /* y = x^((s + 1) / 2) mod p */
   mpz_add_ui(y, s, 1);
-
-  /* y = y >> 1 */
   mpz_tdiv_q_2exp(y, y, 1);
-
-  /* y = x^y mod p */
   mpz_powm(y, x, y, p);
 
   /* b = x^s mod p */
@@ -725,11 +709,9 @@ goo_mpz_sqrtm(mpz_t ret, const mpz_t num, const mpz_t p) {
     if (m >= k)
       goto fail;
 
-    /* t = 1 << (k - m - 1) */
+    /* t = g^(2^(k - m - 1)) mod p */
     mpz_set_ui(t, 1);
     mpz_mul_2exp(t, t, k - m - 1);
-
-    /* t = g^t mod p */
     mpz_powm(t, g, t, p);
 
     /* g = t^2 mod p */
@@ -829,6 +811,14 @@ goo_is_prime_div(const mpz_t n) {
   if (mpz_cmp_ui(n, 1) <= 0)
     return 0;
 
+  /* if n mod 2 == 0 */
+  if (mpz_even_p(n)) {
+    /* if n == 2 */
+    if (mpz_cmp_ui(n, 2) == 0)
+      return 2;
+    return 0;
+  }
+
   for (i = 0; i < GOO_TEST_PRIMES_LEN; i++) {
     /* if n == test_primes[i] */
     if (mpz_cmp_ui(n, goo_test_primes[i]) == 0)
@@ -856,14 +846,15 @@ goo_is_prime_mr(const mpz_t n,
 
   /* if n < 7 */
   if (mpz_cmp_ui(n, 7) < 0) {
-    /* if n == 2 or n == 3 or n == 5 */
-    if (mpz_cmp_ui(n, 2) == 0
+    /* n == 2 or n == 3 or n == 5 */
+    return mpz_cmp_ui(n, 2) == 0
         || mpz_cmp_ui(n, 3) == 0
-        || mpz_cmp_ui(n, 5) == 0) {
-      return 1;
-    }
-    return 0;
+        || mpz_cmp_ui(n, 5) == 0;
   }
+
+  /* if n mod 2 == 0 */
+  if (mpz_even_p(n))
+    return 0;
 
   mpz_init(nm1);
   mpz_init(nm3);
@@ -900,7 +891,7 @@ goo_is_prime_mr(const mpz_t n,
     /* y = x^q mod n */
     mpz_powm(y, x, q, n);
 
-    /* if y == 1 || y == nm1 */
+    /* if y == 1 or y == -1 mod n */
     if (mpz_cmp_ui(y, 1) == 0 || mpz_cmp(y, nm1) == 0)
       continue;
 
@@ -909,11 +900,11 @@ goo_is_prime_mr(const mpz_t n,
       mpz_mul(y, y, y);
       mpz_mod(y, y, n);
 
-      /* if y == nm1 */
+      /* if y == -1 mod n */
       if (mpz_cmp(y, nm1) == 0)
         goto next;
 
-      /* if y == 1 */
+      /* if y == 1 mod n */
       if (mpz_cmp_ui(y, 1) == 0)
         goto fail;
     }
@@ -936,14 +927,12 @@ fail:
 
 /* https://github.com/golang/go/blob/aadaec5/src/math/big/prime.go#L150 */
 static int
-goo_is_prime_lucas(const mpz_t n) {
-  int r = 0;
-  unsigned long p;
-  mpz_t d, s, nm2;
-  mpz_t vk, vk1;
-  mpz_t t1, t2, t3;
-  unsigned long zb;
+goo_is_prime_lucas(const mpz_t n, unsigned long limit) {
+  int ret = 0;
+  unsigned long p, r;
+  mpz_t d, s, nm2, vk, vk1, t1, t2, t3;
   long i, t;
+  int j;
 
   mpz_init(d);
   mpz_init(s);
@@ -954,12 +943,10 @@ goo_is_prime_lucas(const mpz_t n) {
   mpz_init(t2);
   mpz_init(t3);
 
-  /* Ignore 0 and 1. */
   /* if n <= 1 */
   if (mpz_cmp_ui(n, 1) <= 0)
     goto fail;
 
-  /* Two is the only even prime. */
   /* if n mod 2 == 0 */
   if (mpz_even_p(n)) {
     /* if n == 2 */
@@ -968,8 +955,6 @@ goo_is_prime_lucas(const mpz_t n) {
     goto fail;
   }
 
-  /* Baillie-OEIS "method C" for choosing D, P, Q. */
-  /* See: https://oeis.org/A217719/a217719.txt. */
   /* p = 3 */
   p = 3;
 
@@ -977,19 +962,13 @@ goo_is_prime_lucas(const mpz_t n) {
   mpz_set_ui(d, 1);
 
   for (;;) {
-    int j;
-
     if (p > 10000) {
       /* Thought to be impossible. */
       goto fail;
     }
 
-    if (p > 50) {
-      /* It's thought to be impossible for `p` */
-      /* to be larger than 10,000, but fail */
-      /* on anything higher than 50 to prevent */
-      /* DoS attacks. `p` never seems to be */
-      /* higher than 30 in practice. */
+    if (limit != 0 && p > limit) {
+      /* Enforce a limit to prevent DoS'ing. */
       goto fail;
     }
 
@@ -998,9 +977,11 @@ goo_is_prime_lucas(const mpz_t n) {
 
     j = mpz_jacobi(d, n);
 
+    /* if d is not square mod n */
     if (j == -1)
       break;
 
+    /* if d == 0 mod n */
     if (j == 0) {
       /* if n == p + 2 */
       if (mpz_cmp_ui(n, p + 2) == 0)
@@ -1009,7 +990,7 @@ goo_is_prime_lucas(const mpz_t n) {
     }
 
     if (p == 40) {
-      /* if (n^(1 / 2))^2 == n */
+      /* if floor(n^(1 / 2))^2 == n */
       if (mpz_perfect_square_p(n))
         goto fail;
     }
@@ -1017,19 +998,14 @@ goo_is_prime_lucas(const mpz_t n) {
     p += 1;
   }
 
-  /* Check for Grantham definition of */
-  /* "extra strong Lucas pseudoprime". */
   /* s = n + 1 */
   mpz_add_ui(s, n, 1);
 
-  /* zb = s factors of 2 */
-  zb = goo_mpz_zerobits(s);
+  /* r = s factors of 2 */
+  r = goo_mpz_zerobits(s);
 
   /* nm2 = n - 2 */
   mpz_sub_ui(nm2, n, 2);
-
-  /* s >>= zb */
-  mpz_tdiv_q_2exp(s, s, zb);
 
   /* vk = 2 */
   mpz_set_ui(vk, 2);
@@ -1037,57 +1013,44 @@ goo_is_prime_lucas(const mpz_t n) {
   /* vk1 = p */
   mpz_set_ui(vk1, p);
 
+  /* s >>= r */
+  mpz_tdiv_q_2exp(s, s, r);
+
   for (i = (long)goo_mpz_bitlen(s); i >= 0; i--) {
+    /* if floor(s / 2^i) mod 2 == 1 */
     if (mpz_tstbit(s, i)) {
-      /* t1 = vk * vk1 */
+      /* vk = (vk * vk1 + n - p) mod n */
+      /* vk1 = (vk1^2 + nm2) mod n */
       mpz_mul(t1, vk, vk1);
-      /* t1 += n */
       mpz_add(t1, t1, n);
-      /* t1 -= p */
       mpz_sub_ui(t1, t1, p);
-      /* vk = t1 mod n */
       mpz_mod(vk, t1, n);
-      /* t1 = vk1 * vk1 */
       mpz_mul(t1, vk1, vk1);
-      /* t1 += nm2 */
       mpz_add(t1, t1, nm2);
-      /* vk1 = t1 mod n */
       mpz_mod(vk1, t1, n);
     } else {
-      /* t1 = vk * vk1 */
+      /* vk1 = (vk * vk1 + n - p) mod n */
+      /* vk = (vk^2 + nm2) mod n */
       mpz_mul(t1, vk, vk1);
-      /* t1 += n */
       mpz_add(t1, t1, n);
-      /* t1 -= p */
       mpz_sub_ui(t1, t1, p);
-      /* vk1 = t1 mod n */
       mpz_mod(vk1, t1, n);
-      /* t1 = vk * vk */
       mpz_mul(t1, vk, vk);
-      /* t1 += nm2 */
       mpz_add(t1, t1, nm2);
-      /* vk = t1 mod n */
       mpz_mod(vk, t1, n);
     }
   }
 
   /* if vk == 2 or vk == nm2 */
   if (mpz_cmp_ui(vk, 2) == 0 || mpz_cmp(vk, nm2) == 0) {
-    /* t1 = vk * p */
+    /* t3 = abs(vk * p - vk1 * 2) mod n */
     mpz_mul_ui(t1, vk, p);
-    /* t2 = vk1 << 1 */
     mpz_mul_2exp(t2, vk1, 1);
 
-    /* if t1 < t2 */
-    if (mpz_cmp(t1, t2) < 0) {
-      /* (t1, t2) = (t2, t1) */
+    if (mpz_cmp(t1, t2) < 0)
       mpz_swap(t1, t2);
-    }
 
-    /* t1 -= t2 */
     mpz_sub(t1, t1, t2);
-
-    /* t3 = t1 mod n */
     mpz_mod(t3, t1, n);
 
     /* if t3 == 0 */
@@ -1095,7 +1058,7 @@ goo_is_prime_lucas(const mpz_t n) {
       goto succeed;
   }
 
-  for (t = 0; t < (long)zb - 1; t++) {
+  for (t = 0; t < (long)r - 1; t++) {
     /* if vk == 0 */
     if (mpz_sgn(vk) == 0)
       goto succeed;
@@ -1104,17 +1067,15 @@ goo_is_prime_lucas(const mpz_t n) {
     if (mpz_cmp_ui(vk, 2) == 0)
       goto fail;
 
-    /* t1 = vk * vk */
+    /* vk = (vk^2 - 2) mod n */
     mpz_mul(t1, vk, vk);
-    /* t1 -= 2 */
     mpz_sub_ui(t1, t1, 2);
-    /* vk = t1 mod n */
     mpz_mod(vk, t1, n);
   }
 
   goto fail;
 succeed:
-  r = 1;
+  ret = 1;
 fail:
   mpz_clear(d);
   mpz_clear(s);
@@ -1124,21 +1085,15 @@ fail:
   mpz_clear(t1);
   mpz_clear(t2);
   mpz_clear(t3);
-  return r;
+  return ret;
 }
 
 static int
 goo_is_prime(const mpz_t p, const unsigned char *key) {
-  int ret;
-
-  /* if p <= 1 */
-  if (mpz_cmp_ui(p, 1) <= 0)
-    return 0;
-
-  /* 0 = not prime */
-  /* 1 = maybe prime */
-  /* 2 = definitely prime */
-  ret = goo_is_prime_div(p);
+  /* 0 = Not prime. */
+  /* 1 = Maybe prime. */
+  /* 2 = Definitely prime. */
+  int ret = goo_is_prime_div(p);
 
   if (ret == 0)
     return 0;
@@ -1150,7 +1105,7 @@ goo_is_prime(const mpz_t p, const unsigned char *key) {
   if (!goo_is_prime_mr(p, key, 16 + 1, 1))
     return 0;
 
-  if (!goo_is_prime_lucas(p))
+  if (!goo_is_prime_lucas(p, 50))
     return 0;
 
   return 1;
