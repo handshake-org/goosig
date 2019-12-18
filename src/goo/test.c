@@ -2159,6 +2159,9 @@ run_api_test(goo_prng_t *rng) {
   unsigned char *C1, *sig, *ct, *pt;
   size_t ct_len, pt_len;
   size_t C1_len, sig_len;
+  unsigned char entropy1[32];
+  unsigned char entropy2[32];
+  unsigned char entropy3[32];
   unsigned char s_prime[32];
   unsigned char msg[32];
   unsigned char exp[3] = {0x01, 0x00, 0x01};
@@ -2166,7 +2169,9 @@ run_api_test(goo_prng_t *rng) {
 
   printf("Testing API...\n");
 
-  goo_prng_generate(rng, s_prime, sizeof(s_prime));
+  goo_prng_generate(rng, entropy1, sizeof(entropy1));
+  goo_prng_generate(rng, entropy2, sizeof(entropy2));
+  goo_prng_generate(rng, entropy3, sizeof(entropy3));
   goo_prng_generate(rng, msg, sizeof(msg));
 
   goo = goo_create(GOO_RSA2048, sizeof(GOO_RSA2048), 2, 3, 4096);
@@ -2175,17 +2180,19 @@ run_api_test(goo_prng_t *rng) {
   assert(goo != NULL);
   assert(ver != NULL);
 
+  assert(goo_generate(goo, s_prime, entropy1));
+
   assert(goo_challenge(goo, &C1, &C1_len, s_prime,
                        MODULUS_4096, sizeof(MODULUS_4096)));
 
   assert(goo_encrypt(&ct, &ct_len, C1, C1_len,
                      MODULUS_4096, sizeof(MODULUS_4096),
-                     exp, sizeof(exp), NULL, 0, msg));
+                     exp, sizeof(exp), NULL, 0, entropy2));
 
   assert(goo_decrypt(&pt, &pt_len, ct, ct_len,
                      PRIME_P_2048, sizeof(PRIME_P_2048),
                      PRIME_Q_2048, sizeof(PRIME_Q_2048),
-                     exp, sizeof(exp), NULL, 0, msg));
+                     exp, sizeof(exp), NULL, 0, entropy3));
 
   assert(pt_len == C1_len);
   assert(memcmp(pt, C1, pt_len) == 0);

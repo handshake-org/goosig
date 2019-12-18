@@ -26,6 +26,11 @@ void
 goo_destroy(goo_ctx_t *ctx);
 
 int
+goo_generate(goo_ctx_t *ctx,
+             unsigned char *s_prime,
+             const unsigned char *entropy);
+
+int
 goo_challenge(goo_ctx_t *ctx,
               unsigned char **C1,
               size_t *C1_len,

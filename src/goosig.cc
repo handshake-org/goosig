@@ -43,6 +43,8 @@ Goo::Init(v8::Local<v8::Object> &target) {
   Nan::SetPrototypeMethod(tpl, "verify", Goo::Verify);
   Nan::SetPrototypeMethod(tpl, "encrypt", Goo::Encrypt);
   Nan::SetPrototypeMethod(tpl, "decrypt", Goo::Decrypt);
+
+  Nan::SetMethod(tpl, "generate", Goo::Generate);
   Nan::SetMethod(tpl, "encrypt", Goo::Encrypt);
   Nan::SetMethod(tpl, "decrypt", Goo::Decrypt);
 
@@ -99,9 +101,16 @@ NAN_METHOD(Goo::New) {
 }
 
 NAN_METHOD(Goo::Generate) {
+  unsigned char entropy[32];
   unsigned char s_prime[32];
 
-  if (!goo_random((void *)&s_prime[0], 32))
+  memset(&entropy[0], 0x00, 32);
+  memset(&s_prime[0], 0x00, 32);
+
+  if (!goo_random((void *)&entropy[0], 32))
+    return Nan::ThrowError("Could not generate s_prime.");
+
+  if (!goo_generate(NULL, &s_prime[0], &entropy[0]))
     return Nan::ThrowError("Could not generate s_prime.");
 
   info.GetReturnValue().Set(

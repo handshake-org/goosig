@@ -3380,6 +3380,30 @@ goo_destroy(goo_group_t *ctx) {
 }
 
 int
+goo_generate(goo_group_t *ctx,
+             unsigned char *s_prime,
+             const unsigned char *entropy) {
+  goo_sha256_t sha;
+
+  (void)ctx;
+
+  if (s_prime == NULL || entropy == NULL)
+    return 0;
+
+  /* Hash to mitigate any kind of backtracking */
+  /* that may be possible with the global RNG. */
+  goo_sha256_init(&sha);
+  goo_sha256_update(&sha, GOO_PRNG_GENERATE, sizeof(GOO_PRNG_GENERATE));
+  goo_sha256_update(&sha, entropy, 32);
+  goo_sha256_final(&sha, s_prime);
+
+  /* Zero the context. */
+  goo_cleanse(&sha, sizeof(goo_sha256_t));
+
+  return 1;
+}
+
+int
 goo_challenge(goo_group_t *ctx,
               unsigned char **C1,
               size_t *C1_len,
