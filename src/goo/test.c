@@ -2185,11 +2185,11 @@ run_api_test(goo_prng_t *rng) {
   assert(goo_challenge(goo, &C1, &C1_len, s_prime,
                        MODULUS_4096, sizeof(MODULUS_4096)));
 
-  assert(goo_encrypt(&ct, &ct_len, C1, C1_len,
+  assert(goo_encrypt(goo, &ct, &ct_len, C1, C1_len,
                      MODULUS_4096, sizeof(MODULUS_4096),
                      exp, sizeof(exp), NULL, 0, entropy2));
 
-  assert(goo_decrypt(&pt, &pt_len, ct, ct_len,
+  assert(goo_decrypt(goo, &pt, &pt_len, ct, ct_len,
                      PRIME_P_2048, sizeof(PRIME_P_2048),
                      PRIME_Q_2048, sizeof(PRIME_Q_2048),
                      exp, sizeof(exp), NULL, 0, entropy3));

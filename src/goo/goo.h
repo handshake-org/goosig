@@ -70,7 +70,8 @@ goo_verify(goo_ctx_t *ctx,
            size_t C1_len);
 
 int
-goo_encrypt(unsigned char **out,
+goo_encrypt(goo_ctx_t *ctx,
+            unsigned char **out,
             size_t *out_len,
             const unsigned char *msg,
             size_t msg_len,
@@ -83,7 +84,8 @@ goo_encrypt(unsigned char **out,
             const unsigned char *entropy);
 
 int
-goo_decrypt(unsigned char **out,
+goo_decrypt(goo_ctx_t *ctx,
+            unsigned char **out,
             size_t *out_len,
             const unsigned char *msg,
             size_t msg_len,

@@ -326,7 +326,7 @@ NAN_METHOD(Goo::Encrypt) {
   unsigned char *out;
   size_t out_len;
 
-  if (!goo_encrypt(&out, &out_len, msg, msg_len,
+  if (!goo_encrypt(NULL, &out, &out_len, msg, msg_len,
                    n, n_len, e, e_len, NULL, 0, &entropy[0])) {
     return Nan::ThrowError("Could create ciphertext.");
   }
@@ -379,7 +379,7 @@ NAN_METHOD(Goo::Decrypt) {
   unsigned char *out;
   size_t out_len;
 
-  if (!goo_decrypt(&out, &out_len, msg, msg_len, p, p_len,
+  if (!goo_decrypt(NULL, &out, &out_len, msg, msg_len, p, p_len,
                    q, q_len, e, e_len, NULL, 0, &entropy[0])) {
     return Nan::ThrowError("Could decrypt ciphertext.");
   }

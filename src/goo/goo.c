@@ -3576,7 +3576,8 @@ fail:
 }
 
 int
-goo_encrypt(unsigned char **out,
+goo_encrypt(goo_group_t *ctx,
+            unsigned char **out,
             size_t *out_len,
             const unsigned char *msg,
             size_t msg_len,
@@ -3589,6 +3590,8 @@ goo_encrypt(unsigned char **out,
             const unsigned char *entropy) {
   int r = 0;
   mpz_t n_n, e_n;
+
+  (void)ctx;
 
   if (out == NULL
       || out_len == NULL
@@ -3617,7 +3620,8 @@ fail:
 }
 
 int
-goo_decrypt(unsigned char **out,
+goo_decrypt(goo_group_t *ctx,
+            unsigned char **out,
             size_t *out_len,
             const unsigned char *msg,
             size_t msg_len,
@@ -3632,6 +3636,8 @@ goo_decrypt(unsigned char **out,
             const unsigned char *entropy) {
   int r = 0;
   mpz_t p_n, q_n, e_n;
+
+  (void)ctx;
 
   if (out == NULL
       || out_len == NULL
