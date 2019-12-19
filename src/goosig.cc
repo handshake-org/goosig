@@ -4,6 +4,8 @@
  * https://github.com/handshake-org/goosig
  */
 
+#include <stdlib.h>
+#include <string.h>
 #include "goosig.h"
 #include "random.h"
 
@@ -241,12 +243,9 @@ NAN_METHOD(Goo::Sign) {
   if (s_prime_len != 32)
     return Nan::ThrowRangeError("s_prime must be 32 bytes.");
 
-  if (!goo_sign(goo->ctx,
-                &sig, &sig_len,
-                msg, msg_len,
-                s_prime,
-                p, p_len,
-                q, q_len)) {
+  if (!goo_sign(goo->ctx, &sig, &sig_len,
+                msg, msg_len, s_prime,
+                p, p_len, q, q_len)) {
     return Nan::ThrowError("Could create signature.");
   }
 
@@ -284,8 +283,7 @@ NAN_METHOD(Goo::Verify) {
   const uint8_t *C1 = (const uint8_t *)node::Buffer::Data(C1_buf);
   size_t C1_len = node::Buffer::Length(C1_buf);
 
-  int result = goo_verify(goo->ctx, msg, msg_len,
-                          sig, sig_len, C1, C1_len);
+  int result = goo_verify(goo->ctx, msg, msg_len, sig, sig_len, C1, C1_len);
 
   return info.GetReturnValue().Set(Nan::New<v8::Boolean>(result));
 }
