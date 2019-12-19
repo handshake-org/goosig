@@ -12,7 +12,6 @@
     "cflags": [
       "-Wall",
       "-Wextra",
-      "-Wno-unknown-warning",
       "-O3"
     ],
     "cflags_c": [
