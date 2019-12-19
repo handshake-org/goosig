@@ -15,7 +15,7 @@
 
 #ifdef GOO_HAS_OPENSSL
 
-#include "openssl/sha.h"
+#include <openssl/sha.h>
 
 typedef SHA256_CTX goo_sha256_t;
 

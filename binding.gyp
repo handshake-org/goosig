@@ -28,20 +28,8 @@
     "include_dirs": [
       "<!(node -e \"require('nan')\")"
     ],
-    "defines": [
-      "GOO_HAS_OPENSSL"
-    ],
     "variables": {
       "conditions": [
-        ["OS=='win'", {
-          "conditions": [
-            ["target_arch=='ia32'", {
-              "openssl_root%": "C:/OpenSSL-Win32"
-            }, {
-              "openssl_root%": "C:/OpenSSL-Win64"
-            }]
-          ]
-        }],
         ["OS=='win'", {
           "with_gmp%": "false"
         }, {
@@ -50,6 +38,11 @@
       ]
     },
     "conditions": [
+      ["node_byteorder=='big'", {
+        "defines": [
+          "WORDS_BIGENDIAN"
+        ]
+      }],
       ["with_gmp=='true'", {
         "defines": [
           "GOO_HAS_GMP"
@@ -65,31 +58,10 @@
           "./src/goo/mini-gmp.c"
         ]
       }],
-      ["OS=='win'", {
-        "libraries": [
-          "-l<(openssl_root)/lib/libeay32.lib"
-        ],
-        "include_dirs": [
-          "<(openssl_root)/include"
+      ["OS!='win' and node_shared_openssl=='false'", {
+        "defines": [
+          "GOO_HAS_OPENSSL"
         ]
-      }, {
-        "include_dirs": [
-          "<(node_root_dir)/deps/openssl/openssl/include"
-        ]
-      }],
-      ["OS=='mac'", {
-        "include_dirs": [
-          "/usr/local/include"
-        ],
-        "libraries": [
-          "-L/usr/local/lib"
-        ],
-        "xcode_settings": {
-          "MACOSX_DEPLOYMENT_TARGET": "10.7",
-          "OTHER_CPLUSPLUSFLAGS": [
-            "-stdlib=libc++"
-          ]
-        }
       }]
     ]
   }]
