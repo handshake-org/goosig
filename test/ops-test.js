@@ -19,7 +19,7 @@ describe('Group Ops', function() {
   it('should open contexts', () => {
     const {n} = util.genKey(2048);
 
-    t0 = new Goo(Goo.RSA2048, 2, 3, 0);
+    t0 = new Goo(Goo.RSA2048, 2, 3);
     t1 = new Goo(Goo.RSA2048, 2, 3, 2048);
     t2 = new Goo(n, 5, 7, 2048);
   });
@@ -34,6 +34,7 @@ describe('Group Ops', function() {
     delete h0.items;
 
     assert.deepStrictEqual(g0, {
+      base: '02',
       pointsPerAdd: 7,
       addsPerShift: 4,
       shifts: 5,
@@ -44,6 +45,7 @@ describe('Group Ops', function() {
     });
 
     assert.deepStrictEqual(h0, {
+      base: '03',
       pointsPerAdd: 7,
       addsPerShift: 4,
       shifts: 5,
@@ -68,6 +70,7 @@ describe('Group Ops', function() {
     delete h1.items;
 
     assert.deepStrictEqual(g0, {
+      base: '02',
       pointsPerAdd: 8,
       addsPerShift: 2,
       shifts: 128,
@@ -78,6 +81,7 @@ describe('Group Ops', function() {
     });
 
     assert.deepStrictEqual(h0, {
+      base: '03',
       pointsPerAdd: 8,
       addsPerShift: 2,
       shifts: 128,
@@ -88,6 +92,7 @@ describe('Group Ops', function() {
     });
 
     assert.deepStrictEqual(g1, {
+      base: '02',
       pointsPerAdd: 8,
       addsPerShift: 2,
       shifts: 265,
@@ -98,6 +103,7 @@ describe('Group Ops', function() {
     });
 
     assert.deepStrictEqual(h1, {
+      base: '03',
       pointsPerAdd: 8,
       addsPerShift: 2,
       shifts: 265,

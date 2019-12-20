@@ -7,31 +7,34 @@ const {performance} = require('perf_hooks');
 const util = require('../test/util');
 const Goo = require('../');
 
-const prover = new Goo(Goo.RSA2048, 2, 3, 2048);
-const verifier = new Goo(Goo.RSA2048, 2, 3, null);
+/*
+ * Main
+ */
 
-const msg = Buffer.from('2048-bit RSA GoUO, 2048-bit Signer PK');
-const key = util.genKey(2048);
+function main(argv) {
+  const ops = (argv[2] >>> 0) || 1000;
+  const goo = new Goo(Goo.RSA2048, 2, 3, 2048);
+  const ver = new Goo(Goo.RSA2048, 2, 3);
+  const msg = Buffer.from('2048-bit RSA GoUO, 2048-bit Signer PK');
+  const key = util.genKey(2048);
+  const s_prime = goo.generate();
+  const C1 = goo.challenge(s_prime, key);
+  const sig = goo.sign(msg, s_prime, key);
+  const start = performance.now();
 
-// Generate the challenge token.
-const s_prime = prover.generate();
-const C1 = prover.challenge(s_prime, key);
+  for (let i = 0; i < ops; i++)
+    assert.strictEqual(ver.verify(msg, sig, C1), true);
 
-// Generate the proof.
-const sig = prover.sign(msg, s_prime, key);
+  const stop = performance.now();
+  const ms = stop - start;
 
-// Verify the proof.
-const result = verifier.verify(msg, sig, C1);
-
-assert.strictEqual(result, true);
-
-const start = performance.now();
-
-let i;
-
-for (i = 0; i < 1000; i++) {
-  const result = verifier.verify(msg, sig, C1);
-  assert.strictEqual(result, true);
+  console.log('ms: %d', ms);
+  console.log('ops: %d', ops);
+  console.log('ms/op: %d', ms / ops);
 }
 
-console.log('Native: %d', (performance.now() - start) / i);
+/*
+ * Execute
+ */
+
+main(process.argv);

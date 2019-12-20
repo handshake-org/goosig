@@ -7,7 +7,6 @@
 const assert = require('bsert');
 const rng = require('bcrypto/lib/random');
 const rsa = require('bcrypto/lib/rsa');
-const SHA256 = require('bcrypto/lib/sha256');
 const util = require('./util');
 const Goo = require('../');
 const verify = require('./data/verify.json');

@@ -749,7 +749,7 @@ fail:
 
 static int
 goo_mpz_sqrtpq(mpz_t ret, const mpz_t x, const mpz_t p, const mpz_t q) {
-  /* Compute x^(1 / 2) mod (p * q). */
+  /* Compute x^(1 / 2) in F(p * q). */
   int r = 0;
   mpz_t sp, sq, mp, mq, u, v;
 
@@ -760,11 +760,11 @@ goo_mpz_sqrtpq(mpz_t ret, const mpz_t x, const mpz_t p, const mpz_t q) {
   mpz_init(u);
   mpz_init(v);
 
-  /* sp = x^(1 / 2) mod p */
+  /* sp = x^(1 / 2) in F(p) */
   if (!goo_mpz_sqrtm(sp, x, p))
     goto fail;
 
-  /* sq = x^(1 / 2) mod q */
+  /* sq = x^(1 / 2) in F(q) */
   if (!goo_mpz_sqrtm(sq, x, q))
     goto fail;
 
@@ -2509,7 +2509,7 @@ goo_group_sign(goo_group_t *group,
 
     mpz_set_ui(*t, primes[i]);
 
-    /* w = t^(1 / 2) mod (p * q) */
+    /* w = t^(1 / 2) in F(p * q) */
     if (goo_mpz_sqrtpq(w, *t, p, q)) {
       found = 1;
       break;

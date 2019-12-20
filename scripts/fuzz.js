@@ -17,7 +17,7 @@ const EQ_PAD = 16;
 // const EQ_END = 1827;
 
 const goo = new Goo(Goo.RSA2048, 2, 3, 2048);
-const ver = new Goo(Goo.RSA2048, 2, 3, null);
+const ver = new Goo(Goo.RSA2048, 2, 3);
 const key = rsa.privateKeyGenerate(2048);
 const pub = rsa.publicKeyCreate(key);
 

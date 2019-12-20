@@ -20,14 +20,18 @@ const {performance} = require('perf_hooks');
 const Goo = require('../');
 const util = require('../test/util');
 
+/*
+ * Main
+ */
+
 function main(argv) {
-  const reps = (argv[2] >>> 0) || 4;
+  const ops = (argv[2] >>> 0) || 4;
   const prover42 = new Goo(Goo.AOL2, 2, 3, 2048);
   const prover44 = new Goo(Goo.AOL2, 2, 3, 4096);
-  const verifier40 = new Goo(Goo.AOL2, 2, 3, null);
+  const verifier40 = new Goo(Goo.AOL2, 2, 3);
   const prover22 = new Goo(Goo.RSA2048, 2, 3, 2048);
   const prover24 = new Goo(Goo.RSA2048, 2, 3, 4096);
-  const verifier20 = new Goo(Goo.RSA2048, 2, 3, null);
+  const verifier20 = new Goo(Goo.RSA2048, 2, 3);
 
   const tests = [
     ['4096-bit RSA GoUO, 2048-bit Signer PK', prover42, verifier40, 2048],
@@ -41,20 +45,20 @@ function main(argv) {
   for (let i = 0; i < tests.length; i++)
     times[i] = [[], [], []];
 
-  for (const [i, [name, prover, verifier, bits]] of tests.entries()) {
+  for (const [i, [name, goo, ver, bits]] of tests.entries()) {
     const msg = Buffer.from(name, 'binary');
 
     // Random signer modulus.
     const key = util.genKey(bits);
 
-    for (let j = 0; j < reps; j++) {
+    for (let j = 0; j < ops; j++) {
       let start, stop;
 
       // Generate the challenge token.
       start = performance.now();
 
-      const s_prime = prover.generate();
-      const C1 = prover.challenge(s_prime, key);
+      const s_prime = goo.generate();
+      const C1 = goo.challenge(s_prime, key);
 
       stop = performance.now();
 
@@ -63,7 +67,7 @@ function main(argv) {
       // Generate the signature.
       start = performance.now();
 
-      const sig = prover.sign(msg, s_prime, key);
+      const sig = goo.sign(msg, s_prime, key);
 
       stop = performance.now();
 
@@ -72,7 +76,7 @@ function main(argv) {
       // Verify the signature.
       start = performance.now();
 
-      assert(verifier.verify(msg, sig, C1));
+      assert.strictEqual(ver.verify(msg, sig, C1), true);
 
       stop = performance.now();
 
@@ -102,7 +106,7 @@ function main(argv) {
       for (const time of times)
         mean += time;
 
-      mean /= Math.max(1, times.length);
+      mean /= times.length;
 
       for (const time of times)
         sigma += (time - mean) ** 2;
@@ -126,5 +130,9 @@ function main(argv) {
     console.log('');
   }
 }
+
+/*
+ * Execute
+ */
 
 main(process.argv);
