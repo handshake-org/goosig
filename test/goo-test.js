@@ -4,131 +4,127 @@
 
 'use strict';
 
-const NODE_BACKEND = process.env.NODE_BACKEND || 'native';
-
 const assert = require('bsert');
 const rsa = require('bcrypto/lib/rsa');
 const SHA256 = require('bcrypto/lib/sha256');
-const testUtil = require('./util');
+const util = require('./util');
 const JS = require('../lib/js/goo');
-const Native = NODE_BACKEND === 'native' ? require('../lib/native/goo') : null;
+const Goo = require('../');
 const Signature = require('../lib/js/signature');
 const vectors = require('./data/vectors.json');
 
-function runTests(name, Goo, Other) {
-  describe(name, function() {
-    const tests = [
-      ['2048-bit RSA GoUO, 2048-bit Signer PK', Goo.AOL1, 2, 3, 2048],
-      ['2048-bit RSA GoUO, 4096-bit Signer PK', Goo.AOL1, 2, 3, 4096],
-      ['4096-bit RSA GoUO, 2048-bit Signer PK', Goo.AOL2, 2, 3, 2048],
-      ['4096-bit RSA GoUO, 4096-bit Signer PK', Goo.AOL2, 2, 3, 4096],
-      ['2048-bit RSA GoUO, 2048-bit Signer PK', Goo.RSA2048, 2, 3, 2048],
-      ['2048-bit RSA GoUO, 4096-bit Signer PK', Goo.RSA2048, 2, 3, 4096],
-      ['2048-bit RSA GoUO, 2048-bit Signer PK', Goo.RSA617, 2, 3, 2048],
-      ['2048-bit RSA GoUO, 4096-bit Signer PK', Goo.RSA617, 2, 3, 4096]
-    ];
+describe('Goo', function() {
+  const tests = [
+    ['2048-bit RSA GoUO, 2048-bit Signer PK', Goo.AOL1, 2, 3, 2048],
+    ['2048-bit RSA GoUO, 4096-bit Signer PK', Goo.AOL1, 2, 3, 4096],
+    ['4096-bit RSA GoUO, 2048-bit Signer PK', Goo.AOL2, 2, 3, 2048],
+    ['4096-bit RSA GoUO, 4096-bit Signer PK', Goo.AOL2, 2, 3, 4096],
+    ['2048-bit RSA GoUO, 2048-bit Signer PK', Goo.RSA2048, 2, 3, 2048],
+    ['2048-bit RSA GoUO, 4096-bit Signer PK', Goo.RSA2048, 2, 3, 4096],
+    ['2048-bit RSA GoUO, 2048-bit Signer PK', Goo.RSA617, 2, 3, 2048],
+    ['2048-bit RSA GoUO, 4096-bit Signer PK', Goo.RSA617, 2, 3, 4096]
+  ];
 
-    const sigs = [];
+  const sigs = [];
 
-    for (const [name, n, g, h, bits] of tests) {
-      it(`should sign and verify msg: "${name}"`, () => {
-        const prover = new Goo(n, g, h, bits);
-        const verifier = new Goo(n, g, h, null);
+  for (const [name, n, g, h, bits] of tests) {
+    it(`should sign and verify msg: "${name}"`, () => {
+      const prover = new Goo(n, g, h, bits);
+      const verifier = new Goo(n, g, h, null);
 
-        const msg = SHA256.digest(Buffer.from(name, 'binary'));
+      const msg = SHA256.digest(Buffer.from(name, 'binary'));
 
-        // Random signer modulus.
-        const key = testUtil.genKey(bits);
+      // Random signer modulus.
+      const key = util.genKey(bits);
 
-        // Generate the challenge token.
-        const s_prime = prover.generate();
+      // Generate the challenge token.
+      const s_prime = prover.generate();
 
-        assert.notBufferEqual(s_prime, Buffer.alloc(32, 0x00));
+      assert.notBufferEqual(s_prime, Buffer.alloc(32, 0x00));
 
-        const C1 = prover.challenge(s_prime, key);
+      const C1 = prover.challenge(s_prime, key);
 
-        // Encrypt to the recipient.
-        const ct = prover.encrypt(s_prime, key);
+      // Encrypt to the recipient.
+      const ct = prover.encrypt(s_prime, key);
 
-        // Recipient decrypts.
-        const pt = prover.decrypt(ct, key);
+      // Recipient decrypts.
+      const pt = prover.decrypt(ct, key);
 
-        assert.bufferEqual(pt, s_prime);
+      assert.bufferEqual(pt, s_prime);
 
-        assert(prover.validate(s_prime, C1, key));
+      assert(prover.validate(s_prime, C1, key));
 
-        // Generate the proof.
-        const sig = prover.sign(msg, s_prime, key);
+      // Generate the proof.
+      const sig = prover.sign(msg, s_prime, key);
 
-        sigs.push([n, g, h, msg, sig, C1]);
+      sigs.push([n, g, h, msg, sig, C1]);
 
-        // Verify the proof.
-        const result = verifier.verify(msg, sig, C1);
+      // Verify the proof.
+      const result = verifier.verify(msg, sig, C1);
 
-        assert.strictEqual(result, true);
-      });
-    }
+      assert.strictEqual(result, true);
+    });
+  }
 
-    if (Other) {
-      it('should verify with opposite implementation', () => {
-        for (const [n, g, h, msg, sig, C1] of sigs) {
-          const goo = new Other(n, g, h, null);
-          const result = goo.verify(msg, sig, C1);
-          assert.strictEqual(result, true);
-        }
-      });
-    }
-
-    for (const vector of vectors) {
-      const name = vector.group;
-      const group = Goo[vector.group];
-      const groupBits = vector.groupBits;
-      const g = vector.g;
-      const h = vector.h;
-      const bits = vector.bits;
-      const key = rsa.privateKeyImportJWK(vector.key);
-      const msg = Buffer.from(vector.msg, 'hex');
-      const s_prime = Buffer.from(vector.s_prime, 'hex');
-      const C1 = Buffer.from(vector.C1, 'hex');
-      const ct = Buffer.from(vector.ct, 'hex');
-      const sig = Signature.fromJSON(vector.sig).encode(groupBits);
-      const str = `${groupBits}-bit RSA GoUO, ${bits}-bit Signer PK (${name})`;
-
-      it(`should verify vector: ${str}`, () => {
-        const goo = new Goo(group, g, h, null);
+  if (Goo.native) {
+    it('should verify with opposite implementation', () => {
+      for (const [n, g, h, msg, sig, C1] of sigs) {
+        const goo = new JS(n, g, h, null);
         const result = goo.verify(msg, sig, C1);
 
         assert.strictEqual(result, true);
+      }
+    });
+  }
 
-        const pt = goo.decrypt(ct, key);
+  for (const vector of vectors) {
+    const name = vector.group;
+    const group = Goo[vector.group];
+    const groupBits = vector.groupBits;
+    const g = vector.g;
+    const h = vector.h;
+    const bits = vector.bits;
+    const key = rsa.privateKeyImportJWK(vector.key);
+    const msg = Buffer.from(vector.msg, 'hex');
+    const s_prime = Buffer.from(vector.s_prime, 'hex');
+    const C1 = Buffer.from(vector.C1, 'hex');
+    const ct = Buffer.from(vector.ct, 'hex');
+    const sig = Signature.fromJSON(vector.sig).encode(groupBits);
+    const str = `${groupBits}-bit RSA GoUO, ${bits}-bit Signer PK (${name})`;
 
-        assert.bufferEqual(pt, s_prime);
-      });
+    it(`should verify vector: ${str}`, () => {
+      const goo = new Goo(group, g, h, null);
+      const result = goo.verify(msg, sig, C1);
 
-      it(`should not accept invalid proof: ${str}`, () => {
-        const goo = new Goo(group, g, h, null);
-        const sig2 = Buffer.from(sig);
-        const C12 = Buffer.from(C1);
-        const i = (Math.random() * sig2.length) | 0;
-        const j = (Math.random() * C12.length) | 0;
+      assert.strictEqual(result, true);
 
-        sig2[i] ^= 1;
-        const res1 = goo.verify(msg, sig2, C12);
-        sig2[i] ^= 1;
+      const pt = goo.decrypt(ct, key);
 
-        assert.strictEqual(res1, false);
+      assert.bufferEqual(pt, s_prime);
+    });
 
-        C12[j] ^= 1;
-        const res2 = goo.verify(msg, sig2, C12);
-        C12[j] ^= 1;
+    it(`should not accept invalid proof: ${str}`, () => {
+      const goo = new Goo(group, g, h, null);
+      const sig2 = Buffer.from(sig);
+      const C12 = Buffer.from(C1);
+      const i = (Math.random() * sig2.length) | 0;
+      const j = (Math.random() * C12.length) | 0;
 
-        assert.strictEqual(res2, false);
-      });
-    }
-  });
-}
+      sig2[i] ^= 1;
 
-if (Native)
-  runTests('Goo (Native)', Native, JS);
-else
-  runTests('Goo', JS, Native);
+      const res1 = goo.verify(msg, sig2, C12);
+
+      sig2[i] ^= 1;
+
+      assert.strictEqual(res1, false);
+
+      C12[j] ^= 1;
+
+      const res2 = goo.verify(msg, sig2, C12);
+
+      C12[j] ^= 1;
+
+      assert.strictEqual(res2, false);
+    });
+  }
+});

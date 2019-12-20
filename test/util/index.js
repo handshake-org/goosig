@@ -14,328 +14,16 @@
 'use strict';
 
 const assert = require('bsert');
-const rsa = require('bcrypto/lib/rsa');
 const BN = require('bcrypto/lib/bn.js');
-const primes = require('../../lib/js/primes');
-
-const testUtil = {
-  log(...args) {
-    console.log(...args);
-  },
-
-  write(str) {
-    process.stdout.write(str);
-  },
-
-  flush() {
-    ;
-  },
-
-  showOneResult(name, fails, reps) {
-    const istr = [' \u2717 ', ' \u2713 '];
-
-    if (fails == null) {
-      this.log('\x1b[92m%sPASS\x1b[0m: %s', istr[1], name);
-    } else if (fails > 0) {
-      this.log('\x1b[91m%sFAIL\x1b[0m: %s (%d/%d failed)',
-               istr[0], name, fails, reps);
-    } else {
-      this.log('\x1b[92m%sPASS\x1b[0m: %s', istr[1], name);
-    }
-  },
-
-  showTest(name, just = 32) {
-    this.write(`\x1b[38;5;33m${name}\x1b[0m: `);
-    this.flush();
-  },
-
-  showWarning(warn) {
-    this.write(`\x1b[91mWARNING\x1b[0m: ${warn}\n`);
-  },
-
-  showProgress(failed) {
-    if (failed)
-      this.write('\x1b[91m.\x1b[0m');
-    else
-      this.write('\x1b[92m.\x1b[0m');
-
-    this.flush();
-  },
-
-  showTiming(tname, tvals, just = 32) {
-    const mean = sum(tvals) / tvals.length;
-    const sampDev = total(tvals, mean);
-
-    this.write(`\x1b[92m \u25f7 ${tname}\x1b[0m: `);
-
-    this.log('%s ms, \u03c3=%s ms, max=%s ms, min=%s ms',
-             mean.toFixed(2),
-             sampDev.toFixed(2),
-             max(tvals).toFixed(2),
-             min(tvals).toFixed(2));
-  },
-
-  showTimingTriple(tname, pvvals) {
-    const [gvals, pvals, vvals] = pvvals;
-
-    this.showTest(`Timings for ${tname}`, 0);
-    this.write('\n');
-    this.showTiming('Generation', gvals, 36);
-    this.showTiming('Signing', pvals, 36);
-    this.showTiming('Verifying', vvals, 36);
-    this.write('\n');
-    this.flush();
-  },
-
-  runTest(callback, doc, reps) {
-    const ndisp = Math.max(1, reps >>> 6);
-    const parts = doc.split(',');
-    const [testName, failNames] = [parts[0], parts.slice(1)];
-
-    this.showTest(testName);
-
-    const fails = [];
-
-    for (let i = 0; i < failNames.length; i++)
-      fails.push(0);
-
-    let failed = false;
-
-    for (let idx = 0; idx < reps; idx++) {
-      const checks = callback();
-
-      let cidx = 0;
-      let c;
-
-      for ([cidx, c] of checks.entries()) {
-        if (!c) {
-          failed = true;
-          fails[cidx] += 1;
-        }
-      }
-
-      assert(cidx + 1 === fails.length);
-
-      if (idx % ndisp === ndisp - 1) {
-        this.showProgress(failed);
-        failed = false;
-      }
-    }
-
-    this.write('\n');
-
-    if (sum(fails) === 0) {
-      this.showOneResult(`all ${testName} subtests passed (${fails.length})`,
-                           null, null);
-    } else {
-      for (const [nf, nn] of this.zip(fails, failNames))
-        this.showOneResult(`${testName}_${nn}`, nf, reps);
-    }
-
-    return [sum(fails.map(x => x > 0 ? 1 : 0)), fails.length];
-  },
-
-  runAllTests(reps, modname, tests) {
-    this.showTest(`${modname} tests`, 0);
-    this.write('\n');
-
-    let fails = 0;
-    let subtests = 0;
-
-    for (const [test, doc] of tests) {
-      const [f, s] = this.runTest(test, doc, reps);
-      fails += f;
-      subtests += s;
-    }
-
-    this.showTest('Summary', 0);
-    this.write('\n');
-
-    if (fails === 0)
-      this.showOneResult(`all ${subtests} subtests passed`, null, null);
-    else
-      this.showOneResult('some subtests did not pass', fails, subtests);
-
-    this.write('\n');
-  },
-
-  sample(pop, k) {
-    assert(Array.isArray(pop));
-    assert((k >>> 0) === k);
-    assert(k <= pop.length);
-
-    const out = [];
-    const set = new Set();
-
-    while (out.length < k) {
-      const i = ((Math.random() * 0x100000000) >>> 0) % pop.length;
-
-      if (set.has(i))
-        continue;
-
-      out.push(pop[i]);
-      set.add(i);
-    }
-
-    return out;
-  },
-
-  iterator(iterable) {
-    assert(iterable);
-
-    if (typeof iterable === 'function') {
-      const iter = iterable();
-      assert(typeof iter.next === 'function');
-      return iter;
-    }
-
-    if (typeof iterable.next !== 'function') {
-      assert(typeof iterable[Symbol.iterator] === 'function');
-      return iterable[Symbol.iterator]();
-    }
-
-    return iterable;
-  },
-
-  next(iterable, def) {
-    const iter = this.iterator(iterable);
-    const it = iter.next();
-
-    if (iter.done) {
-      if (def !== undefined)
-        return def;
-      throw new Error('Iterator is done.');
-    }
-
-    return it.value;
-  },
-
-  *enumerate(iterable) {
-    const iter = this.iterator(iterable);
-
-    let i = 0;
-
-    for (const item of iter) {
-      yield [i, item];
-      i += 1;
-    }
-  },
-
-  list(iterable) {
-    const iter = this.iterator(iterable);
-
-    const items = [];
-
-    for (const item of iter)
-      items.push(item);
-
-    return items;
-  },
-
-  *cycle(iterable) {
-    const iter = this.iterator(iterable);
-    const saved = [];
-
-    for (const item of iter) {
-      yield item;
-      saved.push(item);
-    }
-
-    while (saved.length) {
-      for (const item of saved)
-        yield item;
-    }
-  },
-
-  *chain(...args) {
-    for (const iter of args) {
-      for (const item of iter)
-        yield item;
-    }
-  },
-
-  *zip(...args) {
-    const iters = [];
-
-    for (const iterable of args)
-      iters.push(this.iterator(iterable));
-
-    while (iters.length) {
-      const result = [];
-
-      for (const iter of iters) {
-        const it = iter.next();
-
-        if (it.done)
-          return;
-
-        result.push(it.value);
-      }
-
-      yield result;
-    }
-  },
-
-  rsaExponent(pRaw, qRaw) {
-    // Find a decryption exponent.
-    const p = BN.decode(pRaw);
-    const q = BN.decode(qRaw);
-    const n = p.mul(q);
-    const p1 = p.subn(1);
-    const q1 = q.subn(1);
-    const lam = p1.mul(q1).div(p1.gcd(q1));
-
-    for (const p of primes.testPrimes.slice(1)) {
-      if (p > 1000)
-        throw new Error('Could find a suitable exponent!');
-
-      const e = new BN(p);
-
-      let d;
-      try {
-        d = e.invert(lam);
-      } catch (e) {
-        continue;
-      }
-
-      return [
-        n.encode(),
-        e.encode(),
-        d.encode()
-      ];
-    }
-
-    throw new Error('Unreachable.');
-  },
-
-  rsaKey(p, q) {
-    const [n, e, d] = this.rsaExponent(p, q);
-    const key = new rsa.RSAPrivateKey(n, e, d, p, q);
-
-    rsa.privateKeyCompute(key);
-
-    return key;
-  },
-
-  genKey(bits) {
-    assert((bits >>> 0) === bits);
-    assert(bits === 2048 || bits === 4096);
-
-    const primes = bits === 2048
-      ? this.primes1024
-      : this.primes2048;
-
-    const [p, q] = this.sample(primes, 2);
-
-    return this.rsaKey(p, q);
-  },
-
-  primes1024: null,
-  primes2048: null
-};
-
-// Some random primes for testing (saves time vs generating on the fly).
-testUtil.primes1024 = [
+const rng = require('bcrypto/lib/random');
+const rsa = require('bcrypto/lib/rsa');
+const {smallPrimes} = require('../../lib/js/primes');
+
+/*
+ * Primes (1024 bit)
+ */
+
+const primes1024 = [
   Buffer.from(''
     + '50231a89e29c993030482ae715f6ee967460d356b797a85771f5df8d'
     + 'b434bdcda3b6b2e15dc4827b85e75451a145a622735417c7b082a2b7'
@@ -449,7 +137,11 @@ testUtil.primes1024 = [
     + '80f4422c2a2d8c0b67b2f160a1495573', 'hex')
 ];
 
-testUtil.primes2048 = [
+/*
+ * Primes (2048 bit)
+ */
+
+const primes2048 = [
   Buffer.from(''
     + 'ccbf79ad1f5e47086062274ea9815042fd938149a5557c8cb3b0c33d'
     + 'dcd87c58a53760826a99d196852460762e16a715e40bee5847324aa1'
@@ -643,48 +335,64 @@ testUtil.primes2048 = [
     + '8eb33883', 'hex')
 ];
 
-function sum(iter) {
-  let ret = 0;
-  for (const n of iter)
-    ret += n;
-  return ret;
-}
+/*
+ * RSA Key Generation
+ */
 
-function min(iter) {
-  let ret = -1;
+function genKey(bits) {
+  assert((bits >>> 0) === bits);
+  assert(bits === 2048 || bits === 4096);
 
-  for (const n of iter) {
-    if (ret === -1 || n < ret)
-      ret = n;
+  const primes = [primes1024, primes2048][bits >>> 12];
+
+  for (;;) {
+    const i = rng.randomRange(0, primes.length);
+    const j = rng.randomRange(0, primes.length);
+
+    if (i === j)
+      continue;
+
+    const p = BN.decode(primes[i]);
+    const q = BN.decode(primes[j]);
+    const n = p.mul(q);
+    const pm1 = p.subn(1);
+    const qm1 = q.subn(1);
+    const phi = pm1.mul(qm1);
+
+    let e = null;
+    let d = null;
+
+    for (let i = 1; i < smallPrimes.length; i++) {
+      try {
+        e = new BN(smallPrimes[i]);
+        d = e.invert(phi);
+      } catch (e) {
+        continue;
+      }
+      break;
+    }
+
+    if (e == null || d == null)
+      throw new Error('Could not find a suitable exponent!');
+
+    const key = new rsa.RSAPrivateKey(
+      n.encode(),
+      e.encode(),
+      d.encode(),
+      p.encode(),
+      q.encode()
+    );
+
+    rsa.privateKeyCompute(key);
+
+    return key;
   }
-
-  if (ret === -1)
-    ret = 0;
-
-  return ret;
 }
 
-function max(iter) {
-  let ret = -1;
+/*
+ * Expose
+ */
 
-  for (const n of iter) {
-    if (ret === -1 || n > ret)
-      ret = n;
-  }
-
-  if (ret === -1)
-    ret = 0;
-
-  return ret;
-}
-
-function total(tvals, mean) {
-  let sum = 0;
-
-  for (const tval of tvals)
-    sum += (tval - mean) ** 2;
-
-  return Math.sqrt(sum / Math.max(1, tvals.length - 1));
-}
-
-module.exports = testUtil;
+exports.primes1024 = primes1024;
+exports.primes2048 = primes2048;
+exports.genKey = genKey;

@@ -5,7 +5,7 @@
 const assert = require('bsert');
 const rsa = require('bcrypto/lib/rsa');
 const rng = require('bcrypto/lib/random');
-const Goo = require('../lib/goo');
+const Goo = require('../');
 const Signature = require('../lib/js/signature');
 
 const SIG_LENGTH = new Signature().encode(2048).length; // 1964

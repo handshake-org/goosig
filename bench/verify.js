@@ -4,15 +4,14 @@
 
 const assert = require('bsert');
 const {performance} = require('perf_hooks');
-const testUtil = require('../test/util');
-const Goo = require('../lib/native/goo');
+const util = require('../test/util');
+const Goo = require('../');
 
 const prover = new Goo(Goo.RSA2048, 2, 3, 2048);
 const verifier = new Goo(Goo.RSA2048, 2, 3, null);
 
 const msg = Buffer.from('2048-bit RSA GoUO, 2048-bit Signer PK');
-const [p, q] = testUtil.sample(testUtil.primes1024, 2);
-const key = testUtil.rsaKey(p, q);
+const key = util.genKey(2048);
 
 // Generate the challenge token.
 const s_prime = prover.generate();

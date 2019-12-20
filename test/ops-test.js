@@ -5,7 +5,7 @@
 'use strict';
 
 const assert = require('bsert');
-const testUtil = require('./util');
+const util = require('./util');
 const BN = require('bcrypto/lib/bn.js');
 const rng = require('bcrypto/lib/random');
 const constants = require('../lib/internal/constants');
@@ -17,7 +17,7 @@ describe('Group Ops', function() {
   let t2 = null;
 
   it('should open contexts', () => {
-    const {n} = testUtil.genKey(2048);
+    const {n} = util.genKey(2048);
 
     t0 = new Goo(Goo.RSA2048, 2, 3, 0);
     t1 = new Goo(Goo.RSA2048, 2, 3, 2048);

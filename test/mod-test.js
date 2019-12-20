@@ -6,7 +6,7 @@
 const assert = require('bsert');
 const BN = require('bcrypto/lib/bn.js');
 const SHA256 = require('bcrypto/lib/sha256');
-const Goo = require('../lib/goo');
+const Goo = require('../');
 
 const hashes = {
   AOL1: '7bd082427ff18b35c8e2cdb2b848d9c139877a273663d1eeea1d2a3d72b01140',
