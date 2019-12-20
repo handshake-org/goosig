@@ -1,3 +1,9 @@
+/*!
+ * bench/verify.js - GoUO benchmarks for javascript
+ * Copyright (c) 2018-2019, Christopher Jeffrey (MIT License).
+ * https://github.com/handshake-org/goosig
+ */
+
 /* eslint camelcase: "off" */
 
 'use strict';
