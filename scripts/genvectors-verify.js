@@ -18,6 +18,7 @@ const json = [
   msg.toString('hex'),
   sig.toString('hex'),
   C1.toString('hex'),
+  true,
   'valid'
 ];
 

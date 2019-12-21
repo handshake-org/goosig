@@ -64,10 +64,11 @@ describe('Goo', function() {
       const msg = Buffer.from(item[0], 'hex');
       const sig = Buffer.from(item[1], 'hex');
       const C1 = Buffer.from(item[2], 'hex');
-      const comment = item[3];
+      const result = item[3];
+      const comment = item[4];
 
       it(`should verify vector #${i + 1} (${comment})`, () => {
-        assert.strictEqual(goo.verify(msg, sig, C1), comment === 'valid');
+        assert.strictEqual(goo.verify(msg, sig, C1), result);
       });
     }
   });

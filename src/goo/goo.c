@@ -2864,7 +2864,7 @@ goo_group_verify(goo_group_t *group,
     goto fail;
 
   /* `ell` must be in range. */
-  if (goo_mpz_bitlen(*ell) > GOO_ELL_BITS)
+  if (mpz_sgn(*ell) == 0 || goo_mpz_bitlen(*ell) > GOO_ELL_BITS)
     goto fail;
 
   /* All group elements must be the canonical */
