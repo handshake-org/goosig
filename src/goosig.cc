@@ -79,17 +79,16 @@ NAN_METHOD(Goo::New) {
   size_t n_len = node::Buffer::Length(n_buf);
   unsigned long g = (unsigned long)Nan::To<int64_t>(info[1]).FromJust();
   unsigned long h = (unsigned long)Nan::To<int64_t>(info[2]).FromJust();
-
-  unsigned long modbits = 0;
+  unsigned long bits = 0;
 
   if (info.Length() > 3 && !IsNull(info[3])) {
     if (!info[3]->IsNumber())
       return Nan::ThrowTypeError("Fourth argument must be a number.");
 
-    modbits = (unsigned long)Nan::To<int64_t>(info[3]).FromJust();
+    bits = (unsigned long)Nan::To<int64_t>(info[3]).FromJust();
   }
 
-  goo_ctx_t *ctx = goo_create(n, n_len, g, h, modbits);
+  goo_ctx_t *ctx = goo_create(n, n_len, g, h, bits);
 
   if (ctx == NULL)
     return Nan::ThrowError("Could not create context.");

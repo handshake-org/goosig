@@ -20,7 +20,7 @@ goo_create(const unsigned char *n,
            size_t n_len,
            unsigned long g,
            unsigned long h,
-           unsigned long modbits);
+           unsigned long bits);
 
 void
 goo_destroy(goo_ctx_t *ctx);
