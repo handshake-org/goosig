@@ -394,7 +394,7 @@ goo_prng_seed(goo_prng_t *prng,
   memcpy(&entropy[0], iv, 32);
   memcpy(&entropy[32], key, 32);
 
-  goo_drbg_init(&prng->ctx, entropy, 64);
+  goo_drbg_init(&prng->ctx, entropy, sizeof(entropy));
 
   mpz_set_ui(prng->save, 0);
   prng->total = 0;
@@ -1217,10 +1217,10 @@ goo_sig_size(const goo_sig_t *sig, size_t bits) {
     return 0;                           \
                                         \
   pad = (size) - bytes;                 \
-  memset(&out[pos], 0x00, pad);         \
+  memset(out + pos, 0x00, pad);         \
   pos += pad;                           \
                                         \
-  goo_mpz_export(&out[pos], NULL, (n)); \
+  goo_mpz_export(out + pos, NULL, (n)); \
   pos += bytes;                         \
 } while (0)
 
@@ -1260,7 +1260,7 @@ goo_sig_export(unsigned char *out, const goo_sig_t *sig, size_t bits) {
 #undef goo_write_int
 
 #define goo_read_int(n, size) do {         \
-  goo_mpz_import((n), &data[pos], (size)); \
+  goo_mpz_import((n), data + pos, (size)); \
   pos += (size);                           \
 } while (0)                                \
 
