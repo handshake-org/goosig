@@ -735,15 +735,15 @@ goo_mpz_sqrtm(mpz_t ret, const mpz_t num, const mpz_t p) {
 succeed:
   r = 1;
 fail:
-  mpz_clear(x);
-  mpz_clear(e);
-  mpz_clear(t);
-  mpz_clear(a);
-  mpz_clear(s);
-  mpz_clear(n);
-  mpz_clear(y);
-  mpz_clear(b);
-  mpz_clear(g);
+  goo_mpz_clear(x);
+  goo_mpz_clear(e);
+  goo_mpz_clear(t);
+  goo_mpz_clear(a);
+  goo_mpz_clear(s);
+  goo_mpz_clear(n);
+  goo_mpz_clear(y);
+  goo_mpz_clear(b);
+  goo_mpz_clear(g);
   return r;
 }
 
@@ -790,12 +790,12 @@ goo_mpz_sqrtpq(mpz_t ret, const mpz_t x, const mpz_t p, const mpz_t q) {
 
   r = 1;
 fail:
-  mpz_clear(sp);
-  mpz_clear(sq);
-  mpz_clear(mp);
-  mpz_clear(mq);
-  mpz_clear(u);
-  mpz_clear(v);
+  goo_mpz_clear(sp);
+  goo_mpz_clear(sq);
+  goo_mpz_clear(mp);
+  goo_mpz_clear(mq);
+  goo_mpz_clear(u);
+  goo_mpz_clear(v);
   return r;
 }
 
@@ -1550,6 +1550,14 @@ goo_comb_uninit(goo_comb_t *comb) {
   comb->wins = NULL;
 }
 
+static void
+goo_comb_cleanse(goo_comb_t *comb) {
+  unsigned long i;
+
+  for (i = 0; i < comb->shifts; i++)
+    goo_cleanse(comb->wins[i], comb->adds_per_shift * sizeof(unsigned long));
+}
+
 static int
 goo_comb_recode(goo_comb_t *comb, const mpz_t e) {
   unsigned long len = goo_mpz_bitlen(e);
@@ -1706,6 +1714,29 @@ goo_group_uninit(goo_group_t *group) {
   }
 
   group->combs_len = 0;
+}
+
+static void
+goo_group_cleanse(goo_group_t *group) {
+  size_t i;
+
+  for (i = 0; i < GOO_TABLEN; i++) {
+    goo_mpz_cleanse(group->table_p1[i]);
+    goo_mpz_cleanse(group->table_n1[i]);
+    goo_mpz_cleanse(group->table_p2[i]);
+    goo_mpz_cleanse(group->table_n2[i]);
+  }
+
+  goo_cleanse(group->wnaf0, sizeof(group->wnaf0));
+  goo_cleanse(group->wnaf1, sizeof(group->wnaf1));
+  goo_cleanse(group->wnaf2, sizeof(group->wnaf2));
+
+  for (i = 0; i < group->combs_len; i++) {
+    goo_comb_cleanse(&group->combs[i].g);
+    goo_comb_cleanse(&group->combs[i].h);
+  }
+
+  goo_cleanse(group->slab, sizeof(group->slab));
 }
 
 static void
@@ -2407,6 +2438,7 @@ fail:
   goo_mpz_clear(n);
   goo_mpz_clear(s);
   goo_mpz_clear(x);
+  goo_group_cleanse(group);
   return r;
 }
 
@@ -2773,6 +2805,7 @@ fail:
   goo_cleanse(&primes[0], sizeof(primes));
   goo_cleanse(&i, sizeof(i));
   goo_cleanse(&key[0], sizeof(key));
+  goo_group_cleanse(group);
   return r;
 }
 
