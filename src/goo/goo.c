@@ -1745,6 +1745,9 @@ goo_group_reduce(goo_group_t *group, mpz_t ret, const mpz_t b) {
   if (mpz_cmp(b, group->nh) > 0) {
     /* ret = n - b */
     mpz_sub(ret, group->n, b);
+  } else {
+    /* ret = b */
+    mpz_set(ret, b);
   }
 }
 
@@ -1784,7 +1787,7 @@ goo_group_inv2(goo_group_t *group,
   mpz_ptr b12i = r2;
 
   /* b12i = (b1 * b2)^-1 mod n */
-  mpz_mul(b12i, b1, b2);
+  goo_group_mul(group, b12i, b1, b2);
 
   if (!goo_group_inv(group, b12i, b12i))
     goto fail;
