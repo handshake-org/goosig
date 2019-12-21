@@ -21,15 +21,11 @@ goo_drbg_update(goo_drbg_t *drbg, const unsigned char *seed, size_t seed_len);
 
 void
 goo_drbg_init(goo_drbg_t *drbg, const unsigned char *seed, size_t seed_len) {
-  size_t i;
-
   assert(seed != NULL);
   assert(seed_len >= 24);
 
-  for (i = 0; i < GOO_SHA256_HASH_SIZE; i++) {
-    drbg->K[i] = 0x00;
-    drbg->V[i] = 0x01;
-  }
+  memset(&drbg->K[0], 0x00, GOO_SHA256_HASH_SIZE);
+  memset(&drbg->V[0], 0x01, GOO_SHA256_HASH_SIZE);
 
   goo_drbg_update(drbg, seed, seed_len);
 }

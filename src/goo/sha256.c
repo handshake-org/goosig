@@ -101,7 +101,7 @@ goo_sha256_transform(goo_sha256_t *ctx, const unsigned char *chunk) {
   uint32_t g = ctx->state[6];
   uint32_t h = ctx->state[7];
   uint32_t t1, t2;
-  int i = 0;
+  size_t i = 0;
 
 #define Sigma0(x) \
   ((x >> 2 | x << 30) ^ (x >> 13 | x << 19) ^ (x >> 22 | x << 10))
@@ -193,20 +193,18 @@ goo_sha256_final(goo_sha256_t *ctx, unsigned char *out) {
   size_t pos = ctx->size & 63;
   uint64_t len = ctx->size << 3;
   unsigned char D[8];
-  int i;
+  size_t i;
 
   write64(&D[0], len);
 
   goo_sha256_update(ctx, &P[0], 1 + ((119 - pos) & 63));
   goo_sha256_update(ctx, &D[0], 8);
 
-  for (i = 0; i < 8; i++) {
+  for (i = 0; i < 8; i++)
     write32(out + i * 4, ctx->state[i]);
-    ctx->state[i] = 0;
-  }
 
-  for (i = 0; i < 64; i++)
-    ctx->block[i] = 0;
+  memset(&ctx->state[0], 0x00, sizeof(ctx->state));
+  memset(&ctx->block[0], 0x00, sizeof(ctx->block));
 
   ctx->size = 0;
 }
