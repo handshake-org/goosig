@@ -422,15 +422,15 @@ goo_prng_seed_sign(goo_prng_t *prng,
 
   goo_sha256_update(&ctx, s_prime, 32);
   goo_sha256_update(&ctx, msg, msg_len);
-  goo_sha256_final(&ctx, &key[0]);
+  goo_sha256_final(&ctx, key);
 
-  goo_prng_seed(prng, &key[0], GOO_PRNG_SIGN);
+  goo_prng_seed(prng, key, GOO_PRNG_SIGN);
 
   r = 1;
 fail:
   goo_cleanse(slab, GOO_MAX_RSA_BYTES);
   goo_cleanse(&ctx, sizeof(goo_sha256_t));
-  goo_cleanse(&key[0], sizeof(key));
+  goo_cleanse(key, sizeof(key));
   return r;
 }
 
@@ -453,8 +453,8 @@ goo_prng_random_bits(goo_prng_t *prng, mpz_t ret, unsigned long bits) {
     mpz_mul_2exp(ret, ret, sizeof(out) * 8);
 
     /* tmp = random 256 bit integer */
-    goo_prng_generate(prng, &out[0], sizeof(out));
-    goo_mpz_import(prng->tmp, &out[0], sizeof(out));
+    goo_prng_generate(prng, out, sizeof(out));
+    goo_mpz_import(prng->tmp, out, sizeof(out));
 
     /* ret = ret | tmp */
     mpz_ior(ret, ret, prng->tmp);
@@ -506,13 +506,12 @@ goo_prng_random_num(goo_prng_t *prng, unsigned long mod) {
 
   /* http://www.pcg-random.org/posts/bounded-rands.html */
   do {
-    goo_prng_generate(prng, &raw[0], sizeof(raw));
+    goo_prng_generate(prng, raw, sizeof(raw));
 
-    x = 0;
-    x |= ((uint32_t)raw[0]) << 24;
-    x |= ((uint32_t)raw[1]) << 16;
-    x |= ((uint32_t)raw[2]) << 8;
-    x |= ((uint32_t)raw[3]) << 0;
+    x = ((uint32_t)raw[0] << 24)
+      | ((uint32_t)raw[1] << 16)
+      | ((uint32_t)raw[2] << 8)
+      | ((uint32_t)raw[3] << 0);
 
     r = x % max;
   } while (x - r > (-max));
@@ -2226,10 +2225,9 @@ goo_group_hash(goo_group_t *group,
                const mpz_t E,
                const unsigned char *msg,
                size_t msg_len) {
-  unsigned char *slab = &group->slab[0];
+  unsigned char *slab = group->slab;
   size_t GOO_MOD_BYTES = group->size;
-  size_t GOO_INT_BYTES = 4;
-  unsigned char sign[4] = {0, 0, 0, 0};
+  unsigned char sign[GOO_INT_BYTES] = {0, 0, 0, 0};
   goo_sha256_t ctx;
 
   VERIFY_POS(C1);
@@ -2259,7 +2257,7 @@ goo_group_hash(goo_group_t *group,
 
   sign[3] = mpz_sgn(E) < 0 ? 1 : 0;
 
-  goo_sha256_update(&ctx, &sign[0], GOO_INT_BYTES);
+  goo_sha256_update(&ctx, sign, GOO_INT_BYTES);
   goo_sha256_update(&ctx, msg, msg_len);
   goo_sha256_final(&ctx, out);
 
@@ -2534,7 +2532,7 @@ goo_group_sign(goo_group_t *group,
   /* Find a small quadratic residue prime `t`. */
   found = 0;
 
-  memcpy(&primes[0], &goo_primes[0], sizeof(goo_primes));
+  memcpy(primes, goo_primes, sizeof(goo_primes));
 
   for (i = 0; i < GOO_PRIMES_LEN; i++) {
     /* Fisher-Yates shuffle to choose random `t`. */
@@ -2664,7 +2662,7 @@ goo_group_sign(goo_group_t *group,
     goo_group_reduce(group, A, A);
 
     if (!goo_group_derive(group,
-                          *chal, *ell, &key[0], C1, *C2, *C3,
+                          *chal, *ell, key, C1, *C2, *C3,
                           *t, A, B, C, D, E, msg, msg_len)) {
       goto fail;
     }
@@ -2805,9 +2803,9 @@ fail:
   goo_mpz_clear(D);
   goo_mpz_clear(E);
   goo_cleanse(&prng, sizeof(goo_prng_t));
-  goo_cleanse(&primes[0], sizeof(primes));
+  goo_cleanse(primes, sizeof(primes));
   goo_cleanse(&i, sizeof(i));
-  goo_cleanse(&key[0], sizeof(key));
+  goo_cleanse(key, sizeof(key));
   goo_group_cleanse(group);
   return r;
 }
@@ -2973,7 +2971,7 @@ goo_group_verify(goo_group_t *group,
   mpz_sub(E, E, tmp);
 
   /* Recompute `chal` and `ell`. */
-  if (!goo_group_derive(group, chal0, ell0, &key[0],
+  if (!goo_group_derive(group, chal0, ell0, key,
                         C1, *C2, *C3, *t, A, B, C, D, E,
                         msg, msg_len)) {
     goto fail;
@@ -2990,7 +2988,7 @@ goo_group_verify(goo_group_t *group,
     goto fail;
 
   /* `ell` must be prime. */
-  if (!goo_is_prime(*ell, &key[0]))
+  if (!goo_is_prime(*ell, key))
     goto fail;
 
   r = 1;
@@ -3036,8 +3034,8 @@ goo_mgf1xor(unsigned char *out,
 
   while (i < out_len) {
     memcpy(&sha, &ctx, sizeof(goo_sha256_t));
-    goo_sha256_update(&sha, &ctr[0], sizeof(ctr));
-    goo_sha256_final(&sha, &digest[0]);
+    goo_sha256_update(&sha, ctr, sizeof(ctr));
+    goo_sha256_final(&sha, digest);
 
     j = 0;
 
@@ -3172,7 +3170,7 @@ goo_encrypt_oaep(unsigned char **out,
 
   /* EM = 0x00 || (seed) || (Hash(L) || PS || 0x01 || M) */
   em = goo_calloc(klen, sizeof(unsigned char));
-  goo_sha256(&lhash[0], label, label_len);
+  goo_sha256(lhash, label, label_len);
   seed = &em[1];
   slen = hlen;
   db = &em[1 + hlen];
@@ -3182,7 +3180,7 @@ goo_encrypt_oaep(unsigned char **out,
 
   goo_prng_seed(&prng, entropy, GOO_PRNG_ENCRYPT);
   goo_prng_generate(&prng, seed, slen);
-  memcpy(&db[0], &lhash[0], sizeof(lhash));
+  memcpy(&db[0], lhash, sizeof(lhash));
   memset(&db[hlen], 0x00, (dlen - mlen - 1) - hlen);
   db[dlen - mlen - 1] = 0x01;
   memcpy(&db[dlen - mlen], msg, mlen);
@@ -3321,7 +3319,7 @@ goo_decrypt_oaep(unsigned char **out,
   if (em == NULL)
     goto fail;
 
-  goo_sha256(&expect[0], label, label_len);
+  goo_sha256(expect, label, label_len);
   zero = safe_equal(em[0], 0x00);
   seed = &em[1];
   slen = hlen;

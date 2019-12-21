@@ -34,6 +34,7 @@
 #define GOO_EXP_BYTES ((GOO_EXP_BITS + 7) / 8)
 #define GOO_CHAL_BYTES ((GOO_CHAL_BITS + 7) / 8)
 #define GOO_ELL_BYTES ((GOO_ELL_BITS + 7) / 8)
+#define GOO_INT_BYTES 4
 
 /* SHA256("Goo Signature")
  *

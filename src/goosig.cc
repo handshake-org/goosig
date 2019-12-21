@@ -105,16 +105,16 @@ NAN_METHOD(Goo::Generate) {
   unsigned char entropy[32];
   unsigned char s_prime[32];
 
-  if (!goo_random((void *)&entropy[0], 32))
+  if (!goo_random(entropy, sizeof(entropy)))
     return Nan::ThrowError("Could not generate s_prime.");
 
-  memset((void *)&s_prime[0], 0x00, 32);
+  memset(s_prime, 0x00, sizeof(s_prime));
 
-  if (!goo_generate(NULL, &s_prime[0], &entropy[0]))
+  if (!goo_generate(NULL, s_prime, entropy))
     return Nan::ThrowError("Could not generate s_prime.");
 
   info.GetReturnValue().Set(
-    Nan::CopyBuffer((char *)&s_prime[0], 32).ToLocalChecked());
+    Nan::CopyBuffer((char *)s_prime, sizeof(s_prime)).ToLocalChecked());
 }
 
 NAN_METHOD(Goo::Challenge) {
@@ -317,14 +317,14 @@ NAN_METHOD(Goo::Encrypt) {
 
   unsigned char entropy[32];
 
-  if (!goo_random((void *)&entropy[0], 32))
+  if (!goo_random(entropy, sizeof(entropy)))
     return Nan::ThrowError("Could not generate entropy.");
 
   unsigned char *out;
   size_t out_len;
 
   if (!goo_encrypt(NULL, &out, &out_len, msg, msg_len,
-                   n, n_len, e, e_len, NULL, 0, &entropy[0])) {
+                   n, n_len, e, e_len, NULL, 0, entropy)) {
     return Nan::ThrowError("Could create ciphertext.");
   }
 
@@ -370,14 +370,14 @@ NAN_METHOD(Goo::Decrypt) {
 
   unsigned char entropy[32];
 
-  if (!goo_random((void *)&entropy[0], 32))
+  if (!goo_random(entropy, sizeof(entropy)))
     return Nan::ThrowError("Could not generate entropy.");
 
   unsigned char *out;
   size_t out_len;
 
   if (!goo_decrypt(NULL, &out, &out_len, msg, msg_len, p, p_len,
-                   q, q_len, e, e_len, NULL, 0, &entropy[0])) {
+                   q, q_len, e, e_len, NULL, 0, entropy)) {
     return Nan::ThrowError("Could decrypt ciphertext.");
   }
 

@@ -166,7 +166,7 @@ goo_sha256_update(goo_sha256_t *ctx, const void *data, size_t len) {
     if (want > len)
       want = len;
 
-    memcpy(&ctx->block[pos], bytes + off, want);
+    memcpy(ctx->block + pos, bytes + off, want);
 
     pos += want;
     len -= want;
@@ -175,7 +175,7 @@ goo_sha256_update(goo_sha256_t *ctx, const void *data, size_t len) {
     if (pos < 64)
       return;
 
-    goo_sha256_transform(ctx, &ctx->block[0]);
+    goo_sha256_transform(ctx, ctx->block);
   }
 
   while (len >= 64) {
@@ -185,7 +185,7 @@ goo_sha256_update(goo_sha256_t *ctx, const void *data, size_t len) {
   }
 
   if (len > 0)
-    memcpy(&ctx->block[0], bytes + off, len);
+    memcpy(ctx->block, bytes + off, len);
 }
 
 void
@@ -195,16 +195,16 @@ goo_sha256_final(goo_sha256_t *ctx, unsigned char *out) {
   unsigned char D[8];
   size_t i;
 
-  write64(&D[0], len);
+  write64(D, len);
 
-  goo_sha256_update(ctx, &P[0], 1 + ((119 - pos) & 63));
-  goo_sha256_update(ctx, &D[0], 8);
+  goo_sha256_update(ctx, P, 1 + ((119 - pos) & 63));
+  goo_sha256_update(ctx, D, 8);
 
   for (i = 0; i < 8; i++)
     write32(out + i * 4, ctx->state[i]);
 
-  memset(&ctx->state[0], 0x00, sizeof(ctx->state));
-  memset(&ctx->block[0], 0x00, sizeof(ctx->block));
+  memset(ctx->state, 0x00, sizeof(ctx->state));
+  memset(ctx->block, 0x00, sizeof(ctx->block));
 
   ctx->size = 0;
 }
@@ -221,21 +221,21 @@ static uint32_t
 read32(const void *src) {
 #ifdef WORDS_BIGENDIAN
   uint32_t w;
-  memcpy((void *)&w, src, sizeof(w));
+  memcpy(&w, src, sizeof(w));
   return w;
 #else
   const uint8_t *p = (const uint8_t *)src;
-  return ((uint32_t)(p[0]) << 24)
-       | ((uint32_t)(p[1]) << 16)
-       | ((uint32_t)(p[2]) << 8)
-       | ((uint32_t)(p[3]) << 0);
+  return ((uint32_t)p[0] << 24)
+       | ((uint32_t)p[1] << 16)
+       | ((uint32_t)p[2] << 8)
+       | ((uint32_t)p[3] << 0);
 #endif
 }
 
 static void
 write32(void *dst, uint32_t w) {
 #ifdef WORDS_BIGENDIAN
-  memcpy(dst, (void *)&w, sizeof(w));
+  memcpy(dst, &w, sizeof(w));
 #else
   uint8_t *p = (uint8_t *)dst;
   p[0] = w >> 24;
@@ -248,7 +248,7 @@ write32(void *dst, uint32_t w) {
 static void
 write64(void *dst, uint64_t w) {
 #ifdef WORDS_BIGENDIAN
-  memcpy(dst, (void *)&w, sizeof(w));
+  memcpy(dst, &w, sizeof(w));
 #else
   uint8_t *p = (uint8_t *)dst;
   p[0] = w >> 56;

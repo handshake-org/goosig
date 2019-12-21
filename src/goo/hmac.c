@@ -23,7 +23,7 @@ goo_hmac_init(goo_hmac_t *hmac, const unsigned char *key, size_t len) {
     pad[i] = 0x36;
 
   goo_sha256_init(&hmac->inner);
-  goo_sha256_update(&hmac->inner, &pad[0], GOO_SHA256_BLOCK_SIZE);
+  goo_sha256_update(&hmac->inner, pad, GOO_SHA256_BLOCK_SIZE);
 
   for (i = 0; i < len; i++)
     pad[i] = key[i] ^ 0x5c;
@@ -32,7 +32,9 @@ goo_hmac_init(goo_hmac_t *hmac, const unsigned char *key, size_t len) {
     pad[i] = 0x5c;
 
   goo_sha256_init(&hmac->outer);
-  goo_sha256_update(&hmac->outer, &pad[0], GOO_SHA256_BLOCK_SIZE);
+  goo_sha256_update(&hmac->outer, pad, GOO_SHA256_BLOCK_SIZE);
+
+  memset(pad, 0x00, GOO_SHA256_BLOCK_SIZE);
 }
 
 void
