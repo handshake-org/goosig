@@ -814,21 +814,21 @@ goo_is_prime_div(const mpz_t n) {
   if (mpz_even_p(n)) {
     /* if n == 2 */
     if (mpz_cmp_ui(n, 2) == 0)
-      return 2;
+      return 1;
     return 0;
   }
 
   for (i = 0; i < GOO_TEST_PRIMES_LEN; i++) {
     /* if n == test_primes[i] */
     if (mpz_cmp_ui(n, goo_test_primes[i]) == 0)
-      return 2;
+      return 1;
 
     /* if n mod test_primes[i] == 0 */
     if (mpz_fdiv_ui(n, goo_test_primes[i]) == 0)
       return 0;
   }
 
-  return 1;
+  return -1;
 }
 
 /* https://github.com/golang/go/blob/aadaec5/src/math/big/prime.go#L81 */
@@ -1089,17 +1089,10 @@ fail:
 
 static int
 goo_is_prime(const mpz_t p, const unsigned char *key) {
-  /* 0 = Not prime. */
-  /* 1 = Maybe prime. */
-  /* 2 = Definitely prime. */
   int ret = goo_is_prime_div(p);
 
-  if (ret == 0)
-    return 0;
-
-  /* Early exit. */
-  if (ret == 2)
-    return 1;
+  if (ret != -1)
+    return ret;
 
   if (!goo_is_prime_mr(p, key, 16 + 1, 1))
     return 0;

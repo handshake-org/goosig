@@ -1521,7 +1521,7 @@ run_primes_test(goo_prng_t *rng) {
     mpz_init(p);
     mpz_set_ui(p, goo_primes[i]);
 
-    assert(goo_is_prime_div(p) == 2);
+    assert(goo_is_prime_div(p) == 1);
     assert(goo_is_prime_mr(p, key, 16 + 1, 1));
     assert(goo_is_prime_mr(p, key, 1, 1));
     assert(goo_is_prime_mr(p, key, 1, 0));
@@ -1538,7 +1538,7 @@ run_primes_test(goo_prng_t *rng) {
     mpz_init(p);
     mpz_set_ui(p, goo_test_primes[i]);
 
-    assert(goo_is_prime_div(p) == 2);
+    assert(goo_is_prime_div(p) == 1);
     assert(goo_is_prime_mr(p, key, 16 + 1, 1));
     assert(goo_is_prime_mr(p, key, 1, 1));
     assert(goo_is_prime_mr(p, key, 1, 0));
