@@ -882,7 +882,7 @@ goo_is_prime_mr(const mpz_t n,
       /* x = 2 */
       mpz_set_ui(x, 2);
     } else {
-      /* x = random int in [2,n-1] */
+      /* x = random integer in [2,n-1] */
       goo_prng_random_int(&prng, x, nm3);
       mpz_add_ui(x, x, 2);
     }
