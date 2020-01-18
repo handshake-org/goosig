@@ -13,30 +13,6 @@
 #include <string.h>
 #include "sha256.h"
 
-#ifdef GOO_HAS_OPENSSL
-
-void
-goo_sha256_init(goo_sha256_t *ctx) {
-  SHA256_Init(ctx);
-}
-
-void
-goo_sha256_update(goo_sha256_t *ctx, const void *data, size_t len) {
-  SHA256_Update(ctx, data, len);
-}
-
-void
-goo_sha256_final(goo_sha256_t *ctx, unsigned char *out) {
-  SHA256_Final(out, ctx);
-}
-
-void
-goo_sha256(unsigned char *out, const void *data, size_t len) {
-  SHA256((const unsigned char *)data, len, out);
-}
-
-#else /* GOO_HAS_OPENSSL */
-
 static const uint32_t K[64] = {
   0x428a2f98, 0x71374491, 0xb5c0fbcf, 0xe9b5dba5,
   0x3956c25b, 0x59f111f1, 0x923f82a4, 0xab1c5ed5,
@@ -261,5 +237,3 @@ write64(void *dst, uint64_t w) {
   p[7] = w >> 0;
 #endif
 }
-
-#endif /* GOO_HAS_OPENSSL */

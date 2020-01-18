@@ -7,7 +7,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include "goosig.h"
-#include "random.h"
 
 NAN_INLINE static bool
 IsNull(v8::Local<v8::Value> obj) {
@@ -102,13 +101,20 @@ NAN_METHOD(Goo::New) {
 }
 
 NAN_METHOD(Goo::Generate) {
-  unsigned char entropy[32];
+  if (info.Length() < 1)
+    return Nan::ThrowError("goo.generate() requires arguments.");
+
+  v8::Local<v8::Value> entropy_buf = info[0].As<v8::Object>();
+
+  if (!node::Buffer::HasInstance(entropy_buf))
+    return Nan::ThrowTypeError("First argument must be a buffer.");
+
   unsigned char s_prime[32];
+  const uint8_t *entropy = (const uint8_t *)node::Buffer::Data(entropy_buf);
+  size_t entropy_len = node::Buffer::Length(entropy_buf);
 
-  if (!goo_random(entropy, sizeof(entropy)))
-    return Nan::ThrowError("Could not generate s_prime.");
-
-  memset(s_prime, 0x00, sizeof(s_prime));
+  if (entropy_len != 32)
+    return Nan::ThrowRangeError("Entropy must be 32 bytes.");
 
   if (!goo_generate(NULL, s_prime, entropy))
     return Nan::ThrowError("Could not generate s_prime.");
@@ -288,7 +294,7 @@ NAN_METHOD(Goo::Verify) {
 }
 
 NAN_METHOD(Goo::Encrypt) {
-  if (info.Length() < 3)
+  if (info.Length() < 4)
     return Nan::ThrowError("goo.encrypt() requires arguments.");
 
   v8::Local<v8::Object> msg_buf = info[0].As<v8::Object>();
@@ -306,6 +312,11 @@ NAN_METHOD(Goo::Encrypt) {
   if (!node::Buffer::HasInstance(e_buf))
     return Nan::ThrowTypeError("Third argument must be a buffer.");
 
+  v8::Local<v8::Value> entropy_buf = info[3].As<v8::Object>();
+
+  if (!node::Buffer::HasInstance(entropy_buf))
+    return Nan::ThrowTypeError("Fourth argument must be a buffer.");
+
   const uint8_t *msg = (const uint8_t *)node::Buffer::Data(msg_buf);
   size_t msg_len = node::Buffer::Length(msg_buf);
 
@@ -315,10 +326,11 @@ NAN_METHOD(Goo::Encrypt) {
   const uint8_t *e = (const uint8_t *)node::Buffer::Data(e_buf);
   size_t e_len = node::Buffer::Length(e_buf);
 
-  unsigned char entropy[32];
+  const uint8_t *entropy = (const uint8_t *)node::Buffer::Data(entropy_buf);
+  size_t entropy_len = node::Buffer::Length(entropy_buf);
 
-  if (!goo_random(entropy, sizeof(entropy)))
-    return Nan::ThrowError("Could not generate entropy.");
+  if (entropy_len != 32)
+    return Nan::ThrowRangeError("Entropy must be 32 bytes.");
 
   unsigned char *out;
   size_t out_len;
@@ -333,7 +345,7 @@ NAN_METHOD(Goo::Encrypt) {
 }
 
 NAN_METHOD(Goo::Decrypt) {
-  if (info.Length() < 4)
+  if (info.Length() < 5)
     return Nan::ThrowError("goo.decrypt() requires arguments.");
 
   v8::Local<v8::Object> msg_buf = info[0].As<v8::Object>();
@@ -356,6 +368,11 @@ NAN_METHOD(Goo::Decrypt) {
   if (!node::Buffer::HasInstance(e_buf))
     return Nan::ThrowTypeError("Fourth argument must be a buffer.");
 
+  v8::Local<v8::Value> entropy_buf = info[4].As<v8::Object>();
+
+  if (!node::Buffer::HasInstance(entropy_buf))
+    return Nan::ThrowTypeError("Fifth argument must be a buffer.");
+
   const uint8_t *msg = (const uint8_t *)node::Buffer::Data(msg_buf);
   size_t msg_len = node::Buffer::Length(msg_buf);
 
@@ -368,10 +385,11 @@ NAN_METHOD(Goo::Decrypt) {
   const uint8_t *e = (const uint8_t *)node::Buffer::Data(e_buf);
   size_t e_len = node::Buffer::Length(e_buf);
 
-  unsigned char entropy[32];
+  const uint8_t *entropy = (const uint8_t *)node::Buffer::Data(entropy_buf);
+  size_t entropy_len = node::Buffer::Length(entropy_buf);
 
-  if (!goo_random(entropy, sizeof(entropy)))
-    return Nan::ThrowError("Could not generate entropy.");
+  if (entropy_len != 32)
+    return Nan::ThrowRangeError("Entropy must be 32 bytes.");
 
   unsigned char *out;
   size_t out_len;

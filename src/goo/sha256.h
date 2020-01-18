@@ -13,21 +13,11 @@
 #define GOO_SHA256_HASH_SIZE 32
 #define GOO_SHA256_BLOCK_SIZE 64
 
-#ifdef GOO_HAS_OPENSSL
-
-#include <openssl/sha.h>
-
-typedef SHA256_CTX goo_sha256_t;
-
-#else
-
 typedef struct goo_sha256_s {
   uint32_t state[8];
   uint8_t block[64];
   uint64_t size;
 } goo_sha256_t;
-
-#endif /* GOO_HAS_OPENSSL */
 
 void
 goo_sha256_init(goo_sha256_t *ctx);

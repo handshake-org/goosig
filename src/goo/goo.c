@@ -2333,21 +2333,25 @@ goo_is_valid_modulus(const mpz_t n) {
   if (bits < GOO_MIN_RSA_BITS || bits > GOO_MAX_RSA_BITS)
     return 0;
 
+  /* if n mod 2 == 0 */
+  if (mpz_even_p(n))
+    return 0;
+
   return 1;
 }
 
 static int
 goo_is_valid_exponent(const mpz_t e) {
-  /* if e mod 2 == 0 */
-  if (mpz_even_p(e))
-    return 0;
-
   /* if e < 3 */
   if (mpz_cmp_ui(e, 3) < 0)
     return 0;
 
   /* if ceil(log2(e)) > 33 */
   if (goo_mpz_bitlen(e) > 33)
+    return 0;
+
+  /* if e mod 2 == 0 */
+  if (mpz_even_p(e))
     return 0;
 
   return 1;
@@ -3156,6 +3160,9 @@ goo_encrypt_oaep(unsigned char **out,
     goto fail;
 
   if (!goo_is_valid_exponent(e))
+    goto fail;
+
+  if (klen < 2 * hlen + 2)
     goto fail;
 
   if (msg_len > klen - 2 * hlen - 2)

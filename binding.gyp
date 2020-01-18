@@ -6,8 +6,7 @@
       "./src/goo/goo.c",
       "./src/goo/hmac.c",
       "./src/goo/sha256.c",
-      "./src/goosig.cc",
-      "./src/random.cc"
+      "./src/goosig.cc"
     ],
     "cflags": [
       "-Wall",
@@ -56,11 +55,6 @@
         ],
         "sources": [
           "./src/goo/mini-gmp.c"
-        ]
-      }],
-      ["OS!='win' and node_shared_openssl=='false'", {
-        "defines": [
-          "GOO_HAS_OPENSSL"
         ]
       }]
     ]

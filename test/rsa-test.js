@@ -16,11 +16,14 @@ describe('RSA', function() {
       for (let i = 0; i < 10; i++) {
         const key = util.genKey(bits);
         const msg = rng.randomBytes(32);
+        const ent0 = rng.randomBytes(32);
+        const ent1 = rng.randomBytes(32);
+        const ent2 = rng.randomBytes(32);
         const ct0 = Goo.encrypt(msg, key);
-        const ct1 = native.encrypt(msg, key.n, key.e);
+        const ct1 = native.encrypt(msg, key.n, key.e, ent0);
 
-        assert.bufferEqual(native.decrypt(ct0, key.p, key.q, key.e), msg);
-        assert.bufferEqual(native.decrypt(ct1, key.p, key.q, key.e), msg);
+        assert.bufferEqual(native.decrypt(ct0, key.p, key.q, key.e, ent1), msg);
+        assert.bufferEqual(native.decrypt(ct1, key.p, key.q, key.e, ent2), msg);
 
         assert.bufferEqual(Goo.decrypt(ct0, key), msg);
         assert.bufferEqual(Goo.decrypt(ct1, key), msg);
