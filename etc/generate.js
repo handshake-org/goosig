@@ -24,7 +24,7 @@ function parseAOL(file) {
   const cert = x509.Certificate.fromPEM(str);
   const fp = SHA1.digest(cert.raw);
   const spki = cert.tbsCertificate.subjectPublicKeyInfo;
-  const key = rsa.publicKeyImport(spki.publicKey.rightAlign());
+  const key = spki.publicKey.rightAlign();
 
   switch (file) {
     case 'aol1.pem':
