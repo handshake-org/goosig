@@ -16,7 +16,7 @@
   "author": "Christopher Jeffrey <chjjeffrey@gmail.com>",
   "main": "./lib/goosig.js",
   "scripts": {
-    "install": "node-gyp rebuild || echo 'Build failed.'",
+    "install": "node-gyp rebuild",
     "lint": "eslint ./{bench,etc,lib{,/js,/native,/internal},scripts,test{,/util}}/*.js || exit 0",
     "test": "bmocha -S 'test/*-test.js'"
   },

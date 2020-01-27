@@ -8,6 +8,7 @@ const assert = require('bsert');
 const util = require('./util');
 const BN = require('bcrypto/lib/bn.js');
 const rng = require('bcrypto/lib/random');
+const rsa = require('bcrypto/lib/rsa');
 const constants = require('../lib/internal/constants');
 const Goo = require('../lib/js/goo');
 
@@ -17,7 +18,8 @@ describe('Group Ops', function() {
   let t2 = null;
 
   it('should open contexts', () => {
-    const {n} = util.genKey(2048);
+    const key = util.genKey(2048);
+    const {n} = rsa.privateKeyExport(key);
 
     t0 = new Goo(Goo.RSA2048, 2, 3);
     t1 = new Goo(Goo.RSA2048, 2, 3, 2048);

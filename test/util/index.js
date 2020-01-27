@@ -358,6 +358,7 @@ function genKey(bits) {
     const pm1 = p.subn(1);
     const qm1 = q.subn(1);
     const phi = pm1.mul(qm1);
+    const lam = pm1.lcm(qm1);
 
     let e = null;
     let d = null;
@@ -365,27 +366,28 @@ function genKey(bits) {
     for (let i = 1; i < smallPrimes.length; i++) {
       try {
         e = new BN(smallPrimes[i]);
-        d = e.invert(phi);
+
+        if (e.gcd(phi).cmpn(1) !== 0)
+          continue;
+
+        d = e.invert(lam);
       } catch (e) {
         continue;
       }
+
       break;
     }
 
     if (e == null || d == null)
       throw new Error('Could not find a suitable exponent!');
 
-    const key = new rsa.RSAPrivateKey(
-      n.encode(),
-      e.encode(),
-      d.encode(),
-      p.encode(),
-      q.encode()
-    );
-
-    rsa.privateKeyCompute(key);
-
-    return key;
+    return rsa.privateKeyImport({
+      n: n.encode(),
+      e: e.encode(),
+      d: d.encode(),
+      p: p.encode(),
+      q: q.encode()
+    });
   }
 }
 

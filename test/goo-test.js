@@ -31,13 +31,14 @@ describe('Goo', function() {
         const ver = new Goo(n, g, h);
         const msg = Buffer.from(name, 'binary');
         const key = util.genKey(bits);
+        const pub = rsa.publicKeyCreate(key);
 
         // Generate the challenge token.
         const s_prime = goo.generate();
-        const C1 = goo.challenge(s_prime, key);
+        const C1 = goo.challenge(s_prime, pub);
 
         // Encrypt to the recipient.
-        const ct = goo.encrypt(s_prime, key);
+        const ct = goo.encrypt(s_prime, pub);
 
         // Recipient decrypts.
         assert.bufferEqual(goo.decrypt(ct, key), s_prime);
@@ -78,7 +79,8 @@ describe('Goo', function() {
     const ver = new Goo(Goo.RSA2048, 2, 3);
 
     for (const [i, item] of sign.entries()) {
-      const key = rsa.privateKeyImport(Buffer.from(item[0], 'hex'));
+      const key = Buffer.from(item[0], 'hex');
+      const pub = rsa.publicKeyCreate(key);
       const msg = Buffer.from(item[1], 'hex');
       const s_prime = Buffer.from(item[2], 'hex');
       const C1 = Buffer.from(item[3], 'hex');
@@ -86,7 +88,7 @@ describe('Goo', function() {
       const sig = Buffer.from(item[5], 'hex');
 
       it(`should sign & verify vector #${i + 1}`, () => {
-        assert.bufferEqual(goo.challenge(s_prime, key), C1);
+        assert.bufferEqual(goo.challenge(s_prime, pub), C1);
         assert.bufferEqual(goo.sign(msg, s_prime, key), sig);
         assert.bufferEqual(goo.decrypt(ct, key), s_prime);
         assert.strictEqual(goo.verify(msg, sig, C1), true);

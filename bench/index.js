@@ -18,6 +18,7 @@
 
 const assert = require('bsert');
 const {performance} = require('perf_hooks');
+const rsa = require('bcrypto/lib/rsa');
 const Goo = require('../');
 const util = require('../test/util');
 
@@ -42,13 +43,14 @@ function main(argv) {
     const ver = new Goo(n, g, h);
     const msg = Buffer.from(name, 'binary');
     const key = util.genKey(bits);
+    const pub = rsa.publicKeyCreate(key);
     const items = [[], [], []];
 
     for (let j = 0; j < ops; j++) {
       // Generate the challenge token.
       const start0 = performance.now();
       const s_prime = goo.generate();
-      const C1 = goo.challenge(s_prime, key);
+      const C1 = goo.challenge(s_prime, pub);
       const stop0 = performance.now();
 
       // Generate the signature.
