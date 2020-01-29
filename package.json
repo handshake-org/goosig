@@ -1,6 +1,6 @@
 {
   "name": "goosig",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "Group of unknown order signatures",
   "keywords": [
     "crypto",
@@ -21,7 +21,7 @@
     "test": "bmocha -S 'test/*-test.js'"
   },
   "dependencies": {
-    "bcrypto": "~4.3.0",
+    "bcrypto": "~5.0.0",
     "bsert": "~0.0.10",
     "loady": "~0.0.1",
     "nan": "^2.14.0"
