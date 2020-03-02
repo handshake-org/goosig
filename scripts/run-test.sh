@@ -12,6 +12,7 @@ for cc in gcc clang; do
       -Wcast-align             \
       -Wshadow                 \
       -Wno-unused-parameter    \
+      -Wno-sign-compare        \
       -O3                      \
       ./src/goo/drbg.c         \
       ./src/goo/hmac.c         \
