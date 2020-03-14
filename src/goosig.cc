@@ -1,414 +1,271 @@
 /*!
  * goosig.cc - groups of unknown order
- * Copyright (c) 2018-2019, Christopher Jeffrey (MIT License).
+ * Copyright (c) 2018-2020, Christopher Jeffrey (MIT License).
  * https://github.com/handshake-org/goosig
  */
 
+#include <stdint.h>
+#include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
-#include "goosig.h"
+#include <stdio.h>
+#include <node_api.h>
+#include "goo/goo.h"
 
-NAN_INLINE static bool
-IsNull(v8::Local<v8::Value> obj) {
-  Nan::HandleScope scope;
-  return obj->IsNull() || obj->IsUndefined();
+#define CHECK(expr) do {                               \
+  if (!(expr)) {                                       \
+    fprintf(stderr, "%s:%d: Assertion `%s' failed.\n", \
+            __FILE__, __LINE__, #expr);                \
+    fflush(stderr);                                    \
+    abort();                                           \
+  }                                                    \
+} while (0)
+
+#define JS_THROW(msg) do {                              \
+  CHECK(napi_throw_error(env, NULL, (msg)) == napi_ok); \
+  return NULL;                                          \
+} while (0)
+
+#define JS_ASSERT(cond, msg) if (!(cond)) JS_THROW(msg)
+
+#define JS_ERR_CONTEXT "Could not create context."
+#define JS_ERR_ENTROPY_SIZE "Invalid entropy size."
+#define JS_ERR_SPRIME_SIZE "Invalid s_prime size."
+#define JS_ERR_GENERATE "Could not generate s_prime."
+#define JS_ERR_CHALLENGE "Could not create challenge."
+#define JS_ERR_SIGN "Could not sign."
+
+/*
+ * N-API Extras
+ */
+
+static void
+finalize_buffer(napi_env env, void *data, void *hint) {
+  if (data != NULL)
+    free(data);
 }
 
-static Nan::Persistent<v8::FunctionTemplate> goosig_constructor;
-
-Goo::Goo() {
-  ctx = NULL;
+static napi_status
+create_external_buffer(napi_env env, size_t length,
+                       void *data, napi_value *result) {
+  return napi_create_external_buffer(env,
+                                     length,
+                                     data,
+                                     finalize_buffer,
+                                     NULL,
+                                     result);
 }
 
-Goo::~Goo() {
-  goo_destroy(ctx);
-  ctx = NULL;
+/*
+ * GooSig
+ */
+
+static void
+goosig_destroy(napi_env env, void *data, void *hint) {
+  goo_ctx_t *goo = (goo_ctx_t *)data;
+  goo_destroy(goo);
 }
 
-void
-Goo::Init(v8::Local<v8::Object> &target) {
-  Nan::HandleScope scope;
+static napi_value
+goosig_create(napi_env env, napi_callback_info info) {
+  napi_value argv[4];
+  size_t argc = 4;
+  const uint8_t *n;
+  size_t n_len;
+  uint32_t g, h, bits;
+  goo_ctx_t *goo;
+  napi_value handle;
 
-  v8::Local<v8::FunctionTemplate> tpl =
-    Nan::New<v8::FunctionTemplate>(Goo::New);
+  CHECK(napi_get_cb_info(env, info, &argc, argv, NULL, NULL) == napi_ok);
+  CHECK(argc == 4);
+  CHECK(napi_get_buffer_info(env, argv[0], (void **)&n, &n_len) == napi_ok);
+  CHECK(napi_get_value_uint32(env, argv[1], &g) == napi_ok);
+  CHECK(napi_get_value_uint32(env, argv[2], &h) == napi_ok);
+  CHECK(napi_get_value_uint32(env, argv[3], &bits) == napi_ok);
 
-  goosig_constructor.Reset(tpl);
+  goo = goo_create(n, n_len, g, h, bits);
 
-  tpl->SetClassName(Nan::New("Goo").ToLocalChecked());
-  tpl->InstanceTemplate()->SetInternalFieldCount(1);
+  JS_ASSERT(goo != NULL, JS_ERR_CONTEXT);
 
-  Nan::SetPrototypeMethod(tpl, "generate", Goo::Generate);
-  Nan::SetPrototypeMethod(tpl, "challenge", Goo::Challenge);
-  Nan::SetPrototypeMethod(tpl, "validate", Goo::Validate);
-  Nan::SetPrototypeMethod(tpl, "sign", Goo::Sign);
-  Nan::SetPrototypeMethod(tpl, "verify", Goo::Verify);
-  Nan::SetPrototypeMethod(tpl, "encrypt", Goo::Encrypt);
-  Nan::SetPrototypeMethod(tpl, "decrypt", Goo::Decrypt);
+  CHECK(napi_create_external(env,
+                             goo,
+                             goosig_destroy,
+                             NULL,
+                             &handle) == napi_ok);
 
-  Nan::SetMethod(tpl, "generate", Goo::Generate);
-  Nan::SetMethod(tpl, "encrypt", Goo::Encrypt);
-  Nan::SetMethod(tpl, "decrypt", Goo::Decrypt);
-
-  v8::Local<v8::FunctionTemplate> ctor =
-    Nan::New<v8::FunctionTemplate>(goosig_constructor);
-
-  Nan::Set(target, Nan::New("Goo").ToLocalChecked(),
-    Nan::GetFunction(ctor).ToLocalChecked());
+  return handle;
 }
 
-NAN_METHOD(Goo::New) {
-  if (!info.IsConstructCall())
-    return Nan::ThrowError("Could not create Goo instance.");
+static napi_value
+goosig_generate(napi_env env, napi_callback_info info) {
+  napi_value argv[1];
+  size_t argc = 1;
+  uint8_t out[32];
+  const uint8_t *entropy;
+  size_t entropy_len;
+  napi_value result;
 
-  if (info.Length() < 3)
-    return Nan::ThrowError("Goo requires arguments.");
+  CHECK(napi_get_cb_info(env, info, &argc, argv, NULL, NULL) == napi_ok);
+  CHECK(argc == 1);
+  CHECK(napi_get_buffer_info(env, argv[0], (void **)&entropy,
+                             &entropy_len) == napi_ok);
 
-  v8::Local<v8::Object> n_buf = info[0].As<v8::Object>();
+  JS_ASSERT(entropy_len == 32, JS_ERR_ENTROPY_SIZE);
+  JS_ASSERT(goo_generate(NULL, out, entropy), JS_ERR_GENERATE);
 
-  if (!node::Buffer::HasInstance(n_buf))
-    return Nan::ThrowTypeError("First argument must be a buffer.");
+  CHECK(napi_create_buffer_copy(env, 32, out, NULL, &result) == napi_ok);
 
-  if (!info[1]->IsNumber())
-    return Nan::ThrowTypeError("Second argument must be a number.");
-
-  if (!info[2]->IsNumber())
-    return Nan::ThrowTypeError("Third argument must be a number.");
-
-  const uint8_t *n = (const uint8_t *)node::Buffer::Data(n_buf);
-  size_t n_len = node::Buffer::Length(n_buf);
-  unsigned long g = (unsigned long)Nan::To<int64_t>(info[1]).FromJust();
-  unsigned long h = (unsigned long)Nan::To<int64_t>(info[2]).FromJust();
-  unsigned long bits = 0;
-
-  if (info.Length() > 3 && !IsNull(info[3])) {
-    if (!info[3]->IsNumber())
-      return Nan::ThrowTypeError("Fourth argument must be a number.");
-
-    bits = (unsigned long)Nan::To<int64_t>(info[3]).FromJust();
-  }
-
-  goo_ctx_t *ctx = goo_create(n, n_len, g, h, bits);
-
-  if (ctx == NULL)
-    return Nan::ThrowError("Could not create context.");
-
-  Goo *goo = new Goo();
-
-  goo->Wrap(info.This());
-  goo->ctx = ctx;
-
-  info.GetReturnValue().Set(info.This());
+  return result;
 }
 
-NAN_METHOD(Goo::Generate) {
-  if (info.Length() < 1)
-    return Nan::ThrowError("goo.generate() requires arguments.");
-
-  v8::Local<v8::Value> entropy_buf = info[0].As<v8::Object>();
-
-  if (!node::Buffer::HasInstance(entropy_buf))
-    return Nan::ThrowTypeError("First argument must be a buffer.");
-
-  unsigned char s_prime[32];
-  const uint8_t *entropy = (const uint8_t *)node::Buffer::Data(entropy_buf);
-  size_t entropy_len = node::Buffer::Length(entropy_buf);
-
-  if (entropy_len != 32)
-    return Nan::ThrowRangeError("Entropy must be 32 bytes.");
-
-  if (!goo_generate(NULL, s_prime, entropy))
-    return Nan::ThrowError("Could not generate s_prime.");
-
-  info.GetReturnValue().Set(
-    Nan::CopyBuffer((char *)s_prime, sizeof(s_prime)).ToLocalChecked());
-}
-
-NAN_METHOD(Goo::Challenge) {
-  Goo *goo = ObjectWrap::Unwrap<Goo>(info.Holder());
-
-  if (info.Length() < 2)
-    return Nan::ThrowError("goo.challenge() requires arguments.");
-
-  v8::Local<v8::Object> s_prime_buf = info[0].As<v8::Object>();
-
-  if (!node::Buffer::HasInstance(s_prime_buf))
-    return Nan::ThrowTypeError("First argument must be a buffer.");
-
-  v8::Local<v8::Object> n_buf = info[1].As<v8::Object>();
-
-  if (!node::Buffer::HasInstance(n_buf))
-    return Nan::ThrowTypeError("Second argument must be a buffer.");
-
-  const uint8_t *s_prime = (const uint8_t *)node::Buffer::Data(s_prime_buf);
-  size_t s_prime_len = node::Buffer::Length(s_prime_buf);
-
-  const uint8_t *n = (const uint8_t *)node::Buffer::Data(n_buf);
-  size_t n_len = node::Buffer::Length(n_buf);
-
-  unsigned char *C1;
-  size_t C1_len;
-
-  if (s_prime_len != 32)
-    return Nan::ThrowRangeError("s_prime must be 32 bytes.");
-
-  if (!goo_challenge(goo->ctx, &C1, &C1_len, s_prime, n, n_len))
-    return Nan::ThrowError("Could not create challenge.");
-
-  info.GetReturnValue().Set(
-    Nan::NewBuffer((char *)C1, C1_len).ToLocalChecked());
-}
-
-NAN_METHOD(Goo::Validate) {
-  Goo *goo = ObjectWrap::Unwrap<Goo>(info.Holder());
-
-  if (info.Length() < 4)
-    return Nan::ThrowError("goo.validate() requires arguments.");
-
-  v8::Local<v8::Object> s_prime_buf = info[0].As<v8::Object>();
-
-  if (!node::Buffer::HasInstance(s_prime_buf))
-    return Nan::ThrowTypeError("First argument must be a buffer.");
-
-  v8::Local<v8::Value> C1_buf = info[1].As<v8::Object>();
-
-  if (!node::Buffer::HasInstance(C1_buf))
-    return Nan::ThrowTypeError("Second argument must be a buffer.");
-
-  v8::Local<v8::Value> p_buf = info[2].As<v8::Object>();
-
-  if (!node::Buffer::HasInstance(p_buf))
-    return Nan::ThrowTypeError("Third argument must be a buffer.");
-
-  v8::Local<v8::Value> q_buf = info[3].As<v8::Object>();
-
-  if (!node::Buffer::HasInstance(q_buf))
-    return Nan::ThrowTypeError("Fourth argument must be a buffer.");
-
-  const uint8_t *s_prime = (const uint8_t *)node::Buffer::Data(s_prime_buf);
-  size_t s_prime_len = node::Buffer::Length(s_prime_buf);
-
-  const uint8_t *C1 = (const uint8_t *)node::Buffer::Data(C1_buf);
-  size_t C1_len = node::Buffer::Length(C1_buf);
-
-  const uint8_t *p = (const uint8_t *)node::Buffer::Data(p_buf);
-  size_t p_len = node::Buffer::Length(p_buf);
-
-  const uint8_t *q = (const uint8_t *)node::Buffer::Data(q_buf);
-  size_t q_len = node::Buffer::Length(q_buf);
-
-  if (s_prime_len != 32)
-    return Nan::ThrowRangeError("s_prime must be 32 bytes.");
-
-  int result = goo_validate(goo->ctx, s_prime, C1, C1_len, p, p_len, q, q_len);
-
-  return info.GetReturnValue().Set(Nan::New<v8::Boolean>(result));
-}
-
-NAN_METHOD(Goo::Sign) {
-  Goo *goo = ObjectWrap::Unwrap<Goo>(info.Holder());
-
-  if (info.Length() < 4)
-    return Nan::ThrowError("goo.sign() requires arguments.");
-
-  v8::Local<v8::Object> msg_buf = info[0].As<v8::Object>();
-
-  if (!node::Buffer::HasInstance(msg_buf))
-    return Nan::ThrowTypeError("First argument must be a buffer.");
-
-  v8::Local<v8::Value> s_prime_buf = info[1].As<v8::Object>();
-
-  if (!node::Buffer::HasInstance(s_prime_buf))
-    return Nan::ThrowTypeError("Second argument must be a buffer.");
-
-  v8::Local<v8::Value> p_buf = info[2].As<v8::Object>();
-
-  if (!node::Buffer::HasInstance(p_buf))
-    return Nan::ThrowTypeError("Third argument must be a buffer.");
-
-  v8::Local<v8::Value> q_buf = info[3].As<v8::Object>();
-
-  if (!node::Buffer::HasInstance(q_buf))
-    return Nan::ThrowTypeError("Fourth argument must be a buffer.");
-
-  const uint8_t *msg = (const uint8_t *)node::Buffer::Data(msg_buf);
-  size_t msg_len = node::Buffer::Length(msg_buf);
-
-  const uint8_t *s_prime = (const uint8_t *)node::Buffer::Data(s_prime_buf);
-  size_t s_prime_len = node::Buffer::Length(s_prime_buf);
-
-  const uint8_t *p = (const uint8_t *)node::Buffer::Data(p_buf);
-  size_t p_len = node::Buffer::Length(p_buf);
-
-  const uint8_t *q = (const uint8_t *)node::Buffer::Data(q_buf);
-  size_t q_len = node::Buffer::Length(q_buf);
-
-  unsigned char *sig;
-  size_t sig_len;
-
-  if (s_prime_len != 32)
-    return Nan::ThrowRangeError("s_prime must be 32 bytes.");
-
-  if (!goo_sign(goo->ctx, &sig, &sig_len,
-                msg, msg_len, s_prime,
-                p, p_len, q, q_len)) {
-    return Nan::ThrowError("Could create signature.");
-  }
-
-  info.GetReturnValue().Set(
-    Nan::NewBuffer((char *)sig, sig_len).ToLocalChecked());
-}
-
-NAN_METHOD(Goo::Verify) {
-  Goo *goo = ObjectWrap::Unwrap<Goo>(info.Holder());
-
-  if (info.Length() < 3)
-    return Nan::ThrowError("goo.verify() requires arguments.");
-
-  v8::Local<v8::Object> msg_buf = info[0].As<v8::Object>();
-
-  if (!node::Buffer::HasInstance(msg_buf))
-    return Nan::ThrowTypeError("First argument must be a buffer.");
-
-  v8::Local<v8::Value> sig_buf = info[1].As<v8::Object>();
-
-  if (!node::Buffer::HasInstance(sig_buf))
-    return Nan::ThrowTypeError("Second argument must be a buffer.");
-
-  v8::Local<v8::Value> C1_buf = info[2].As<v8::Object>();
-
-  if (!node::Buffer::HasInstance(C1_buf))
-    return Nan::ThrowTypeError("Third argument must be a buffer.");
-
-  const uint8_t *msg = (const uint8_t *)node::Buffer::Data(msg_buf);
-  size_t msg_len = node::Buffer::Length(msg_buf);
-
-  const uint8_t *sig = (const uint8_t *)node::Buffer::Data(sig_buf);
-  size_t sig_len = node::Buffer::Length(sig_buf);
-
-  const uint8_t *C1 = (const uint8_t *)node::Buffer::Data(C1_buf);
-  size_t C1_len = node::Buffer::Length(C1_buf);
-
-  int result = goo_verify(goo->ctx, msg, msg_len, sig, sig_len, C1, C1_len);
-
-  return info.GetReturnValue().Set(Nan::New<v8::Boolean>(result));
-}
-
-NAN_METHOD(Goo::Encrypt) {
-  if (info.Length() < 4)
-    return Nan::ThrowError("goo.encrypt() requires arguments.");
-
-  v8::Local<v8::Object> msg_buf = info[0].As<v8::Object>();
-
-  if (!node::Buffer::HasInstance(msg_buf))
-    return Nan::ThrowTypeError("First argument must be a buffer.");
-
-  v8::Local<v8::Value> n_buf = info[1].As<v8::Object>();
-
-  if (!node::Buffer::HasInstance(n_buf))
-    return Nan::ThrowTypeError("Second argument must be a buffer.");
-
-  v8::Local<v8::Value> e_buf = info[2].As<v8::Object>();
-
-  if (!node::Buffer::HasInstance(e_buf))
-    return Nan::ThrowTypeError("Third argument must be a buffer.");
-
-  v8::Local<v8::Value> entropy_buf = info[3].As<v8::Object>();
-
-  if (!node::Buffer::HasInstance(entropy_buf))
-    return Nan::ThrowTypeError("Fourth argument must be a buffer.");
-
-  const uint8_t *msg = (const uint8_t *)node::Buffer::Data(msg_buf);
-  size_t msg_len = node::Buffer::Length(msg_buf);
-
-  const uint8_t *n = (const uint8_t *)node::Buffer::Data(n_buf);
-  size_t n_len = node::Buffer::Length(n_buf);
-
-  const uint8_t *e = (const uint8_t *)node::Buffer::Data(e_buf);
-  size_t e_len = node::Buffer::Length(e_buf);
-
-  const uint8_t *entropy = (const uint8_t *)node::Buffer::Data(entropy_buf);
-  size_t entropy_len = node::Buffer::Length(entropy_buf);
-
-  if (entropy_len != 32)
-    return Nan::ThrowRangeError("Entropy must be 32 bytes.");
-
-  unsigned char *out;
+static napi_value
+goosig_challenge(napi_env env, napi_callback_info info) {
+  napi_value argv[3];
+  size_t argc = 3;
+  uint8_t *out;
   size_t out_len;
+  const uint8_t *s_prime, *n;
+  size_t s_prime_len, n_len;
+  goo_ctx_t *goo;
+  napi_value result;
 
-  if (!goo_encrypt(NULL, &out, &out_len, msg, msg_len,
-                   n, n_len, e, e_len, NULL, 0, entropy)) {
-    return Nan::ThrowError("Could create ciphertext.");
-  }
+  CHECK(napi_get_cb_info(env, info, &argc, argv, NULL, NULL) == napi_ok);
+  CHECK(argc == 3);
+  CHECK(napi_get_value_external(env, argv[0], (void **)&goo) == napi_ok);
+  CHECK(napi_get_buffer_info(env, argv[1], (void **)&s_prime,
+                             &s_prime_len) == napi_ok);
+  CHECK(napi_get_buffer_info(env, argv[2], (void **)&n, &n_len) == napi_ok);
 
-  info.GetReturnValue().Set(
-    Nan::NewBuffer((char *)out, out_len).ToLocalChecked());
+  JS_ASSERT(s_prime_len == 32, JS_ERR_SPRIME_SIZE);
+  JS_ASSERT(goo_challenge(goo, &out, &out_len, s_prime, n, n_len),
+            JS_ERR_CHALLENGE);
+
+  CHECK(create_external_buffer(env, out_len, out, &result) == napi_ok);
+
+  return result;
 }
 
-NAN_METHOD(Goo::Decrypt) {
-  if (info.Length() < 5)
-    return Nan::ThrowError("goo.decrypt() requires arguments.");
+static napi_value
+goosig_validate(napi_env env, napi_callback_info info) {
+  napi_value argv[5];
+  size_t argc = 5;
+  const uint8_t *s_prime, *C1, *p, *q;
+  size_t s_prime_len, C1_len, p_len, q_len;
+  goo_ctx_t *goo;
+  napi_value result;
+  int ok;
 
-  v8::Local<v8::Object> msg_buf = info[0].As<v8::Object>();
+  CHECK(napi_get_cb_info(env, info, &argc, argv, NULL, NULL) == napi_ok);
+  CHECK(argc == 5);
+  CHECK(napi_get_value_external(env, argv[0], (void **)&goo) == napi_ok);
+  CHECK(napi_get_buffer_info(env, argv[1], (void **)&s_prime,
+                             &s_prime_len) == napi_ok);
+  CHECK(napi_get_buffer_info(env, argv[2], (void **)&C1, &C1_len) == napi_ok);
+  CHECK(napi_get_buffer_info(env, argv[3], (void **)&p, &p_len) == napi_ok);
+  CHECK(napi_get_buffer_info(env, argv[4], (void **)&q, &q_len) == napi_ok);
 
-  if (!node::Buffer::HasInstance(msg_buf))
-    return Nan::ThrowTypeError("First argument must be a buffer.");
+  JS_ASSERT(s_prime_len == 32, JS_ERR_SPRIME_SIZE);
 
-  v8::Local<v8::Value> p_buf = info[1].As<v8::Object>();
+  ok = goo_validate(goo, s_prime, C1, C1_len, p, p_len, q, q_len);
 
-  if (!node::Buffer::HasInstance(p_buf))
-    return Nan::ThrowTypeError("Second argument must be a buffer.");
+  CHECK(napi_get_boolean(env, ok, &result) == napi_ok);
 
-  v8::Local<v8::Value> q_buf = info[2].As<v8::Object>();
+  return result;
+}
 
-  if (!node::Buffer::HasInstance(q_buf))
-    return Nan::ThrowTypeError("Third argument must be a buffer.");
-
-  v8::Local<v8::Value> e_buf = info[3].As<v8::Object>();
-
-  if (!node::Buffer::HasInstance(e_buf))
-    return Nan::ThrowTypeError("Fourth argument must be a buffer.");
-
-  v8::Local<v8::Value> entropy_buf = info[4].As<v8::Object>();
-
-  if (!node::Buffer::HasInstance(entropy_buf))
-    return Nan::ThrowTypeError("Fifth argument must be a buffer.");
-
-  const uint8_t *msg = (const uint8_t *)node::Buffer::Data(msg_buf);
-  size_t msg_len = node::Buffer::Length(msg_buf);
-
-  const uint8_t *p = (const uint8_t *)node::Buffer::Data(p_buf);
-  size_t p_len = node::Buffer::Length(p_buf);
-
-  const uint8_t *q = (const uint8_t *)node::Buffer::Data(q_buf);
-  size_t q_len = node::Buffer::Length(q_buf);
-
-  const uint8_t *e = (const uint8_t *)node::Buffer::Data(e_buf);
-  size_t e_len = node::Buffer::Length(e_buf);
-
-  const uint8_t *entropy = (const uint8_t *)node::Buffer::Data(entropy_buf);
-  size_t entropy_len = node::Buffer::Length(entropy_buf);
-
-  if (entropy_len != 32)
-    return Nan::ThrowRangeError("Entropy must be 32 bytes.");
-
-  unsigned char *out;
+static napi_value
+goosig_sign(napi_env env, napi_callback_info info) {
+  napi_value argv[5];
+  size_t argc = 5;
+  uint8_t *out;
   size_t out_len;
+  const uint8_t *msg, *s_prime, *p, *q;
+  size_t msg_len, s_prime_len, p_len, q_len;
+  goo_ctx_t *goo;
+  napi_value result;
+  int ok;
 
-  if (!goo_decrypt(NULL, &out, &out_len, msg, msg_len, p, p_len,
-                   q, q_len, e, e_len, NULL, 0, entropy)) {
-    return Nan::ThrowError("Could decrypt ciphertext.");
+  CHECK(napi_get_cb_info(env, info, &argc, argv, NULL, NULL) == napi_ok);
+  CHECK(argc == 5);
+  CHECK(napi_get_value_external(env, argv[0], (void **)&goo) == napi_ok);
+  CHECK(napi_get_buffer_info(env, argv[1], (void **)&msg, &msg_len) == napi_ok);
+  CHECK(napi_get_buffer_info(env, argv[2], (void **)&s_prime,
+                             &s_prime_len) == napi_ok);
+  CHECK(napi_get_buffer_info(env, argv[3], (void **)&p, &p_len) == napi_ok);
+  CHECK(napi_get_buffer_info(env, argv[4], (void **)&q, &q_len) == napi_ok);
+
+  JS_ASSERT(s_prime_len == 32, JS_ERR_SPRIME_SIZE);
+
+  ok = goo_sign(goo, &out, &out_len, msg, msg_len, s_prime, p, p_len, q, q_len);
+
+  JS_ASSERT(ok, JS_ERR_SIGN);
+
+  CHECK(create_external_buffer(env, out_len, out, &result) == napi_ok);
+
+  return result;
+}
+
+static napi_value
+goosig_verify(napi_env env, napi_callback_info info) {
+  napi_value argv[4];
+  size_t argc = 4;
+  const uint8_t *msg, *sig, *C1;
+  size_t msg_len, sig_len, C1_len;
+  goo_ctx_t *goo;
+  napi_value result;
+  int ok;
+
+  CHECK(napi_get_cb_info(env, info, &argc, argv, NULL, NULL) == napi_ok);
+  CHECK(argc == 4);
+  CHECK(napi_get_value_external(env, argv[0], (void **)&goo) == napi_ok);
+  CHECK(napi_get_buffer_info(env, argv[1], (void **)&msg,
+                             &msg_len) == napi_ok);
+  CHECK(napi_get_buffer_info(env, argv[2], (void **)&sig, &sig_len) == napi_ok);
+  CHECK(napi_get_buffer_info(env, argv[3], (void **)&C1, &C1_len) == napi_ok);
+
+  ok = goo_verify(goo, msg, msg_len, sig, sig_len, C1, C1_len);
+
+  CHECK(napi_get_boolean(env, ok, &result) == napi_ok);
+
+  return result;
+}
+
+/*
+ * Module
+ */
+
+napi_value
+goosig_init(napi_env env, napi_value exports) {
+  size_t i;
+
+  static struct {
+    const char *name;
+    napi_callback callback;
+  } funcs[] = {
+    { "goosig_create", goosig_create },
+    { "goosig_generate", goosig_generate },
+    { "goosig_challenge", goosig_challenge },
+    { "goosig_validate", goosig_validate },
+    { "goosig_sign", goosig_sign },
+    { "goosig_verify", goosig_verify }
+  };
+
+  for (i = 0; i < sizeof(funcs) / sizeof(funcs[0]); i++) {
+    const char *name = funcs[i].name;
+    napi_callback callback = funcs[i].callback;
+    napi_value fn;
+
+    CHECK(napi_create_function(env,
+                               name,
+                               NAPI_AUTO_LENGTH,
+                               callback,
+                               NULL,
+                               &fn) == napi_ok);
+
+    CHECK(napi_set_named_property(env, exports, name, fn) == napi_ok);
   }
 
-  info.GetReturnValue().Set(
-    Nan::NewBuffer((char *)out, out_len).ToLocalChecked());
+  return exports;
 }
 
-NAN_MODULE_INIT(init) {
-  Goo::Init(target);
-}
-
-#if NODE_MAJOR_VERSION >= 10
-NAN_MODULE_WORKER_ENABLED(goo, init)
-#else
-NODE_MODULE(goo, init)
-#endif
+NAPI_MODULE(NODE_GYP_MODULE_NAME, goosig_init)

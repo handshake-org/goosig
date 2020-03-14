@@ -20,13 +20,6 @@
       "-Wshadow",
       "-Wno-long-long"
     ],
-    "cflags_cc+": [
-      "-std=c++0x",
-      "-Wno-cast-function-type"
-    ],
-    "include_dirs": [
-      "<!(node -e \"require('nan')\")"
-    ],
     "variables": {
       "conditions": [
         ["OS=='win'", {
