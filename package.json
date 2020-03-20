@@ -1,6 +1,6 @@
 {
   "name": "goosig",
-  "version": "0.6.1",
+  "version": "0.7.0",
   "description": "Group of unknown order signatures",
   "keywords": [
     "crypto",
