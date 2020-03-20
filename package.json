@@ -21,7 +21,7 @@
     "test": "bmocha -S 'test/*-test.js'"
   },
   "dependencies": {
-    "bcrypto": "~5.0.0",
+    "bcrypto": "~5.1.0",
     "bsert": "~0.0.10",
     "loady": "~0.0.1"
   },
