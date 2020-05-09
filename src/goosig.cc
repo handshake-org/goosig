@@ -12,13 +12,9 @@
 #include <node_api.h>
 #include "goo/goo.h"
 
-#define CHECK(expr) do {                               \
-  if (!(expr)) {                                       \
-    fprintf(stderr, "%s:%d: Assertion `%s' failed.\n", \
-            __FILE__, __LINE__, #expr);                \
-    fflush(stderr);                                    \
-    abort();                                           \
-  }                                                    \
+#define CHECK(expr) do {                           \
+  if (!(expr))                                     \
+    goosig_assert_fail(__FILE__, __LINE__, #expr); \
 } while (0)
 
 #define JS_THROW(msg) do {                              \
@@ -36,24 +32,14 @@
 #define JS_ERR_SIGN "Could not sign."
 
 /*
- * N-API Extras
+ * Assertions
  */
 
 static void
-finalize_buffer(napi_env env, void *data, void *hint) {
-  if (data != NULL)
-    free(data);
-}
-
-static napi_status
-create_external_buffer(napi_env env, size_t length,
-                       void *data, napi_value *result) {
-  return napi_create_external_buffer(env,
-                                     length,
-                                     data,
-                                     finalize_buffer,
-                                     NULL,
-                                     result);
+goosig_assert_fail(const char *file, int line, const char *expr) {
+  fprintf(stderr, "%s:%d: Assertion `%s' failed.\n", file, line, expr);
+  fflush(stderr);
+  abort();
 }
 
 /*
@@ -140,7 +126,9 @@ goosig_challenge(napi_env env, napi_callback_info info) {
   JS_ASSERT(goo_challenge(goo, &out, &out_len, s_prime, n, n_len),
             JS_ERR_CHALLENGE);
 
-  CHECK(create_external_buffer(env, out_len, out, &result) == napi_ok);
+  CHECK(napi_create_buffer_copy(env, out_len, out, NULL, &result) == napi_ok);
+
+  free(out);
 
   return result;
 }
@@ -200,7 +188,9 @@ goosig_sign(napi_env env, napi_callback_info info) {
 
   JS_ASSERT(ok, JS_ERR_SIGN);
 
-  CHECK(create_external_buffer(env, out_len, out, &result) == napi_ok);
+  CHECK(napi_create_buffer_copy(env, out_len, out, NULL, &result) == napi_ok);
+
+  free(out);
 
   return result;
 }
