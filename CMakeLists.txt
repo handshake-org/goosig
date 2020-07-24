@@ -12,6 +12,8 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_C_EXTENSIONS OFF)
 set(CMAKE_C_STANDARD 99)
 
+option(GOO_ENABLE_GMP "Use gmp if available" ON)
+
 set(goo_sources src/goo/drbg.c
                 src/goo/goo.c
                 src/goo/hmac.c
@@ -37,7 +39,7 @@ endif()
 
 check_library_exists(gmp __gmpz_jacobi "" HAS_GMP)
 
-if(HAS_GMP)
+if(GOO_ENABLE_GMP AND HAS_GMP)
   list(APPEND goo_defines GOO_HAS_GMP)
   list(APPEND goo_libs gmp)
 else()
