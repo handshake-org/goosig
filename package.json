@@ -16,14 +16,14 @@
   "author": "Christopher Jeffrey <chjjeffrey@gmail.com>",
   "main": "./lib/goosig.js",
   "scripts": {
-    "install": "node-gyp rebuild",
+    "install": "cmake-node rebuild --production --fallback",
     "lint": "eslint ./{bench,etc,lib{,/js,/native,/internal},scripts,test{,/util}}/*.js || exit 0",
     "test": "bmocha -S 'test/*-test.js'"
   },
   "dependencies": {
     "bcrypto": "~5.2.0",
     "bsert": "~0.0.10",
-    "loady": "~0.0.1"
+    "cmake-node": "~0.0.16"
   },
   "devDependencies": {
     "bmocha": "^2.1.4"
