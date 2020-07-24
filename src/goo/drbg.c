@@ -8,10 +8,10 @@
  *   https://csrc.nist.gov/publications/detail/sp/800-90a/archive/2012-01-23
  */
 
-#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 #include "drbg.h"
+#include "util.h"
 
 static const unsigned char ZERO[1] = {0x00};
 static const unsigned char ONE[1] = {0x01};
@@ -21,8 +21,8 @@ goo_drbg_update(goo_drbg_t *drbg, const unsigned char *seed, size_t seed_len);
 
 void
 goo_drbg_init(goo_drbg_t *drbg, const unsigned char *seed, size_t seed_len) {
-  assert(seed != NULL);
-  assert(seed_len >= 24);
+  ASSERT(seed != NULL);
+  ASSERT(seed_len >= 24);
 
   memset(drbg->K, 0x00, GOO_SHA256_HASH_SIZE);
   memset(drbg->V, 0x01, GOO_SHA256_HASH_SIZE);
@@ -79,8 +79,8 @@ goo_drbg_generate(goo_drbg_t *drbg, void *out, size_t len) {
     left -= outlen;
   }
 
-  assert(pos == len);
-  assert(left == 0);
+  ASSERT(pos == len);
+  ASSERT(left == 0);
 
   goo_drbg_update(drbg, NULL, 0);
 }

@@ -49,6 +49,10 @@ goosig_assert_fail(const char *file, int line, const char *expr) {
 static void
 goosig_destroy(napi_env env, void *data, void *hint) {
   goo_ctx_t *goo = (goo_ctx_t *)data;
+
+  (void)env;
+  (void)hint;
+
   goo_destroy(goo);
 }
 
@@ -224,20 +228,28 @@ goosig_verify(napi_env env, napi_callback_info info) {
  * Module
  */
 
-napi_value
-goosig_init(napi_env env, napi_value exports) {
+#ifndef NAPI_MODULE_INIT
+#define NAPI_MODULE_INIT()                                       \
+static napi_value goosig_init(napi_env env, napi_value exports); \
+NAPI_MODULE(NODE_GYP_MODULE_NAME, bcrypto_init)                  \
+static napi_value goosig_init(napi_env env, napi_value exports)
+#endif
+
+NAPI_MODULE_INIT() {
   size_t i;
 
-  static struct {
+  static const struct {
     const char *name;
     napi_callback callback;
   } funcs[] = {
-    { "goosig_create", goosig_create },
-    { "goosig_generate", goosig_generate },
-    { "goosig_challenge", goosig_challenge },
-    { "goosig_validate", goosig_validate },
-    { "goosig_sign", goosig_sign },
-    { "goosig_verify", goosig_verify }
+#define F(name) { #name, name }
+    F(goosig_create),
+    F(goosig_generate),
+    F(goosig_challenge),
+    F(goosig_validate),
+    F(goosig_sign),
+    F(goosig_verify)
+#undef F
   };
 
   for (i = 0; i < sizeof(funcs) / sizeof(funcs[0]); i++) {
@@ -257,5 +269,3 @@ goosig_init(napi_env env, napi_value exports) {
 
   return exports;
 }
-
-NAPI_MODULE(NODE_GYP_MODULE_NAME, goosig_init)

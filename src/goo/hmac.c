@@ -4,17 +4,17 @@
  * https://github.com/handshake-org/goosig
  */
 
-#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 #include "hmac.h"
+#include "util.h"
 
 void
 goo_hmac_init(goo_hmac_t *hmac, const unsigned char *key, size_t len) {
   unsigned char pad[GOO_SHA256_BLOCK_SIZE];
   size_t i;
 
-  assert(len <= GOO_SHA256_BLOCK_SIZE);
+  ASSERT(len <= GOO_SHA256_BLOCK_SIZE);
 
   for (i = 0; i < len; i++)
     pad[i] = key[i] ^ 0x36;

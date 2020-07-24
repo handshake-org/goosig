@@ -1,5 +1,5 @@
 /*!
- * goo.c - groups of unknown order for C89
+ * internal.h - internal defs for libgoo
  * Copyright (c) 2018-2019, Christopher Jeffrey (MIT License).
  * https://github.com/handshake-org/goosig
  */

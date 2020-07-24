@@ -29,7 +29,6 @@
  *   https://github.com/indutny/miller-rabin/blob/master/lib/mr.js
  */
 
-#include <assert.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdint.h>
@@ -43,6 +42,7 @@
 #include "internal.h"
 #include "goo.h"
 #include "primes.h"
+#include "util.h"
 
 /*
  * Allocator
@@ -322,9 +322,9 @@ goo_mpz_cleanse(mpz_t n) {
   mpz_limbs_finish(n, 0);
 
   /* Sanity checks. */
-  assert(limbs == orig);
-  assert(mpz_limbs_read(n) == orig);
-  assert(mpz_sgn(n) == 0);
+  ASSERT(limbs == orig);
+  ASSERT(mpz_limbs_read(n) == orig);
+  ASSERT(mpz_sgn(n) == 0);
 #else
   /* Using the internal API. */
   mpz_ptr x = n;
@@ -488,7 +488,7 @@ goo_prng_random_int(goo_prng_t *prng, mpz_t ret, const mpz_t max) {
   /* bits = ceil(log2(ret)) */
   bits = goo_mpz_bitlen(ret);
 
-  assert(bits > 0);
+  ASSERT(bits > 0);
 
   /* while ret >= max */
   while (mpz_cmp(ret, max) >= 0)
@@ -540,7 +540,7 @@ goo_isqrt(unsigned long x) {
   a = 1 << ((len >> 1) + 1);
 
   for (;;) {
-    assert(a != 0);
+    ASSERT(a != 0);
 
     b = x / a;
     b += a;
@@ -1245,7 +1245,7 @@ goo_sig_export(unsigned char *out, const goo_sig_t *sig, size_t bits) {
 
   out[pos++] = mpz_sgn(sig->Eq) < 0 ? 1 : 0;
 
-  assert(goo_sig_size(sig, bits) == pos);
+  ASSERT(goo_sig_size(sig, bits) == pos);
 
   return 1;
 }
@@ -1294,7 +1294,7 @@ goo_sig_import(goo_sig_t *sig,
 
   sign = data[pos++];
 
-  assert(pos == data_len);
+  ASSERT(pos == data_len);
 
   if (sign > 1) {
     /* Non-minimal serialization. */
@@ -1331,8 +1331,8 @@ combspec_size(unsigned long bits) {
 
       shifts = bpw / aps;
 
-      assert(shifts != 0);
-      assert(aps != 0);
+      ASSERT(shifts != 0);
+      ASSERT(aps != 0);
 
       ops1 = shifts * (aps + 1) - 1;
       ops2 = aps * (shifts + 1) - 1;
@@ -1357,7 +1357,7 @@ combspec_generate(goo_combspec_t **specs,
   unsigned long size = ((1 << ppa) - 1) * aps;
   goo_combspec_t *best;
 
-  assert((size_t)ops < specs_len);
+  ASSERT((size_t)ops < specs_len);
 
   if (specs[ops] == NULL) {
     specs[ops] = goo_malloc(sizeof(goo_combspec_t));
@@ -1404,8 +1404,8 @@ goo_combspec_init(goo_combspec_t *out,
 
       shifts = bpw / aps;
 
-      assert(shifts != 0);
-      assert(aps != 0);
+      ASSERT(shifts != 0);
+      ASSERT(aps != 0);
 
       combspec_generate(specs, specs_len, shifts, aps, ppa, bpw);
       combspec_generate(specs, specs_len, aps, shifts, ppa, bpw);
@@ -1468,7 +1468,7 @@ goo_comb_init(goo_comb_t *comb,
   unsigned long i, j, skip;
   mpz_t *items, exp;
 
-  assert((size_t)spec->points_per_add <= sizeof(unsigned long) * 8);
+  ASSERT((size_t)spec->points_per_add <= sizeof(unsigned long) * 8);
 
   mpz_init(exp);
 
@@ -2023,7 +2023,7 @@ goo_group_wnaf(goo_group_t *group,
     mpz_tdiv_q_2exp(e, e, 1);
   }
 
-  assert(mpz_sgn(e) == 0);
+  ASSERT(mpz_sgn(e) == 0);
 
   mpz_clear(e);
 }
@@ -2551,14 +2551,14 @@ goo_group_sign(goo_group_t *group,
     goto fail;
   }
 
-  assert(mpz_sgn(w) > 0);
+  ASSERT(mpz_sgn(w) > 0);
 
   /* a = (w^2 - t) / n */
   mpz_mul(a, w, w);
   mpz_sub(a, a, *t);
   mpz_fdiv_q(a, a, n);
 
-  assert(mpz_sgn(a) >= 0);
+  ASSERT(mpz_sgn(a) >= 0);
 
   /* `w` and `a` must satisfy `w^2 = t + a * n`. */
   mpz_mul(t1, a, n);
@@ -2756,7 +2756,7 @@ goo_group_sign(goo_group_t *group,
   mpz_sub(*Eq, *z_w2, *z_an);
   mpz_fdiv_q(*Eq, *Eq, *ell);
 
-  assert(goo_mpz_bitlen(*Eq) <= GOO_EXP_BITS);
+  ASSERT(goo_mpz_bitlen(*Eq) <= GOO_EXP_BITS);
 
   /* Compute `z' = (z mod ell)`. */
   mpz_mod(*z_w, *z_w, *ell);
@@ -3081,7 +3081,7 @@ goo_veil(mpz_t v,
   mpz_sub_ui(rmax, rmax, 1);
   mpz_fdiv_q(rmax, rmax, n);
 
-  assert(mpz_sgn(rmax) > 0);
+  ASSERT(mpz_sgn(rmax) > 0);
 
   mpz_set(v0, vmax);
 
@@ -3095,8 +3095,8 @@ goo_veil(mpz_t v,
 
   mpz_mod(r0, v0, n);
 
-  assert(mpz_cmp(r0, c) == 0);
-  assert(goo_mpz_bitlen(v0) <= bits);
+  ASSERT(mpz_cmp(r0, c) == 0);
+  ASSERT(goo_mpz_bitlen(v0) <= bits);
 
   mpz_set(v, v0);
 
