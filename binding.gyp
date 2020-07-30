@@ -55,7 +55,12 @@
         ["with_gmp == 'true'", {
           "defines": [
             "GOO_HAS_GMP"
-          ]
+          ],
+          "direct_dependent_settings": {
+            "libraries": [
+              "-lgmp"
+            ]
+          }
         }, {
           "sources": [
             "./src/goo/mini-gmp.c"
@@ -99,11 +104,6 @@
           "xcode_settings": {
             "GCC_C_LANGUAGE_STANDARD": "c99"
           }
-        }],
-        ["with_gmp == 'true'", {
-          "libraries": [
-            "-lgmp"
-          ]
         }]
       ]
     }
