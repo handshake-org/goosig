@@ -37,9 +37,9 @@ else()
                          -Wshadow)
 endif()
 
-check_library_exists(gmp __gmpz_jacobi "" HAS_GMP)
+check_library_exists(gmp __gmpz_jacobi "" GOO_HAS_GMP)
 
-if(GOO_ENABLE_GMP AND HAS_GMP)
+if(GOO_ENABLE_GMP AND GOO_HAS_GMP)
   list(APPEND goo_defines GOO_HAS_GMP)
   list(APPEND goo_libs gmp)
 else()
