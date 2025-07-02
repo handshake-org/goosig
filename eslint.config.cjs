@@ -15,17 +15,6 @@ module.exports = [
   },
   {
     files: [
-      'bin/cli',
-      'bin/hsd',
-      'bin/node',
-      'bin/hs-seeder',
-      'bin/node',
-      'bin/_seeder',
-      'bin/spvnode',
-      'bin/wallet',
-      'bin/hsd-cli',
-      'bin/hsw-cli',
-      'etc/genesis',
       '**/*.js',
       '*.js'
     ],
@@ -43,8 +32,7 @@ module.exports = [
     },
     rules: {
       'max-len': 'off',
-      'prefer-arrow-callback': 'off',
-      'no-return-assign': 'off'
+      'prefer-arrow-callback': 'off'
     }
   }
 ];
